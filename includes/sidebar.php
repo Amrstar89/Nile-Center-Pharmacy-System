@@ -2,16 +2,25 @@
 // Get current page filename
 $current_page = basename($_SERVER['PHP_SELF']);
 $current_dir = basename(dirname($_SERVER['PHP_SELF']));
+$current_module = basename(dirname(dirname($_SERVER['PHP_SELF'])));
 
 // Determine paths based on current directory
 if ($current_dir === 'admin') {
     // We are in admin folder
     $modules_path = '../modules/customer-requests/';
+    $products_path = '../modules/products/';
     $admin_path = '';
     $root_path = '../';
+} elseif ($current_module === 'products') {
+    // We are in modules/products/
+    $modules_path = '../customer-requests/';
+    $products_path = '';
+    $admin_path = '../../admin/';
+    $root_path = '../../';
 } else {
     // We are in modules/customer-requests/
     $modules_path = '';
+    $products_path = '../products/';
     $admin_path = '../../admin/';
     $root_path = '../../';
 }
@@ -25,7 +34,7 @@ if ($current_dir === 'admin') {
     <div class="nav-menu">
         <!-- Main Pages -->
         <div class="nav-item">
-            <a href="<?= $modules_path ?>index.php" class="nav-link <?= $current_page === 'index.php' ? 'active' : '' ?>">
+            <a href="<?= $modules_path ?>index.php" class="nav-link <?= $current_page === 'index.php' && $current_module !== 'products' ? 'active' : '' ?>">
                 <i class="bi bi-speedometer2"></i> الرئيسية
             </a>
         </div>
@@ -55,11 +64,22 @@ if ($current_dir === 'admin') {
             </a>
         </div>
 
+        <!-- Products Module -->
+        <div class="sidebar-heading">كارت الأصناف</div>
+        <div class="nav-item">
+            <a href="<?= $products_path ?>index.php" class="nav-link <?= $current_module === 'products' && $current_page === 'index.php' ? 'active' : '' ?>">
+                <i class="bi bi-boxes"></i> قائمة الأصناف
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="<?= $products_path ?>create.php" class="nav-link <?= $current_page === 'create.php' && $current_module === 'products' ? 'active' : '' ?>">
+                <i class="bi bi-plus-square"></i> إضافة صنف جديد
+            </a>
+        </div>
 
         <?php if (isAdmin()): ?>
         <!-- Admin Pages -->
-        <!-- قسم الإدارة -->
-<div class="sidebar-heading">الإدارة</div>
+        <div class="sidebar-heading">الإدارة</div>
         <div class="nav-item">
             <a href="<?= $modules_path ?>status-manager.php" class="nav-link <?= $current_page === 'status-manager.php' ? 'active' : '' ?>">
                 <i class="bi bi-sliders"></i> إدارة الحالات
@@ -90,13 +110,13 @@ if ($current_dir === 'admin') {
                 <i class="bi bi-clock"></i> أوقات التوفير
             </a>
         </div>
-<div class="nav-item">
-    <a href="<?= $admin_path ?>products.php" class="nav-link <?= $current_page === 'products.php' ? 'active' : '' ?>">
-        <i class="bi bi-box-seam"></i> إدارة الأصناف
-    </a>
-</div>
+        <div class="nav-item">
+            <a href="<?= $admin_path ?>products.php" class="nav-link <?= $current_page === 'products.php' ? 'active' : '' ?>">
+                <i class="bi bi-box-seam"></i> إدارة الأصناف
+            </a>
+        </div>
         <?php endif; ?>
-        
+
         <!-- Logout -->
         <div class="nav-item mt-4">
             <a href="<?= $root_path ?>index.php?logout=1" class="nav-link text-danger">
