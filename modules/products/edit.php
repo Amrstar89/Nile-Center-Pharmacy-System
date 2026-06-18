@@ -1,18 +1,15 @@
 <?php
-require_once '../../core/init.php';
-require_once '../../includes/header.php';
-require_once '../../includes/sidebar.php';
+require_once __DIR__ . '/../../core/config.php';
+require_once __DIR__ . '/../../core/auth.php';
+requireAuth();
 
-// Check permissions
-if (!hasPermission('products.edit')) {
-    redirect('view.php?id=' . ($_GET['id'] ?? 0));
-}
+$db = getDB();
 
 // Get product ID
 $product_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if (!$product_id) {
-    setFlashMessage('error', 'معرف الصنف غير صحيح');
-    redirect('index.php');
+    header("Location: index.php");
+    exit;
 }
 
 // Get product data
@@ -31,8 +28,8 @@ $stmt->execute([$product_id]);
 $product = $stmt->fetch();
 
 if (!$product) {
-    setFlashMessage('error', 'الصنف غير موجود');
-    redirect('index.php');
+    header("Location: index.php");
+    exit;
 }
 
 // Get lookup data
@@ -219,49 +216,170 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Log activity
-        logActivity('update', 'products', $product_id, 
-            json_encode(['old' => ['sell_price' => $old_sell, 'cost_price' => $old_cost]]),
-            json_encode(['new' => ['sell_price' => $new_sell, 'cost_price' => $new_cost]])
-        );
-
         $db->commit();
 
-        setFlashMessage('success', 'تم تحديث الصنف بنجاح!');
-        redirect('view.php?id=' . $product_id);
+        header("Location: view.php?id=" . $product_id);
+        exit;
 
     } catch (Exception $e) {
         $db->rollBack();
-        setFlashMessage('error', 'حدث خطأ: ' . $e->getMessage());
+        $error = $e->getMessage();
     }
 }
 
 $page_title = 'تعديل صنف: ' . $product['product_name'];
+
+// Include sidebar
+require_once __DIR__ . '/../../includes/sidebar.php';
 ?>
 
-<div class="content-wrapper">
-    <div class="content-header">
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= $page_title ?> - <?= APP_NAME ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #198754;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #0dcaf0;
+        }
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .sidebar {
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 260px;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+        .sidebar-brand {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar-brand h4 {
+            color: white;
+            margin: 0;
+            font-weight: 700;
+        }
+        .sidebar-brand small {
+            color: rgba(255,255,255,0.6);
+        }
+        .nav-menu {
+            padding: 15px 0;
+        }
+        .nav-item {
+            margin: 2px 0;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        .nav-link:hover, .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border-right: 3px solid var(--primary);
+        }
+        .nav-link i {
+            width: 25px;
+            margin-left: 10px;
+            font-size: 18px;
+        }
+        .main-content {
+            margin-right: 260px;
+            padding: 20px;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        .card-header {
+            background: white;
+            border-bottom: 1px solid #eee;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 20px;
+        }
+        .nav-tabs .nav-link {
+            color: #666;
+            border: none;
+            padding: 15px 20px;
+        }
+        .nav-tabs .nav-link.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+            background: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border: none;
+        }
+        .sidebar-heading {
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 15px 20px 5px;
+            font-weight: 600;
+        }
+        .form-label {
+            font-weight: 600;
+            color: #555;
+        }
+        .unit-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .unit-card h6 {
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; position: relative; }
+            .main-content { margin-right: 0; }
+        }
+    </style>
+</head>
+<body>
+    <?= $sidebar ?? '' ?>
+
+    <div class="main-content">
         <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">
-                        <i class="fas fa-edit"></i> <?= $page_title ?>
-                    </h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="../../index.php">الرئيسية</a></li>
-                        <li class="breadcrumb-item"><a href="index.php">كارت الأصناف</a></li>
-                        <li class="breadcrumb-item"><a href="view.php?id=<?= $product_id ?>"><?= htmlspecialchars($product['product_name']) ?></a></li>
-                        <li class="breadcrumb-item active">تعديل</li>
-                    </ol>
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-pencil-square"></i> <?= $page_title ?></h2>
+                <div>
+                    <a href="view.php?id=<?= $product_id ?>" class="btn btn-info">
+                        <i class="bi bi-eye"></i> عرض
+                    </a>
+                    <a href="index.php" class="btn btn-secondary">
+                        <i class="bi bi-arrow-right"></i> العودة
+                    </a>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <section class="content">
-        <div class="container-fluid">
+            <?php if (isset($error)): ?>
+                <div class="alert alert-danger"><?= $error ?></div>
+            <?php endif; ?>
+
             <form method="POST" action="" id="productForm">
 
                 <!-- Tabs Navigation -->
@@ -269,38 +387,38 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                     <div class="card-header p-0">
                         <ul class="nav nav-tabs" id="productTabs" role="tablist">
                             <li class="nav-item">
-                                <a class="nav-link active" id="basic-tab" data-toggle="tab" href="#basic" role="tab">
-                                    <i class="fas fa-info-circle"></i> البيانات الأساسية
+                                <a class="nav-link active" id="basic-tab" data-bs-toggle="tab" href="#basic" role="tab">
+                                    <i class="bi bi-info-circle"></i> البيانات الأساسية
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" id="barcodes-tab" data-toggle="tab" href="#barcodes" role="tab">
-                                    <i class="fas fa-barcode"></i> الباركود
+                                <a class="nav-link" id="barcodes-tab" data-bs-toggle="tab" href="#barcodes" role="tab">
+                                    <i class="bi bi-upc"></i> الباركود
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" id="units-tab" data-toggle="tab" href="#units" role="tab">
-                                    <i class="fas fa-balance-scale"></i> الوحدات
+                                <a class="nav-link" id="units-tab" data-bs-toggle="tab" href="#units" role="tab">
+                                    <i class="bi bi-balance-scale"></i> الوحدات
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" id="pricing-tab" data-toggle="tab" href="#pricing" role="tab">
-                                    <i class="fas fa-tag"></i> التسعير
+                                <a class="nav-link" id="pricing-tab" data-bs-toggle="tab" href="#pricing" role="tab">
+                                    <i class="bi bi-tag"></i> التسعير
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" id="stock-tab" data-toggle="tab" href="#stock" role="tab">
-                                    <i class="fas fa-warehouse"></i> المخزون
+                                <a class="nav-link" id="stock-tab" data-bs-toggle="tab" href="#stock" role="tab">
+                                    <i class="bi bi-warehouse"></i> المخزون
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" id="suppliers-tab" data-toggle="tab" href="#suppliers" role="tab">
-                                    <i class="fas fa-truck"></i> الموردين
+                                <a class="nav-link" id="suppliers-tab" data-bs-toggle="tab" href="#suppliers" role="tab">
+                                    <i class="bi bi-truck"></i> الموردين
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" id="alerts-tab" data-toggle="tab" href="#alerts" role="tab">
-                                    <i class="fas fa-exclamation-triangle"></i> التحذيرات
+                                <a class="nav-link" id="alerts-tab" data-bs-toggle="tab" href="#alerts" role="tab">
+                                    <i class="bi bi-exclamation-triangle"></i> التحذيرات
                                 </a>
                             </li>
                         </ul>
@@ -313,15 +431,15 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                             <div class="tab-pane fade show active" id="basic" role="tabpanel">
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>اسم الصنف <span class="text-danger">*</span></label>
+                                        <div class="mb-3">
+                                            <label class="form-label">اسم الصنف <span class="text-danger">*</span></label>
                                             <input type="text" name="product_name" class="form-control" required 
                                                    value="<?= htmlspecialchars($product['product_name']) ?>">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>اسم الصنف بالإنجليزي</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">اسم الصنف بالإنجليزي</label>
                                             <input type="text" name="product_name_en" class="form-control" 
                                                    value="<?= htmlspecialchars($product['product_name_en'] ?? '') ?>">
                                         </div>
@@ -330,16 +448,16 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
 
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>المادة الفعالة (الاسم العلمي)</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">المادة الفعالة (الاسم العلمي)</label>
                                             <input type="text" name="scientific_name" class="form-control" 
                                                    value="<?= htmlspecialchars($product['scientific_name'] ?? '') ?>">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>نوع الصنف <span class="text-danger">*</span></label>
-                                            <select name="product_type_id" class="form-control" required>
+                                        <div class="mb-3">
+                                            <label class="form-label">نوع الصنف <span class="text-danger">*</span></label>
+                                            <select name="product_type_id" class="form-select" required>
                                                 <?php foreach ($product_types as $type): ?>
                                                     <option value="<?= $type['id'] ?>" <?= $product['product_type_id'] == $type['id'] ? 'selected' : '' ?>>
                                                         <?= $type['type_name_ar'] ?>
@@ -352,9 +470,9 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
 
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>القسم</label>
-                                            <select name="category_id" class="form-control">
+                                        <div class="mb-3">
+                                            <label class="form-label">القسم</label>
+                                            <select name="category_id" class="form-select">
                                                 <option value="">-- اختر القسم --</option>
                                                 <?php foreach ($categories as $cat): ?>
                                                     <option value="<?= $cat['id'] ?>" <?= $product['category_id'] == $cat['id'] ? 'selected' : '' ?>>
@@ -365,9 +483,9 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>الشركة المنتجة</label>
-                                            <select name="company_id" class="form-control">
+                                        <div class="mb-3">
+                                            <label class="form-label">الشركة المنتجة</label>
+                                            <select name="company_id" class="form-select">
                                                 <option value="">-- اختر الشركة --</option>
                                                 <?php foreach ($companies as $comp): ?>
                                                     <option value="<?= $comp['id'] ?>" <?= $product['company_id'] == $comp['id'] ? 'selected' : '' ?>>
@@ -381,8 +499,8 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
 
                                 <div class="row">
                                     <div class="col-md-12">
-                                        <div class="form-group">
-                                            <label>ملاحظات</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">ملاحظات</label>
                                             <textarea name="notes" class="form-control" rows="3"><?= htmlspecialchars($product['notes'] ?? '') ?></textarea>
                                         </div>
                                     </div>
@@ -440,7 +558,7 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                                 <input type="text" name="barcodes[]" class="form-control" placeholder="باركود دولي 1">
                                             </div>
                                             <div class="col-md-3">
-                                                <select name="barcode_units[]" class="form-control">
+                                                <select name="barcode_units[]" class="form-select">
                                                     <option value="1">الوحدة الكبرى</option>
                                                     <option value="2">الوحدة الوسطى</option>
                                                     <option value="3">الوحدة الصغرى</option>
@@ -448,7 +566,7 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                             </div>
                                             <div class="col-md-3">
                                                 <button type="button" class="btn btn-success btn-sm add-barcode">
-                                                    <i class="fas fa-plus"></i> إضافة
+                                                    <i class="bi bi-plus-lg"></i> إضافة
                                                 </button>
                                             </div>
                                         </div>
@@ -459,7 +577,7 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                                     <input type="text" name="barcodes[]" class="form-control" value="<?= htmlspecialchars($barcode['barcode']) ?>">
                                                 </div>
                                                 <div class="col-md-3">
-                                                    <select name="barcode_units[]" class="form-control">
+                                                    <select name="barcode_units[]" class="form-select">
                                                         <option value="1" <?= $barcode['unit_id'] == 1 ? 'selected' : '' ?>>الوحدة الكبرى</option>
                                                         <option value="2" <?= $barcode['unit_id'] == 2 ? 'selected' : '' ?>>الوحدة الوسطى</option>
                                                         <option value="3" <?= $barcode['unit_id'] == 3 ? 'selected' : '' ?>>الوحدة الصغرى</option>
@@ -467,16 +585,16 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                                 </div>
                                                 <div class="col-md-2">
                                                     <?php if ($barcode['is_primary']): ?>
-                                                        <span class="badge badge-primary">رئيسي</span>
+                                                        <span class="badge bg-primary">رئيسي</span>
                                                     <?php endif; ?>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <button type="button" class="btn btn-success btn-sm add-barcode">
-                                                        <i class="fas fa-plus"></i>
+                                                        <i class="bi bi-plus-lg"></i>
                                                     </button>
                                                     <?php if ($index > 0): ?>
                                                         <button type="button" class="btn btn-danger btn-sm remove-row">
-                                                            <i class="fas fa-trash"></i>
+                                                            <i class="bi bi-trash"></i>
                                                         </button>
                                                     <?php endif; ?>
                                                 </div>
@@ -498,91 +616,79 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                             <div class="tab-pane fade" id="units" role="tabpanel">
                                 <div class="row">
                                     <div class="col-md-4">
-                                        <div class="card">
-                                            <div class="card-header bg-primary">
-                                                <h5 class="mb-0 text-white">الوحدة الكبرى</h5>
+                                        <div class="unit-card">
+                                            <h6><i class="bi bi-box"></i> الوحدة الكبرى</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">نوع الوحدة</label>
+                                                <select name="unit1_id" class="form-select">
+                                                    <option value="">-- اختر --</option>
+                                                    <?php foreach ($units as $unit): ?>
+                                                        <option value="<?= $unit['id'] ?>" <?= $product['unit1_id'] == $unit['id'] ? 'selected' : '' ?>>
+                                                            <?= $unit['unit_name_ar'] ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
                                             </div>
-                                            <div class="card-body">
-                                                <div class="form-group">
-                                                    <label>نوع الوحدة</label>
-                                                    <select name="unit1_id" class="form-control">
-                                                        <option value="">-- اختر --</option>
-                                                        <?php foreach ($units as $unit): ?>
-                                                            <option value="<?= $unit['id'] ?>" <?= $product['unit1_id'] == $unit['id'] ? 'selected' : '' ?>>
-                                                                <?= $unit['unit_name_ar'] ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label>سعر البيع</label>
-                                                    <input type="number" name="sell_price" class="form-control" step="0.01" value="<?= $product['sell_price'] ?>">
-                                                </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">سعر البيع</label>
+                                                <input type="number" name="sell_price" class="form-control" step="0.01" value="<?= $product['sell_price'] ?>">
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="card">
-                                            <div class="card-header bg-info">
-                                                <h5 class="mb-0 text-white">الوحدة الوسطى</h5>
+                                        <div class="unit-card">
+                                            <h6><i class="bi bi-box-seam"></i> الوحدة الوسطى</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">نوع الوحدة</label>
+                                                <select name="unit2_id" class="form-select">
+                                                    <option value="">-- اختر --</option>
+                                                    <?php foreach ($units as $unit): ?>
+                                                        <option value="<?= $unit['id'] ?>" <?= $product['unit2_id'] == $unit['id'] ? 'selected' : '' ?>>
+                                                            <?= $unit['unit_name_ar'] ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
                                             </div>
-                                            <div class="card-body">
-                                                <div class="form-group">
-                                                    <label>نوع الوحدة</label>
-                                                    <select name="unit2_id" class="form-control">
-                                                        <option value="">-- اختر --</option>
-                                                        <?php foreach ($units as $unit): ?>
-                                                            <option value="<?= $unit['id'] ?>" <?= $product['unit2_id'] == $unit['id'] ? 'selected' : '' ?>>
-                                                                <?= $unit['unit_name_ar'] ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label>عدد الوحدات</label>
-                                                    <input type="number" name="unit1_to_unit2" class="form-control" value="<?= $product['unit1_to_unit2'] ?>">
-                                                </div>
-                                                <div class="form-group">
-                                                    <label>سعر البيع</label>
-                                                    <input type="number" name="unit2_sell_price" class="form-control" step="0.01" value="<?= $product['unit2_sell_price'] ?>">
-                                                </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">عدد الوحدات</label>
+                                                <input type="number" name="unit1_to_unit2" class="form-control" value="<?= $product['unit1_to_unit2'] ?>">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">سعر البيع</label>
+                                                <input type="number" name="unit2_sell_price" class="form-control" step="0.01" value="<?= $product['unit2_sell_price'] ?>">
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="card">
-                                            <div class="card-header bg-secondary">
-                                                <h5 class="mb-0 text-white">الوحدة الصغرى</h5>
+                                        <div class="unit-card">
+                                            <h6><i class="bi bi-box2"></i> الوحدة الصغرى</h6>
+                                            <div class="mb-3">
+                                                <label class="form-label">نوع الوحدة</label>
+                                                <select name="unit3_id" class="form-select">
+                                                    <option value="">-- اختر --</option>
+                                                    <?php foreach ($units as $unit): ?>
+                                                        <option value="<?= $unit['id'] ?>" <?= $product['unit3_id'] == $unit['id'] ? 'selected' : '' ?>>
+                                                            <?= $unit['unit_name_ar'] ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
                                             </div>
-                                            <div class="card-body">
-                                                <div class="form-group">
-                                                    <label>نوع الوحدة</label>
-                                                    <select name="unit3_id" class="form-control">
-                                                        <option value="">-- اختر --</option>
-                                                        <?php foreach ($units as $unit): ?>
-                                                            <option value="<?= $unit['id'] ?>" <?= $product['unit3_id'] == $unit['id'] ? 'selected' : '' ?>>
-                                                                <?= $unit['unit_name_ar'] ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label>عدد الوحدات</label>
-                                                    <input type="number" name="unit1_to_unit3" class="form-control" value="<?= $product['unit1_to_unit3'] ?>">
-                                                </div>
-                                                <div class="form-group">
-                                                    <label>سعر البيع</label>
-                                                    <input type="number" name="unit3_sell_price" class="form-control" step="0.01" value="<?= $product['unit3_sell_price'] ?>">
-                                                </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">عدد الوحدات</label>
+                                                <input type="number" name="unit1_to_unit3" class="form-control" value="<?= $product['unit1_to_unit3'] ?>">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">سعر البيع</label>
+                                                <input type="number" name="unit3_sell_price" class="form-control" step="0.01" value="<?= $product['unit3_sell_price'] ?>">
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="row mt-3">
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>وحدة البيع الافتراضية</label>
-                                            <select name="default_sale_unit" class="form-control">
+                                        <div class="mb-3">
+                                            <label class="form-label">وحدة البيع الافتراضية</label>
+                                            <select name="default_sale_unit" class="form-select">
                                                 <option value="1" <?= $product['default_sale_unit'] == 1 ? 'selected' : '' ?>>الوحدة الكبرى</option>
                                                 <option value="2" <?= $product['default_sale_unit'] == 2 ? 'selected' : '' ?>>الوحدة الوسطى</option>
                                                 <option value="3" <?= $product['default_sale_unit'] == 3 ? 'selected' : '' ?>>الوحدة الصغرى</option>
@@ -596,44 +702,40 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                             <div class="tab-pane fade" id="pricing" role="tabpanel">
                                 <div class="row">
                                     <div class="col-md-4">
-                                        <div class="form-group">
-                                            <label>سعر التكلفة</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">سعر التكلفة</label>
                                             <input type="number" name="cost_price" class="form-control" step="0.01" value="<?= $product['cost_price'] ?>">
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="form-group">
-                                            <label>سعر البيع (الكبرى)</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">سعر البيع (الكبرى)</label>
                                             <input type="number" name="sell_price" class="form-control" step="0.01" value="<?= $product['sell_price'] ?>">
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="form-group">
-                                            <label>نسبة الربح</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">نسبة الربح</label>
                                             <div class="input-group">
                                                 <input type="number" class="form-control" id="profitPercent" readonly>
-                                                <div class="input-group-append">
-                                                    <span class="input-group-text">%</span>
-                                                </div>
+                                                <span class="input-group-text">%</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>نسبة الخصم العامة</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">نسبة الخصم العامة</label>
                                             <div class="input-group">
                                                 <input type="number" name="max_discount" class="form-control" step="0.01" value="<?= $product['max_discount'] ?>">
-                                                <div class="input-group-append">
-                                                    <span class="input-group-text">%</span>
-                                                </div>
+                                                <span class="input-group-text">%</span>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>سبب تغيير السعر (اختياري)</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">سبب تغيير السعر (اختياري)</label>
                                             <input type="text" name="price_change_reason" class="form-control" placeholder="مثال: تغيير سعر المورد">
                                         </div>
                                     </div>
@@ -652,27 +754,27 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                             <div class="tab-pane fade" id="stock" role="tabpanel">
                                 <div class="row">
                                     <div class="col-md-4">
-                                        <div class="form-group">
-                                            <label>الحد الأقصى للمخزون</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">الحد الأقصى للمخزون</label>
                                             <input type="number" name="max_stock" class="form-control" value="<?= $product['max_stock'] ?>">
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="form-group">
-                                            <label>الحد الأدنى للمخزون</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">الحد الأدنى للمخزون</label>
                                             <input type="number" name="min_stock" class="form-control" value="<?= $product['min_stock'] ?>">
                                         </div>
                                     </div>
                                     <div class="col-md-4">
-                                        <div class="form-group">
-                                            <label>حد الطلب (Reorder Point)</label>
+                                        <div class="mb-3">
+                                            <label class="form-label">حد الطلب (Reorder Point)</label>
                                             <input type="number" name="reorder_point" class="form-control" value="<?= $product['reorder_point'] ?>">
                                         </div>
                                     </div>
                                 </div>
                                 <div class="row">
                                     <div class="col-md-12">
-                                        <h5 class="mt-3"><i class="fas fa-map-marker-alt"></i> مواقع التخزين</h5>
+                                        <h5 class="mt-3"><i class="bi bi-geo-alt"></i> مواقع التخزين</h5>
                                         <div id="locationsContainer">
                                             <?php if (empty($locations)): ?>
                                                 <div class="location-row row mb-2">
@@ -690,7 +792,7 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                                     </div>
                                                     <div class="col-md-2">
                                                         <button type="button" class="btn btn-success btn-sm add-location">
-                                                            <i class="fas fa-plus"></i>
+                                                            <i class="bi bi-plus-lg"></i>
                                                         </button>
                                                     </div>
                                                 </div>
@@ -711,11 +813,11 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                                         </div>
                                                         <div class="col-md-2">
                                                             <button type="button" class="btn btn-success btn-sm add-location">
-                                                                <i class="fas fa-plus"></i>
+                                                                <i class="bi bi-plus-lg"></i>
                                                             </button>
                                                             <?php if ($index > 0): ?>
                                                                 <button type="button" class="btn btn-danger btn-sm remove-row">
-                                                                    <i class="fas fa-trash"></i>
+                                                                    <i class="bi bi-trash"></i>
                                                                 </button>
                                                             <?php endif; ?>
                                                         </div>
@@ -733,7 +835,7 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                     <?php if (empty($supplier_prices)): ?>
                                         <div class="supplier-row row mb-3 border p-3 rounded">
                                             <div class="col-md-3">
-                                                <select name="supplier_ids[]" class="form-control">
+                                                <select name="supplier_ids[]" class="form-select">
                                                     <option value="">-- اختر المورد --</option>
                                                     <?php foreach ($suppliers as $sup): ?>
                                                         <option value="<?= $sup['id'] ?>"><?= $sup['supplier_name'] ?></option>
@@ -753,8 +855,8 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                                 <input type="number" name="supplier_vats[]" class="form-control" step="0.01" placeholder="ضريبة %">
                                             </div>
                                             <div class="col-md-1">
-                                                <button type="button" class="btn btn-success btn-sm btn-block add-supplier">
-                                                    <i class="fas fa-plus"></i>
+                                                <button type="button" class="btn btn-success btn-sm w-100 add-supplier">
+                                                    <i class="bi bi-plus-lg"></i>
                                                 </button>
                                             </div>
                                             <div class="col-md-12 mt-2">
@@ -765,7 +867,7 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                         <?php foreach ($supplier_prices as $index => $sp): ?>
                                             <div class="supplier-row row mb-3 border p-3 rounded">
                                                 <div class="col-md-3">
-                                                    <select name="supplier_ids[]" class="form-control">
+                                                    <select name="supplier_ids[]" class="form-select">
                                                         <option value="">-- اختر المورد --</option>
                                                         <?php foreach ($suppliers as $sup): ?>
                                                             <option value="<?= $sup['id'] ?>" <?= $sp['supplier_id'] == $sup['id'] ? 'selected' : '' ?>>
@@ -787,12 +889,12 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                                     <input type="number" name="supplier_vats[]" class="form-control" step="0.01" value="<?= $sp['vat_percent'] ?>">
                                                 </div>
                                                 <div class="col-md-1">
-                                                    <button type="button" class="btn btn-success btn-sm btn-block add-supplier">
-                                                        <i class="fas fa-plus"></i>
+                                                    <button type="button" class="btn btn-success btn-sm w-100 add-supplier">
+                                                        <i class="bi bi-plus-lg"></i>
                                                     </button>
                                                     <?php if ($index > 0): ?>
-                                                        <button type="button" class="btn btn-danger btn-sm btn-block remove-row mt-1">
-                                                            <i class="fas fa-trash"></i>
+                                                        <button type="button" class="btn btn-danger btn-sm w-100 remove-row mt-1">
+                                                            <i class="bi bi-trash"></i>
                                                         </button>
                                                     <?php endif; ?>
                                                 </div>
@@ -811,7 +913,7 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                     <?php if (empty($alerts)): ?>
                                         <div class="alert-row row mb-2">
                                             <div class="col-md-4">
-                                                <select name="alerts[]" class="form-control">
+                                                <select name="alerts[]" class="form-select">
                                                     <option value="">-- اختر نوع التحذير --</option>
                                                     <option value="HIGH_ALERT">HIGH ALERT</option>
                                                     <option value="TOXIC">TOXIC</option>
@@ -827,7 +929,7 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                             </div>
                                             <div class="col-md-2">
                                                 <button type="button" class="btn btn-success btn-sm add-alert">
-                                                    <i class="fas fa-plus"></i>
+                                                    <i class="bi bi-plus-lg"></i>
                                                 </button>
                                             </div>
                                         </div>
@@ -835,7 +937,7 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                         <?php foreach ($alerts as $index => $alert): ?>
                                             <div class="alert-row row mb-2">
                                                 <div class="col-md-4">
-                                                    <select name="alerts[]" class="form-control">
+                                                    <select name="alerts[]" class="form-select">
                                                         <option value="">-- اختر --</option>
                                                         <option value="HIGH_ALERT" <?= $alert['alert_type'] == 'HIGH_ALERT' ? 'selected' : '' ?>>HIGH ALERT</option>
                                                         <option value="TOXIC" <?= $alert['alert_type'] == 'TOXIC' ? 'selected' : '' ?>>TOXIC</option>
@@ -851,11 +953,11 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
                                                 </div>
                                                 <div class="col-md-2">
                                                     <button type="button" class="btn btn-success btn-sm add-alert">
-                                                        <i class="fas fa-plus"></i>
+                                                        <i class="bi bi-plus-lg"></i>
                                                     </button>
                                                     <?php if ($index > 0): ?>
                                                         <button type="button" class="btn btn-danger btn-sm remove-row">
-                                                            <i class="fas fa-trash"></i>
+                                                            <i class="bi bi-trash"></i>
                                                         </button>
                                                     <?php endif; ?>
                                                 </div>
@@ -870,156 +972,171 @@ $page_title = 'تعديل صنف: ' . $product['product_name'];
 
                     <div class="card-footer">
                         <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-save"></i> حفظ التغييرات
+                            <i class="bi bi-save"></i> حفظ التغييرات
                         </button>
                         <a href="view.php?id=<?= $product_id ?>" class="btn btn-secondary btn-lg">
-                            <i class="fas fa-times"></i> إلغاء
+                            <i class="bi bi-x-lg"></i> إلغاء
                         </a>
                     </div>
                 </div>
 
             </form>
         </div>
-    </section>
-</div>
+    </div>
 
-<script>
-$(document).ready(function() {
-    // Add barcode row
-    $(document).on('click', '.add-barcode', function() {
-        var newRow = `
-            <div class="barcode-row row mb-2">
-                <div class="col-md-4">
-                    <input type="text" name="barcodes[]" class="form-control" placeholder="باركود">
-                </div>
-                <div class="col-md-3">
-                    <select name="barcode_units[]" class="form-control">
-                        <option value="1">الوحدة الكبرى</option>
-                        <option value="2">الوحدة الوسطى</option>
-                        <option value="3">الوحدة الصغرى</option>
-                    </select>
-                </div>
-                <div class="col-md-2"></div>
-                <div class="col-md-3">
-                    <button type="button" class="btn btn-danger btn-sm remove-row">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-        $('#barcodesContainer').append(newRow);
-    });
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add barcode row
+        document.querySelectorAll('.add-barcode').forEach(btn => {
+            btn.addEventListener('click', function() {
+                var container = document.getElementById('barcodesContainer');
+                var newRow = document.createElement('div');
+                newRow.className = 'barcode-row row mb-2';
+                newRow.innerHTML = `
+                    <div class="col-md-4">
+                        <input type="text" name="barcodes[]" class="form-control" placeholder="باركود">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="barcode_units[]" class="form-select">
+                            <option value="1">الوحدة الكبرى</option>
+                            <option value="2">الوحدة الوسطى</option>
+                            <option value="3">الوحدة الصغرى</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2"></div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-danger btn-sm remove-row">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(newRow);
+            });
+        });
 
-    // Add location row
-    $(document).on('click', '.add-location', function() {
-        var newRow = `
-            <div class="location-row row mb-2">
-                <div class="col-md-3">
-                    <input type="text" name="locations[]" class="form-control" placeholder="كود الموقع">
-                </div>
-                <div class="col-md-3">
-                    <input type="text" name="location_names[]" class="form-control" placeholder="اسم الموقع">
-                </div>
-                <div class="col-md-2">
-                    <input type="text" name="shelf_numbers[]" class="form-control" placeholder="رف">
-                </div>
-                <div class="col-md-2">
-                    <input type="text" name="row_numbers[]" class="form-control" placeholder="صف">
-                </div>
-                <div class="col-md-2">
-                    <button type="button" class="btn btn-danger btn-sm remove-row">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-        $('#locationsContainer').append(newRow);
-    });
+        // Add location row
+        document.querySelectorAll('.add-location').forEach(btn => {
+            btn.addEventListener('click', function() {
+                var container = document.getElementById('locationsContainer');
+                var newRow = document.createElement('div');
+                newRow.className = 'location-row row mb-2';
+                newRow.innerHTML = `
+                    <div class="col-md-3">
+                        <input type="text" name="locations[]" class="form-control" placeholder="كود الموقع">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" name="location_names[]" class="form-control" placeholder="اسم الموقع">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" name="shelf_numbers[]" class="form-control" placeholder="رف">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" name="row_numbers[]" class="form-control" placeholder="صف">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-danger btn-sm remove-row">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(newRow);
+            });
+        });
 
-    // Add supplier row
-    $(document).on('click', '.add-supplier', function() {
-        var newRow = `
-            <div class="supplier-row row mb-3 border p-3 rounded">
-                <div class="col-md-3">
-                    <select name="supplier_ids[]" class="form-control">
-                        <option value="">-- اختر المورد --</option>
-                        <?php foreach ($suppliers as $sup): ?>
-                            <option value="<?= $sup['id'] ?>"><?= $sup['supplier_name'] ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <input type="number" name="supplier_prices[]" class="form-control" step="0.01" placeholder="سعر الشراء">
-                </div>
-                <div class="col-md-2">
-                    <input type="number" name="supplier_sell_prices[]" class="form-control" step="0.01" placeholder="سعر البيع">
-                </div>
-                <div class="col-md-2">
-                    <input type="number" name="supplier_discounts[]" class="form-control" step="0.01" placeholder="خصم %">
-                </div>
-                <div class="col-md-2">
-                    <input type="number" name="supplier_vats[]" class="form-control" step="0.01" placeholder="ضريبة %">
-                </div>
-                <div class="col-md-1">
-                    <button type="button" class="btn btn-danger btn-sm btn-block remove-row">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-                <div class="col-md-12 mt-2">
-                    <input type="text" name="supplier_notes[]" class="form-control" placeholder="ملاحظات...">
-                </div>
-            </div>
-        `;
-        $('#suppliersContainer').append(newRow);
-    });
+        // Add supplier row
+        document.querySelectorAll('.add-supplier').forEach(btn => {
+            btn.addEventListener('click', function() {
+                var container = document.getElementById('suppliersContainer');
+                var newRow = document.createElement('div');
+                newRow.className = 'supplier-row row mb-3 border p-3 rounded';
+                newRow.innerHTML = `
+                    <div class="col-md-3">
+                        <select name="supplier_ids[]" class="form-select">
+                            <option value="">-- اختر المورد --</option>
+                            <?php foreach ($suppliers as $sup): ?>
+                                <option value="<?= $sup['id'] ?>"><?= $sup['supplier_name'] ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" name="supplier_prices[]" class="form-control" step="0.01" placeholder="سعر الشراء">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" name="supplier_sell_prices[]" class="form-control" step="0.01" placeholder="سعر البيع">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" name="supplier_discounts[]" class="form-control" step="0.01" placeholder="خصم %">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" name="supplier_vats[]" class="form-control" step="0.01" placeholder="ضريبة %">
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-danger btn-sm w-100 remove-row">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    <div class="col-md-12 mt-2">
+                        <input type="text" name="supplier_notes[]" class="form-control" placeholder="ملاحظات...">
+                    </div>
+                `;
+                container.appendChild(newRow);
+            });
+        });
 
-    // Add alert row
-    $(document).on('click', '.add-alert', function() {
-        var newRow = `
-            <div class="alert-row row mb-2">
-                <div class="col-md-4">
-                    <select name="alerts[]" class="form-control">
-                        <option value="">-- اختر نوع التحذير --</option>
-                        <option value="HIGH_ALERT">HIGH ALERT</option>
-                        <option value="TOXIC">TOXIC</option>
-                        <option value="SOUNDALIKE">SOUND ALIKE</option>
-                        <option value="LOOKALIKE">LOOK ALIKE</option>
-                        <option value="CONTRAINDICATION">CONTRAINDICATION</option>
-                        <option value="PREGNANCY">PREGNANCY</option>
-                        <option value="OTHER">أخرى</option>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <input type="text" name="alert_messages[]" class="form-control" placeholder="رسالة التحذير...">
-                </div>
-                <div class="col-md-2">
-                    <button type="button" class="btn btn-danger btn-sm remove-row">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-        $('#alertsContainer').append(newRow);
-    });
+        // Add alert row
+        document.querySelectorAll('.add-alert').forEach(btn => {
+            btn.addEventListener('click', function() {
+                var container = document.getElementById('alertsContainer');
+                var newRow = document.createElement('div');
+                newRow.className = 'alert-row row mb-2';
+                newRow.innerHTML = `
+                    <div class="col-md-4">
+                        <select name="alerts[]" class="form-select">
+                            <option value="">-- اختر نوع التحذير --</option>
+                            <option value="HIGH_ALERT">HIGH ALERT</option>
+                            <option value="TOXIC">TOXIC</option>
+                            <option value="SOUNDALIKE">SOUND ALIKE</option>
+                            <option value="LOOKALIKE">LOOK ALIKE</option>
+                            <option value="CONTRAINDICATION">CONTRAINDICATION</option>
+                            <option value="PREGNANCY">PREGNANCY</option>
+                            <option value="OTHER">أخرى</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <input type="text" name="alert_messages[]" class="form-control" placeholder="رسالة التحذير...">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-danger btn-sm remove-row">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(newRow);
+            });
+        });
 
-    // Remove row
-    $(document).on('click', '.remove-row', function() {
-        $(this).closest('.barcode-row, .location-row, .supplier-row, .alert-row').remove();
-    });
+        // Remove row
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.remove-row')) {
+                e.target.closest('.barcode-row, .location-row, .supplier-row, .alert-row').remove();
+            }
+        });
 
-    // Calculate profit
-    function calculateProfit() {
-        var cost = parseFloat($('input[name="cost_price"]').val()) || 0;
-        var sell = parseFloat($('input[name="sell_price"]').val()) || 0;
-        if (cost > 0) {
-            var profit = ((sell - cost) / cost * 100).toFixed(2);
-            $('#profitPercent').val(profit);
+        // Calculate profit
+        function calculateProfit() {
+            var cost = parseFloat(document.querySelector('input[name="cost_price"]').value) || 0;
+            var sell = parseFloat(document.querySelector('input[name="sell_price"]').value) || 0;
+            if (cost > 0) {
+                var profit = ((sell - cost) / cost * 100).toFixed(2);
+                document.getElementById('profitPercent').value = profit;
+            }
         }
-    }
 
-    $('input[name="cost_price"], input[name="sell_price"]').on('input', calculateProfit);
-    calculateProfit(); // Initial calculation
-});
-</script>
-
-<?php require_once '../../includes/footer.php'; ?>
+        document.querySelector('input[name="cost_price"]').addEventListener('input', calculateProfit);
+        document.querySelector('input[name="sell_price"]').addEventListener('input', calculateProfit);
+        calculateProfit(); // Initial calculation
+    });
+    </script>
+</body>
+</html>
