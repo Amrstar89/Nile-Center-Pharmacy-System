@@ -9,18 +9,28 @@ if ($current_dir === 'admin') {
     // We are in admin folder
     $modules_path = '../modules/customer-requests/';
     $products_path = '../modules/products/';
+    $customers_path = '../modules/customers/';
     $admin_path = '';
     $root_path = '../';
 } elseif ($current_module === 'products') {
     // We are in modules/products/
     $modules_path = '../customer-requests/';
     $products_path = '';
+    $customers_path = '../customers/';
+    $admin_path = '../../admin/';
+    $root_path = '../../';
+} elseif ($current_module === 'customers') {
+    // We are in modules/customers/
+    $modules_path = '../customer-requests/';
+    $products_path = '../products/';
+    $customers_path = '';
     $admin_path = '../../admin/';
     $root_path = '../../';
 } else {
     // We are in modules/customer-requests/
     $modules_path = '';
     $products_path = '../products/';
+    $customers_path = '../customers/';
     $admin_path = '../../admin/';
     $root_path = '../../';
 }
@@ -34,7 +44,7 @@ if ($current_dir === 'admin') {
     <div class="nav-menu">
         <!-- Main Pages -->
         <div class="nav-item">
-            <a href="<?= $modules_path ?>index.php" class="nav-link <?= $current_page === 'index.php' && $current_module !== 'products' ? 'active' : '' ?>">
+            <a href="<?= $modules_path ?>index.php" class="nav-link <?= $current_page === 'index.php' && $current_module === 'customer-requests' ? 'active' : '' ?>">
                 <i class="bi bi-speedometer2"></i> الرئيسية
             </a>
         </div>
@@ -64,6 +74,19 @@ if ($current_dir === 'admin') {
             </a>
         </div>
 
+        <!-- Customers Module -->
+        <div class="sidebar-heading">كارت العملاء</div>
+        <div class="nav-item">
+            <a href="<?= $customers_path ?>index.php" class="nav-link <?= $current_module === 'customers' && $current_page === 'index.php' ? 'active' : '' ?>">
+                <i class="bi bi-people-fill"></i> قائمة العملاء
+            </a>
+        </div>
+        <div class="nav-item">
+            <a href="<?= $customers_path ?>create.php" class="nav-link <?= $current_module === 'customers' && $current_page === 'create.php' ? 'active' : '' ?>">
+                <i class="bi bi-person-plus"></i> إضافة عميل جديد
+            </a>
+        </div>
+
         <!-- Products Module -->
         <div class="sidebar-heading">كارت الأصناف</div>
         <div class="nav-item">
@@ -72,7 +95,7 @@ if ($current_dir === 'admin') {
             </a>
         </div>
         <div class="nav-item">
-            <a href="<?= $products_path ?>create.php" class="nav-link <?= $current_page === 'create.php' && $current_module === 'products' ? 'active' : '' ?>">
+            <a href="<?= $products_path ?>create.php" class="nav-link <?= $current_module === 'products' && $current_page === 'create.php' ? 'active' : '' ?>">
                 <i class="bi bi-plus-square"></i> إضافة صنف جديد
             </a>
         </div>
