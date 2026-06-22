@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':customer_class_id' => !empty($_POST['customer_class_id']) ? intval($_POST['customer_class_id']) : null,
             ':payment_type' => $payment_type,
             ':credit_limit' => $payment_type == 'credit' ? $credit_limit : 0,
-            ':credit_password' => ($payment_type == 'credit' && !empty($_POST['credit_password'])) ? password_hash($_POST['credit_password'], PASSWORD_DEFAULT) : null,
+            ':credit_password' => null,
             ':branch_id' => !empty($_POST['branch_id']) ? intval($_POST['branch_id']) : null,
             ':phone' => !empty($_POST['phone']) ? $_POST['phone'] : null,
             ':email' => !empty($_POST['email']) ? $_POST['email'] : null,
@@ -505,7 +505,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 <!-- Credit Fields (hidden by default) -->
                                 <div id="creditFields" style="display: none;">
                                     <div class="row">
-                                        <div class="col-md-6">
+                                        <div class="col-md-12">
                                             <div class="mb-3">
                                                 <label class="form-label">الحد الأقصى للآجل</label>
                                                 <div class="input-group">
@@ -514,24 +514,51 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">باسورد التجاوز</label>
-                                                <input type="password" name="credit_password" class="form-control" placeholder="لتجاوز الحد عند الطوارئ">
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
 
                                 <!-- Class-specific fields -->
                                 <div id="wholesaleFields" style="display: none;">
                                     <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i> سيتم تطبيق هامش الربح المحدد في التصنيف
+                                        <i class="bi bi-info-circle"></i> هامش الربح للعميل (جملة)
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">هامش الربح - محلي (%)</label>
+                                                <input type="number" name="local_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('local_margin', '0') ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">هامش الربح - مستورد (%)</label>
+                                                <input type="number" name="imported_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('imported_margin', '0') ?>">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div id="retailFields" style="display: none;">
                                     <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i> سيتم تطبيق نسبة الخصم المحددة في التصنيف
+                                        <i class="bi bi-info-circle"></i> نسبة الخصم للعميل (تجزئة)
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">نسبة الخصم - محلي (%)</label>
+                                                <input type="number" name="local_discount" class="form-control" step="0.01" min="0" max="100" value="<?= old('local_discount', '0') ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">نسبة الخصم - مستورد (%)</label>
+                                                <input type="number" name="imported_discount" class="form-control" step="0.01" min="0" max="100" value="<?= old('imported_discount', '0') ?>">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="costFields" style="display: none;">
+                                    <div class="alert alert-warning">
+                                        <i class="bi bi-exclamation-triangle"></i> العميل سيتم بيع الأصناف له بسعر التكلفة
                                     </div>
                                 </div>
 
@@ -645,6 +672,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         const type = select.options[select.selectedIndex].dataset.type;
         document.getElementById('wholesaleFields').style.display = type === 'wholesale' ? 'block' : 'none';
         document.getElementById('retailFields').style.display = type === 'retail' ? 'block' : 'none';
+        document.getElementById('costFields').style.display = type === 'cost' ? 'block' : 'none';
     }
 
     // Update Flag Emoji

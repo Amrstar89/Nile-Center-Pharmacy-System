@@ -115,12 +115,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':id' => $customer_id
         ]);
 
-        // Update credit password if provided
-        if ($payment_type == 'credit' && !empty($_POST['credit_password'])) {
-            $db->prepare("UPDATE customers SET credit_password = ? WHERE id = ?")
-               ->execute([password_hash($_POST['credit_password'], PASSWORD_DEFAULT), $customer_id]);
-        }
-
         // Delete old phones and re-insert
         $db->prepare("DELETE FROM customer_phones WHERE customer_id = ?")->execute([$customer_id]);
         if (!empty($_POST['phones'])) {
@@ -700,19 +694,13 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 <!-- Credit Fields -->
                                 <div id="creditFields" style="display: <?= ($customer['payment_type'] ?? 'cash') == 'credit' ? 'block' : 'none' ?>;">
                                     <div class="row">
-                                        <div class="col-md-6">
+                                        <div class="col-md-12">
                                             <div class="mb-3">
                                                 <label class="form-label">الحد الأقصى للآجل</label>
                                                 <div class="input-group">
                                                     <input type="number" name="credit_limit" class="form-control" step="0.01" value="<?= old('credit_limit', $customer['credit_limit'] ?? '0') ?>">
                                                     <span class="input-group-text">ج</span>
                                                 </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">باسورد التجاوز (اتركه فارغاً إذا لا تريد التغيير)</label>
-                                                <input type="password" name="credit_password" class="form-control" placeholder="لتجاوز الحد عند الطوارئ">
                                             </div>
                                         </div>
                                     </div>
@@ -730,12 +718,45 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 ?>
                                 <div id="wholesaleFields" style="display: <?= $class_type == 'wholesale' ? 'block' : 'none' ?>;">
                                     <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i> سيتم تطبيق هامش الربح المحدد في التصنيف
+                                        <i class="bi bi-info-circle"></i> هامش الربح للعميل (جملة)
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">هامش الربح - محلي (%)</label>
+                                                <input type="number" name="local_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('local_margin', $customer['local_margin'] ?? '0') ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">هامش الربح - مستورد (%)</label>
+                                                <input type="number" name="imported_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('imported_margin', $customer['imported_margin'] ?? '0') ?>">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div id="retailFields" style="display: <?= $class_type == 'retail' ? 'block' : 'none' ?>;">
                                     <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i> سيتم تطبيق نسبة الخصم المحددة في التصنيف
+                                        <i class="bi bi-info-circle"></i> نسبة الخصم للعميل (تجزئة)
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">نسبة الخصم - محلي (%)</label>
+                                                <input type="number" name="local_discount" class="form-control" step="0.01" min="0" max="100" value="<?= old('local_discount', $customer['local_discount'] ?? '0') ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">نسبة الخصم - مستورد (%)</label>
+                                                <input type="number" name="imported_discount" class="form-control" step="0.01" min="0" max="100" value="<?= old('imported_discount', $customer['imported_discount'] ?? '0') ?>">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="costFields" style="display: <?= $class_type == 'cost' ? 'block' : 'none' ?>;">
+                                    <div class="alert alert-warning">
+                                        <i class="bi bi-exclamation-triangle"></i> العميل سيتم بيع الأصناف له بسعر التكلفة
                                     </div>
                                 </div>
 
@@ -849,6 +870,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         const type = select.options[select.selectedIndex].dataset.type;
         document.getElementById('wholesaleFields').style.display = type === 'wholesale' ? 'block' : 'none';
         document.getElementById('retailFields').style.display = type === 'retail' ? 'block' : 'none';
+        document.getElementById('costFields').style.display = type === 'cost' ? 'block' : 'none';
     }
 
     // Update Flag Emoji
