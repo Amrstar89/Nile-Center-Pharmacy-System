@@ -227,7 +227,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 <div class="alert alert-danger"><?= $error ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="" id="customerForm">
+            <form method="POST" action="" id="customerForm" novalidate>
                 <div class="card">
                     <div class="card-header p-0">
                         <ul class="nav nav-tabs" id="customerTabs" role="tablist">
@@ -270,13 +270,15 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">اسم العميل بالعربي <span class="text-danger">*</span></label>
-                                            <input type="text" name="customer_name" class="form-control" required value="<?= old('customer_name') ?>" placeholder="اسم العميل">
+                                            <input type="text" name="customer_name" class="form-control" required value="<?= old('customer_name') ?>" placeholder="اسم العميل" onblur="validateField(this, 'customer_name')" data-validate="customer_name">
+                                            <div class="invalid-feedback" id="error_customer_name"></div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">اسم العميل بالإنجليزي</label>
-                                            <input type="text" name="customer_name_en" class="form-control" value="<?= old('customer_name_en') ?>" placeholder="Customer Name">
+                                            <input type="text" name="customer_name_en" class="form-control" value="<?= old('customer_name_en') ?>" placeholder="Customer Name" onblur="validateField(this, 'customer_name_en')" data-validate="customer_name_en">
+                                            <div class="invalid-feedback" id="error_customer_name_en"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -285,7 +287,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">البريد الإلكتروني</label>
-                                            <input type="email" name="email" class="form-control" value="<?= old('email') ?>" placeholder="email@example.com">
+                                            <input type="email" name="email" class="form-control" value="<?= old('email') ?>" placeholder="email@example.com" onblur="validateField(this, 'email')" data-validate="email">
+                                            <div class="invalid-feedback" id="error_email"></div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -329,7 +332,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label">رقم الهاتف</label>
-                                                <input type="text" name="phones[0][number]" class="form-control" placeholder="01xxxxxxxxx">
+                                                <input type="text" name="phones[0][number]" class="form-control" placeholder="01xxxxxxxxx" onblur="validateField(this, 'phone')" data-validate="phone">
+                                                    <div class="invalid-feedback" id="error_phone_0"></div>
                                             </div>
                                             <div class="col-md-3">
                                                 <label class="form-label">نوع</label>
@@ -520,18 +524,18 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 <!-- Class-specific fields -->
                                 <div id="wholesaleFields" style="display: none;">
                                     <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i> هامش الربح للعميل (جملة)
+                                        <i class="bi bi-info-circle"></i> هامش ربح الصيدلية (جملة)
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label class="form-label">هامش الربح - محلي (%)</label>
+                                                <label class="form-label">هامش ربح الصيدلية - محلي (%)</label>
                                                 <input type="number" name="local_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('local_margin', '0') ?>">
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label class="form-label">هامش الربح - مستورد (%)</label>
+                                                <label class="form-label">هامش ربح الصيدلية - مستورد (%)</label>
                                                 <input type="number" name="imported_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('imported_margin', '0') ?>">
                                             </div>
                                         </div>
@@ -580,7 +584,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label class="form-label">رقم التعاقد</label>
-                                                <input type="text" name="contract_number" class="form-control" placeholder="رقم التعاقد">
+                                                <input type="text" name="contract_number" class="form-control" placeholder="رقم التعاقد" onblur="validateField(this, 'contract_number')" data-validate="contract_number">
+                                                <div class="invalid-feedback" id="error_contract_number"></div>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
@@ -605,13 +610,15 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label class="form-label">رقم الكارنية</label>
-                                                <input type="text" name="card_number" class="form-control" placeholder="رقم الكارنية">
+                                                <input type="text" name="card_number" class="form-control" placeholder="رقم الكارنية" onblur="validateField(this, 'card_number')" data-validate="card_number">
+                                                <div class="invalid-feedback" id="error_card_number"></div>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label class="form-label">رقم بطاقة المريض</label>
-                                                <input type="text" name="patient_card_number" class="form-control" placeholder="رقم بطاقة المريض">
+                                                <input type="text" name="patient_card_number" class="form-control" placeholder="رقم بطاقة المريض" onblur="validateField(this, 'patient_card_number')" data-validate="patient_card_number">
+                                                <div class="invalid-feedback" id="error_patient_card_number"></div>
                                             </div>
                                         </div>
                                         <div class="col-md-4">
