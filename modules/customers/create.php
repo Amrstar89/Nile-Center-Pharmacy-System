@@ -147,6 +147,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Insert contract if checked
+        if (isset($_POST['has_contract']) && !empty($_POST['contract_number'])) {
+            $contract_stmt = $db->prepare("INSERT INTO customer_contracts 
+                (customer_id, contract_number, contract_type, card_number, patient_card_number, expiry_date, coverage_percent, max_bill_amount) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $contract_stmt->execute([
+                $customer_id,
+                $_POST['contract_number'],
+                $_POST['contract_type'] ?? 'insurance',
+                !empty($_POST['card_number']) ? $_POST['card_number'] : null,
+                !empty($_POST['patient_card_number']) ? $_POST['patient_card_number'] : null,
+                !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null,
+                floatval($_POST['coverage_percent'] ?? 100),
+                floatval($_POST['max_bill_amount'] ?? 0)
+            ]);
+        }
+
         $db->commit();
         header("Location: view.php?id=" . $customer_id);
         exit;
@@ -170,7 +187,18 @@ require_once __DIR__ . '/../../includes/sidebar.php';
     <style>
         :root { --primary: #667eea; --secondary: #764ba2; --success: #198754; --warning: #ffc107; --danger: #dc3545; }
         body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .sidebar { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; position: fixed; right: 0; top: 0; width: 260px; z-index: 1000; }
+        .sidebar { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; position: fixed; right: 0; top: 0; width: 260px; z-index: 1000; color: #fff; }
+        .sidebar .nav-link { color: rgba(255,255,255,0.8); padding: 12px 20px; display: flex; align-items: center; transition: all 0.3s; border-radius: 8px; margin: 2px 10px; text-decoration: none; }
+        .sidebar .nav-link:hover { color: #fff; background: rgba(255,255,255,0.1); }
+        .sidebar .nav-link.active { color: #fff; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); }
+        .sidebar .nav-link i { margin-left: 10px; font-size: 18px; color: rgba(255,255,255,0.7); }
+        .sidebar .nav-link:hover i { color: #fff; }
+        .sidebar .nav-link.active i { color: #fff; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); color: #fff; }
+        .sidebar-brand h4 { margin: 0; font-size: 20px; }
+        .sidebar-brand small { color: rgba(255,255,255,0.6); font-size: 12px; }
+        .sidebar-heading { color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 15px 20px 5px; font-weight: 600; }
+        .nav-menu { padding: 10px 0; }
         .main-content { margin-right: 260px; padding: 20px; }
         .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
         .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); border: none; }
@@ -506,6 +534,78 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <i class="bi bi-info-circle"></i> سيتم تطبيق نسبة الخصم المحددة في التصنيف
                                     </div>
                                 </div>
+
+                                <!-- Contract Section -->
+                                <hr class="my-4">
+                                <h5 class="section-title">بيانات التعاقد</h5>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input type="checkbox" name="has_contract" value="1" class="form-check-input" id="has_contract" onchange="toggleContractFields()">
+                                                <label class="form-check-label" for="has_contract">عميل متعاقد</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="contractFields" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">رقم التعاقد</label>
+                                                <input type="text" name="contract_number" class="form-control" placeholder="رقم التعاقد">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">نوع التعاقد</label>
+                                                <select name="contract_type" class="form-select">
+                                                    <option value="insurance">تأمين</option>
+                                                    <option value="company">شركة</option>
+                                                    <option value="government">حكومي</option>
+                                                    <option value="other">آخر</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">تاريخ انتهاء التعاقد</label>
+                                                <input type="date" name="expiry_date" class="form-control">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">رقم الكارنية</label>
+                                                <input type="text" name="card_number" class="form-control" placeholder="رقم الكارنية">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">رقم بطاقة المريض</label>
+                                                <input type="text" name="patient_card_number" class="form-control" placeholder="رقم بطاقة المريض">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">نسبة التغطية (%)</label>
+                                                <input type="number" name="coverage_percent" class="form-control" min="0" max="100" step="0.01" value="100">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">الحد الأقصى للفاتورة</label>
+                                                <div class="input-group">
+                                                    <input type="number" name="max_bill_amount" class="form-control" step="0.01" value="0">
+                                                    <span class="input-group-text">ج</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                         </div>
@@ -732,6 +832,12 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             .catch(err => {
                 console.error('Error loading areas:', err);
             });
+    }
+
+    // Toggle Contract Fields
+    function toggleContractFields() {
+        const hasContract = document.getElementById('has_contract').checked;
+        document.getElementById('contractFields').style.display = hasContract ? 'block' : 'none';
     }
 
     // Initialize

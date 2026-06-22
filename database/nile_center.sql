@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 22, 2026 at 11:48 PM
+-- Generation Time: Jun 23, 2026 at 12:44 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -142,7 +142,8 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (75, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-20 16:00:59'),
 (76, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-20 21:00:32'),
 (77, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-20 21:02:12'),
-(78, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-22 18:15:57');
+(78, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-22 18:15:57'),
+(79, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-22 22:22:55');
 
 -- --------------------------------------------------------
 
@@ -159,6 +160,29 @@ CREATE TABLE `areas` (
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `areas`
+--
+
+INSERT INTO `areas` (`id`, `area_code`, `area_name_ar`, `area_name_en`, `governorate_id`, `is_active`, `created_at`) VALUES
+(1, NULL, 'المعادي', NULL, 1, 1, '2026-06-22 22:09:19'),
+(2, NULL, 'مصر الجديدة', NULL, 1, 1, '2026-06-22 22:09:19'),
+(3, NULL, 'مدينة نصر', NULL, 1, 1, '2026-06-22 22:09:19'),
+(4, NULL, 'الدقي', NULL, 1, 1, '2026-06-22 22:09:19'),
+(5, NULL, 'العجوزة', NULL, 1, 1, '2026-06-22 22:09:19'),
+(6, NULL, 'الزمالك', NULL, 1, 1, '2026-06-22 22:09:19'),
+(7, NULL, 'وسط البلد', NULL, 1, 1, '2026-06-22 22:09:19'),
+(8, NULL, 'العباسية', NULL, 1, 1, '2026-06-22 22:09:19'),
+(9, NULL, 'السيدة زينب', NULL, 1, 1, '2026-06-22 22:09:19'),
+(10, NULL, 'حلوان', NULL, 1, 1, '2026-06-22 22:09:19'),
+(11, NULL, 'التجمع الخامس', NULL, 1, 1, '2026-06-22 22:09:19'),
+(12, NULL, 'الشيخ زايد', NULL, 2, 1, '2026-06-22 22:09:19'),
+(13, NULL, '6 أكتوبر', NULL, 2, 1, '2026-06-22 22:09:19'),
+(14, NULL, 'الحوامدية', NULL, 2, 1, '2026-06-22 22:09:19'),
+(15, NULL, 'الساحل الشمالي', NULL, 3, 1, '2026-06-22 22:09:19'),
+(16, NULL, 'سموحة', NULL, 3, 1, '2026-06-22 22:09:19'),
+(17, NULL, 'المنتزه', NULL, 3, 1, '2026-06-22 22:09:19');
 
 -- --------------------------------------------------------
 
@@ -185,6 +209,99 @@ INSERT INTO `branches` (`id`, `branch_code`, `branch_name`, `address`, `phone`, 
 (2, '2', 'نوال', '29 نوال الدقي', '01010300751', 1, '2026-06-16 19:06:20'),
 (3, '3', 'مصدق', '29 نوال الدقي', '01099822899', 1, '2026-06-16 19:06:20'),
 (4, '4', 'صيد', '29 نوال الدقي', '01099499478', 1, '2026-06-16 19:48:31');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `company_employees`
+--
+
+CREATE TABLE `company_employees` (
+  `id` int(11) NOT NULL,
+  `customer_id` int(11) NOT NULL,
+  `employee_code` varchar(20) DEFAULT NULL,
+  `employee_name` varchar(100) NOT NULL,
+  `employee_name_en` varchar(100) DEFAULT NULL,
+  `national_id` varchar(20) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `job_title` varchar(100) DEFAULT NULL,
+  `department` varchar(100) DEFAULT NULL,
+  `birth_date` date DEFAULT NULL,
+  `hire_date` date DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `country_codes`
+--
+
+CREATE TABLE `country_codes` (
+  `id` int(11) NOT NULL,
+  `country_name_ar` varchar(100) NOT NULL,
+  `country_name_en` varchar(100) NOT NULL,
+  `country_code` varchar(10) NOT NULL,
+  `flag_emoji` varchar(10) DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `country_codes`
+--
+
+INSERT INTO `country_codes` (`id`, `country_name_ar`, `country_name_en`, `country_code`, `flag_emoji`, `is_active`) VALUES
+(1, 'مصر', 'Egypt', '+20', '🇪🇬', 1),
+(2, 'السعودية', 'Saudi Arabia', '+966', '🇸🇦', 1),
+(3, 'الإمارات', 'UAE', '+971', '🇦🇪', 1),
+(4, 'الكويت', 'Kuwait', '+965', '🇰🇼', 1),
+(5, 'قطر', 'Qatar', '+974', '🇶🇦', 1),
+(6, 'البحرين', 'Bahrain', '+973', '🇧🇭', 1),
+(7, 'عمان', 'Oman', '+968', '🇴🇲', 1),
+(8, 'الأردن', 'Jordan', '+962', '🇯🇴', 1),
+(9, 'لبنان', 'Lebanon', '+961', '🇱🇧', 1),
+(10, 'العراق', 'Iraq', '+964', '🇮🇶', 1),
+(11, 'سوريا', 'Syria', '+963', '🇸🇾', 1),
+(12, 'اليمن', 'Yemen', '+967', '🇾🇪', 1),
+(13, 'ليبيا', 'Libya', '+218', '🇱🇾', 1),
+(14, 'السودان', 'Sudan', '+249', '🇸🇩', 1),
+(15, 'الجزائر', 'Algeria', '+213', '🇩🇿', 1),
+(16, 'المغرب', 'Morocco', '+212', '🇲🇦', 1),
+(17, 'تونس', 'Tunisia', '+216', '🇹🇳', 1),
+(18, 'فلسطين', 'Palestine', '+970', '🇵🇸', 1);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `customers`
+--
+
+CREATE TABLE `customers` (
+  `id` int(11) NOT NULL,
+  `customer_code` varchar(20) DEFAULT NULL,
+  `customer_name` varchar(100) NOT NULL,
+  `customer_name_en` varchar(100) DEFAULT NULL,
+  `customer_type` enum('individual','company') DEFAULT 'individual',
+  `customer_class_id` int(11) DEFAULT NULL,
+  `payment_type` enum('cash','credit') DEFAULT 'cash',
+  `credit_limit` decimal(12,2) DEFAULT 0.00,
+  `credit_password` varchar(255) DEFAULT NULL,
+  `branch_id` int(11) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `phone2` varchar(20) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `branch_code` varchar(20) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `source` enum('estock','manual') DEFAULT 'manual',
+  `estock_id` decimal(18,0) DEFAULT NULL,
+  `manual_code` varchar(50) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -220,6 +337,29 @@ INSERT INTO `customers_backup` (`id`, `customer_code`, `customer_name`, `phone`,
 (3, 'CUST003', 'فاطمة أحمد', '01003456789', NULL, NULL, NULL, 'BR001', NULL, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
 (5, 'CUST1781640433', 'الة', '01067785', '012645564984', NULL, '21لاالي اللاايس', '3', NULL, 1, '2026-06-16 20:07:13', '2026-06-16 20:07:13', 'estock', NULL, NULL),
 (6, 'CUST1781640799', 'محمد ', '0123456789', '012345678998', NULL, '29 نوال الدقي', '2', NULL, 1, '2026-06-16 20:13:19', '2026-06-16 20:13:19', 'estock', NULL, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `customer_addresses`
+--
+
+CREATE TABLE `customer_addresses` (
+  `id` int(11) NOT NULL,
+  `customer_id` int(11) NOT NULL,
+  `address_type` enum('home','work','other') DEFAULT 'home',
+  `building_number` varchar(20) DEFAULT NULL,
+  `floor_number` varchar(10) DEFAULT NULL,
+  `apartment_number` varchar(20) DEFAULT NULL,
+  `street_name` varchar(200) DEFAULT NULL,
+  `landmark` varchar(200) DEFAULT NULL,
+  `area_id` int(11) DEFAULT NULL,
+  `governorate_id` int(11) DEFAULT NULL,
+  `delivery_zone_id` int(11) DEFAULT NULL,
+  `is_primary` tinyint(1) DEFAULT 0,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -260,6 +400,13 @@ CREATE TABLE `customer_classes` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `customer_classes`
+--
+
+INSERT INTO `customer_classes` (`id`, `class_code`, `class_name_ar`, `class_name_en`, `class_type`, `local_margin`, `imported_margin`, `local_discount`, `imported_discount`, `is_active`, `source`, `estock_id`, `created_at`) VALUES
+(0, NULL, 'جملة', 'Wholesale', 'cost', 0.00, 0.00, 0.00, 0.00, 1, 'estock', NULL, '2026-06-22 22:09:19');
+
 -- --------------------------------------------------------
 
 --
@@ -285,6 +432,23 @@ CREATE TABLE `customer_contracts` (
   `estock_id` decimal(18,0) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `customer_phones`
+--
+
+CREATE TABLE `customer_phones` (
+  `id` int(11) NOT NULL,
+  `customer_id` int(11) NOT NULL,
+  `country_code` varchar(10) DEFAULT '+20',
+  `phone_number` varchar(20) NOT NULL,
+  `phone_type` enum('mobile','home','work','other') DEFAULT 'mobile',
+  `is_primary` tinyint(1) DEFAULT 0,
+  `is_whatsapp` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -330,6 +494,16 @@ CREATE TABLE `delivery_zones` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `delivery_zones`
+--
+
+INSERT INTO `delivery_zones` (`id`, `zone_code`, `zone_name_ar`, `zone_name_en`, `delivery_fee`, `is_active`, `created_at`) VALUES
+(1, 'Z1', 'المنطقة الداخلية', NULL, 25.00, 1, '2026-06-22 22:09:19'),
+(2, 'Z2', 'المنطقة المتوسطة', NULL, 40.00, 1, '2026-06-22 22:09:19'),
+(3, 'Z3', 'المنطقة الخارجية', NULL, 60.00, 1, '2026-06-22 22:09:19'),
+(4, 'Z4', 'المنطقة البعيدة', NULL, 80.00, 1, '2026-06-22 22:09:19');
+
 -- --------------------------------------------------------
 
 --
@@ -344,6 +518,37 @@ CREATE TABLE `governorates` (
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `governorates`
+--
+
+INSERT INTO `governorates` (`id`, `governorate_code`, `governorate_name_ar`, `governorate_name_en`, `is_active`, `created_at`) VALUES
+(1, 'EG-C', 'القاهرة', 'Cairo', 1, '2026-06-22 22:09:19'),
+(2, 'EG-GZ', 'الجيزة', 'Giza', 1, '2026-06-22 22:09:19'),
+(3, 'EG-ALX', 'الإسكندرية', 'Alexandria', 1, '2026-06-22 22:09:19'),
+(4, 'EG-DK', 'الدقهلية', 'Dakahlia', 1, '2026-06-22 22:09:19'),
+(5, 'EG-BHR', 'البحر الأحمر', 'Red Sea', 1, '2026-06-22 22:09:19'),
+(6, 'EG-BH', 'البحيرة', 'Beheira', 1, '2026-06-22 22:09:19'),
+(7, 'EG-FYM', 'الفيوم', 'Fayoum', 1, '2026-06-22 22:09:19'),
+(8, 'EG-GH', 'الغربية', 'Gharbia', 1, '2026-06-22 22:09:19'),
+(9, 'EG-IS', 'الإسماعيلية', 'Ismailia', 1, '2026-06-22 22:09:19'),
+(10, 'EG-MNF', 'المنوفية', 'Menofia', 1, '2026-06-22 22:09:19'),
+(11, 'EG-MN', 'المنيا', 'Minya', 1, '2026-06-22 22:09:19'),
+(12, 'EG-KB', 'القليوبية', 'Qalyubia', 1, '2026-06-22 22:09:19'),
+(13, 'EG-KN', 'قنا', 'Qena', 1, '2026-06-22 22:09:19'),
+(14, 'EG-SHG', 'سوهاج', 'Sohag', 1, '2026-06-22 22:09:19'),
+(15, 'EG-SUZ', 'السويس', 'Suez', 1, '2026-06-22 22:09:19'),
+(16, 'EG-ASN', 'أسوان', 'Aswan', 1, '2026-06-22 22:09:19'),
+(17, 'EG-AST', 'أسيوط', 'Assiut', 1, '2026-06-22 22:09:19'),
+(18, 'EG-BNS', 'بني سويف', 'Beni Suef', 1, '2026-06-22 22:09:19'),
+(19, 'EG-PTS', 'بورسعيد', 'Port Said', 1, '2026-06-22 22:09:19'),
+(20, 'EG-DT', 'دمياط', 'Damietta', 1, '2026-06-22 22:09:19'),
+(21, 'EG-JS', 'جنوب سيناء', 'South Sinai', 1, '2026-06-22 22:09:19'),
+(22, 'EG-KFS', 'كفر الشيخ', 'Kafr El Sheikh', 1, '2026-06-22 22:09:19'),
+(23, 'EG-MT', 'مطروح', 'Matrouh', 1, '2026-06-22 22:09:19'),
+(24, 'EG-LX', 'الأقصر', 'Luxor', 1, '2026-06-22 22:09:19'),
+(25, 'EG-WAD', 'الوادي الجديد', 'New Valley', 1, '2026-06-22 22:09:19');
 
 -- --------------------------------------------------------
 
@@ -869,7 +1074,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-22 20:15:57', '2026-06-15 16:53:16', '2026-06-22 18:15:57'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-23 00:22:55', '2026-06-15 16:53:16', '2026-06-22 22:22:55'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -901,11 +1106,44 @@ ALTER TABLE `branches`
   ADD UNIQUE KEY `branch_code` (`branch_code`);
 
 --
+-- Indexes for table `company_employees`
+--
+ALTER TABLE `company_employees`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_customer` (`customer_id`);
+
+--
+-- Indexes for table `country_codes`
+--
+ALTER TABLE `country_codes`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `country_code` (`country_code`);
+
+--
+-- Indexes for table `customers`
+--
+ALTER TABLE `customers`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `customer_code` (`customer_code`),
+  ADD KEY `fk_customer_class` (`customer_class_id`),
+  ADD KEY `fk_customer_branch` (`branch_id`);
+
+--
 -- Indexes for table `customers_backup`
 --
 ALTER TABLE `customers_backup`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `customer_code` (`customer_code`);
+
+--
+-- Indexes for table `customer_addresses`
+--
+ALTER TABLE `customer_addresses`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_customer` (`customer_id`),
+  ADD KEY `fk_address_area` (`area_id`),
+  ADD KEY `fk_address_governorate` (`governorate_id`),
+  ADD KEY `fk_address_zone` (`delivery_zone_id`);
 
 --
 -- Indexes for table `customer_areas`
@@ -923,6 +1161,13 @@ ALTER TABLE `customer_classes`
 -- Indexes for table `customer_contracts`
 --
 ALTER TABLE `customer_contracts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_customer` (`customer_id`);
+
+--
+-- Indexes for table `customer_phones`
+--
+ALTER TABLE `customer_phones`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_customer` (`customer_id`);
 
@@ -1110,19 +1355,49 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
 
 --
 -- AUTO_INCREMENT for table `areas`
 --
 ALTER TABLE `areas`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT for table `branches`
 --
 ALTER TABLE `branches`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `company_employees`
+--
+ALTER TABLE `company_employees`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `country_codes`
+--
+ALTER TABLE `country_codes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+
+--
+-- AUTO_INCREMENT for table `customers`
+--
+ALTER TABLE `customers`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `customer_addresses`
+--
+ALTER TABLE `customer_addresses`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `customer_phones`
+--
+ALTER TABLE `customer_phones`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `delivery_times`
@@ -1134,13 +1409,13 @@ ALTER TABLE `delivery_times`
 -- AUTO_INCREMENT for table `delivery_zones`
 --
 ALTER TABLE `delivery_zones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `governorates`
 --
 ALTER TABLE `governorates`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `inventory_batches`
@@ -1241,6 +1516,34 @@ ALTER TABLE `users`
 --
 ALTER TABLE `areas`
   ADD CONSTRAINT `fk_area_governorate` FOREIGN KEY (`governorate_id`) REFERENCES `governorates` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `company_employees`
+--
+ALTER TABLE `company_employees`
+  ADD CONSTRAINT `fk_employee_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `customers`
+--
+ALTER TABLE `customers`
+  ADD CONSTRAINT `fk_customer_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_customer_class` FOREIGN KEY (`customer_class_id`) REFERENCES `customer_classes` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `customer_addresses`
+--
+ALTER TABLE `customer_addresses`
+  ADD CONSTRAINT `fk_address_area` FOREIGN KEY (`area_id`) REFERENCES `areas` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_address_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_address_governorate` FOREIGN KEY (`governorate_id`) REFERENCES `governorates` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_address_zone` FOREIGN KEY (`delivery_zone_id`) REFERENCES `delivery_zones` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `customer_phones`
+--
+ALTER TABLE `customer_phones`
+  ADD CONSTRAINT `fk_phone_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `orders`

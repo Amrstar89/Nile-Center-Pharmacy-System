@@ -47,6 +47,23 @@ $employees = $db->prepare("SELECT * FROM company_employees WHERE customer_id = ?
 $employees->execute([$customer_id]);
 $employees = $employees->fetchAll();
 
+// Get contract info
+$contract_stmt = $db->prepare("SELECT * FROM customer_contracts WHERE customer_id = ? AND is_active = 1 ORDER BY id DESC LIMIT 1");
+$contract_stmt->execute([$customer_id]);
+$customer_contract = $contract_stmt->fetch();
+
+// Calculate customer balance (total sales - total payments)
+$balance_stmt = $db->prepare("
+    SELECT 
+        COALESCE(SUM(final_total), 0) as total_sales,
+        COALESCE(SUM(total_discount_value), 0) as total_discounts
+    FROM orders 
+    WHERE customer_id = ? AND status_id != 4
+");
+$balance_stmt->execute([$customer_id]);
+$balance_data = $balance_stmt->fetch();
+$customer_balance = ($balance_data['total_sales'] ?? 0) - ($balance_data['total_discounts'] ?? 0);
+
 // Get order history
 $orders = $db->prepare("
     SELECT o.*, os.status_name, os.status_color
@@ -83,7 +100,18 @@ require_once __DIR__ . '/../../includes/sidebar.php';
     <style>
         :root { --primary: #667eea; --secondary: #764ba2; --success: #198754; --warning: #ffc107; --danger: #dc3545; --info: #0dcaf0; }
         body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .sidebar { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; position: fixed; right: 0; top: 0; width: 260px; z-index: 1000; }
+        .sidebar { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; position: fixed; right: 0; top: 0; width: 260px; z-index: 1000; color: #fff; }
+        .sidebar .nav-link { color: rgba(255,255,255,0.8); padding: 12px 20px; display: flex; align-items: center; transition: all 0.3s; border-radius: 8px; margin: 2px 10px; text-decoration: none; }
+        .sidebar .nav-link:hover { color: #fff; background: rgba(255,255,255,0.1); }
+        .sidebar .nav-link.active { color: #fff; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); }
+        .sidebar .nav-link i { margin-left: 10px; font-size: 18px; color: rgba(255,255,255,0.7); }
+        .sidebar .nav-link:hover i { color: #fff; }
+        .sidebar .nav-link.active i { color: #fff; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); color: #fff; }
+        .sidebar-brand h4 { margin: 0; font-size: 20px; }
+        .sidebar-brand small { color: rgba(255,255,255,0.6); font-size: 12px; }
+        .sidebar-heading { color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 15px 20px 5px; font-weight: 600; }
+        .nav-menu { padding: 10px 0; }
         .main-content { margin-right: 260px; padding: 20px; }
         .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
         .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); border: none; }
@@ -157,23 +185,38 @@ require_once __DIR__ . '/../../includes/sidebar.php';
 
             <!-- Stats Row -->
             <div class="row mb-4">
-                <div class="col-md-4 mb-3">
+                <div class="col-md-3 mb-3">
                     <div class="stat-card card">
                         <div class="stat-number"><?= number_format($stats['total_orders'] ?? 0) ?></div>
                         <div class="stat-label"><i class="bi bi-cart"></i> إجمالي الطلبات</div>
                     </div>
                 </div>
-                <div class="col-md-4 mb-3">
+                <div class="col-md-3 mb-3">
                     <div class="stat-card card">
                         <div class="stat-number"><?= number_format($stats['total_amount'] ?? 0, 2) ?> ج</div>
                         <div class="stat-label"><i class="bi bi-cash-stack"></i> إجمالي المبيعات</div>
                     </div>
                 </div>
-                <div class="col-md-4 mb-3">
-                    <div class="stat-card card">
-                        <div class="stat-number"><?= count($addresses) ?></div>
-                        <div class="stat-label"><i class="bi bi-geo-alt"></i> عدد العناوين</div>
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card card" style="border-right: 4px solid var(--warning);">
+                        <div class="stat-number" style="color: var(--warning);"><?= number_format($customer_balance, 2) ?> ج</div>
+                        <div class="stat-label"><i class="bi bi-wallet2"></i> رصيد العميل</div>
                     </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card card" style="border-right: 4px solid var(--info);">
+                        <div class="stat-number" style="color: var(--info);"><?= number_format($customer['credit_limit'] ?? 0, 2) ?> ج</div>
+                        <div class="stat-label"><i class="bi bi-credit-card"></i> حد الآجل</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statement Button -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <a href="statement.php?id=<?= $customer_id ?>" class="btn btn-info btn-lg w-100">
+                        <i class="bi bi-file-text"></i> كشف حساب العميل
+                    </a>
                 </div>
             </div>
 
@@ -233,6 +276,66 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                             <?php endif; ?>
                         </div>
                     </div>
+
+                    <!-- Contract Info (if has contract) -->
+                    <?php if (!empty($customer_contract)): ?>
+                    <div class="card mb-4 border-warning">
+                        <div class="card-header bg-warning text-white">
+                            <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> بيانات التعاقد</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="info-item">
+                                        <div class="info-label">رقم التعاقد</div>
+                                        <div class="info-value"><?= htmlspecialchars($customer_contract['contract_number'] ?? '—') ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="info-item">
+                                        <div class="info-label">رقم الكارنية</div>
+                                        <div class="info-value"><?= htmlspecialchars($customer_contract['card_number'] ?? '—') ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="info-item">
+                                        <div class="info-label">رقم بطاقة المريض</div>
+                                        <div class="info-value"><?= htmlspecialchars($customer_contract['patient_card_number'] ?? '—') ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="info-item">
+                                        <div class="info-label">تاريخ الانتهاء</div>
+                                        <div class="info-value <?= (strtotime($customer_contract['expiry_date'] ?? '2099-01-01') < time()) ? 'text-danger' : 'text-success' ?>">
+                                            <?= !empty($customer_contract['expiry_date']) ? date('Y-m-d', strtotime($customer_contract['expiry_date'])) : '—' ?>
+                                            <?= (strtotime($customer_contract['expiry_date'] ?? '2099-01-01') < time()) ? ' (منتهي)' : '' ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <div class="info-item">
+                                        <div class="info-label">نوع التعاقد</div>
+                                        <div class="info-value"><?= htmlspecialchars($customer_contract['contract_type'] ?? '—') ?></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="info-item">
+                                        <div class="info-label">نسبة التغطية</div>
+                                        <div class="info-value"><?= number_format($customer_contract['coverage_percent'] ?? 100, 2) ?>%</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="info-item">
+                                        <div class="info-label">الحد الأقصى للفاتورة</div>
+                                        <div class="info-value"><?= number_format($customer_contract['max_bill_amount'] ?? 0, 2) ?> ج</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
                     <!-- Phones -->
                     <div class="card mb-4">
