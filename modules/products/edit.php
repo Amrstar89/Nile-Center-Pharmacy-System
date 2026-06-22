@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $db->prepare("SELECT id FROM products WHERE manual_code = ? AND is_active = 1 AND id != ?");
             $stmt->execute([$manual_code, $product_id]);
             if ($stmt->fetch()) {
-                $errors[] = 'الكود المختصر مستخدم بالفعل!';
+                $errors[] = 'الكود المختصر مستخدم بالفعل لصنف آخر!';
             }
         }
 
@@ -199,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':allow_discount' => isset($_POST['allow_discount']) ? 1 : 0,
             ':max_discount' => floatval($_POST['max_discount'] ?? 0),
             ':notes' => $_POST['notes'] ?? null,
-            ':manual_code' => !empty($manual_code) ? $manual_code : $product['manual_code'],
+            ':manual_code' => !empty($manual_code) ? $manual_code : null,
             ':product_id' => $product_id
         ]);
 
@@ -305,6 +305,9 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         .validation-feedback.invalid { color: var(--danger); display: block; }
         .form-control.is-valid { border-color: var(--success); background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: left calc(0.375em + 0.1875rem) center; background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem); }
         .form-control.is-invalid { border-color: var(--danger); background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: left calc(0.375em + 0.1875rem) center; background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem); }
+        .code-display { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
+        .code-display h5 { margin: 0; font-weight: 700; }
+        .code-display small { opacity: 0.8; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -321,6 +324,20 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             <?php if (isset($error)): ?>
                 <div class="alert alert-danger"><?= $error ?></div>
             <?php endif; ?>
+
+            <!-- Product Code Display -->
+            <div class="code-display mb-4">
+                <div class="row">
+                    <div class="col-md-6">
+                        <small>الكود التسلسلي</small>
+                        <h5><?= htmlspecialchars($product['product_code']) ?></h5>
+                    </div>
+                    <div class="col-md-6">
+                        <small>الكود المختصر</small>
+                        <h5><?= !empty($product['manual_code']) ? htmlspecialchars($product['manual_code']) : '<em style="opacity:0.6">غير محدد</em>' ?></h5>
+                    </div>
+                </div>
+            </div>
 
             <form method="POST" action="" id="productForm">
                 <div class="card">
@@ -339,6 +356,26 @@ require_once __DIR__ . '/../../includes/sidebar.php';
 
                             <!-- Basic Info Tab -->
                             <div class="tab-pane fade show active" id="basic" role="tabpanel">
+                                <!-- Product Codes Row -->
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">الكود التسلسلي</label>
+                                            <input type="text" class="form-control" value="<?= htmlspecialchars($product['product_code']) ?>" readonly style="background: #e9ecef; font-weight: bold;">
+                                            <small class="text-muted">لا يمكن تعديل الكود التسلسلي</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">الكود المختصر (Fast Moving) <span class="text-info"><i class="bi bi-info-circle"></i></span></label>
+                                            <input type="text" name="manual_code" id="manual_code" class="form-control" 
+                                                   value="<?= editOld('manual_code', $product['manual_code']) ?>" placeholder="مثال: R, RA, CAT, RIVO">
+                                            <small class="text-muted">كود مختصر للأصناف السريعة - حروف/أرقام (مينفعش يتكرر)</small>
+                                            <div class="validation-feedback" id="manual_code_feedback"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
@@ -413,15 +450,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 </div>
 
                                 <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">الكود المختصر</label>
-                                            <input type="text" name="manual_code" id="manual_code" class="form-control"
-                                                   value="<?= editOld('manual_code', $product['manual_code']) ?>" placeholder="كود مختصر">
-                                            <div class="validation-feedback" id="manual_code_feedback"></div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-12">
                                         <div class="mb-3">
                                             <label class="form-label">ملاحظات</label>
                                             <textarea name="notes" class="form-control" rows="3" placeholder="ملاحظات عامة..."><?= editOld('notes', $product['notes']) ?></textarea>
@@ -463,8 +492,15 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                             <label class="form-check-label" for="can_be_negative">يسمح بالسالب</label>
                                         </div>
                                     </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="is_made" value="1" class="form-check-input" id="is_made" <?= editOldCheck('is_made', $product['is_made']) ?>>
+                                            <label class="form-check-label" for="is_made">صناعة محلية</label>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-  </div>
+
                             <!-- Barcodes Tab -->
                             <div class="tab-pane fade" id="barcodes" role="tabpanel">
                                 <div class="row">

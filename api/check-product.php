@@ -37,7 +37,7 @@ try {
                 $stmt->bindValue(':exclude_id', $exclude_id, PDO::PARAM_INT);
             }
             break;
-            
+
         case 'barcode':
         case 'qr_code':
             $sql = "SELECT pb.id FROM product_barcodes pb 
@@ -53,15 +53,15 @@ try {
             }
             break;
     }
-    
+
     $stmt->execute();
     $exists = $stmt->fetch() !== false;
-    
+
     echo json_encode([
         'exists' => $exists,
         'message' => $exists ? 'هذه القيمة مستخدمة بالفعل!' : 'متاح'
     ]);
-    
+
 } catch (Exception $e) {
     echo json_encode(['exists' => false, 'error' => $e->getMessage()]);
 }

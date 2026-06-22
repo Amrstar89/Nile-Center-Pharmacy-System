@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // ===== VALIDATION BEFORE INSERT =====
         $errors = [];
-        
+
         // Check product_name (Arabic)
         $product_name = trim($_POST['product_name'] ?? '');
         if (empty($product_name)) {
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'اسم الصنف العربي مستخدم بالفعل!';
             }
         }
-        
+
         // Check product_name_en (English) - if not empty
         $product_name_en = trim($_POST['product_name_en'] ?? '');
         if (!empty($product_name_en)) {
@@ -55,7 +55,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'اسم الصنف الإنجليزي مستخدم بالفعل!';
             }
         }
-        
+
+        // Check manual_code (short code) - if provided, must be unique
+        $manual_code = trim($_POST['manual_code'] ?? '');
+        if (!empty($manual_code)) {
+            $stmt = $db->prepare("SELECT id FROM products WHERE manual_code = ? AND is_active = 1");
+            $stmt->execute([$manual_code]);
+            if ($stmt->fetch()) {
+                $errors[] = 'الكود المختصر مستخدم بالفعل لصنف آخر!';
+            }
+        }
+
         // Check barcodes
         if (!empty($_POST['barcodes'])) {
             foreach ($_POST['barcodes'] as $barcode) {
@@ -70,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-        
+
         // Check QR code
         $qr_code = trim($_POST['qr_code'] ?? '');
         if (!empty($qr_code)) {
@@ -82,17 +92,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $errors[] = 'QR Code مستخدم بالفعل!';
             }
         }
-        
+
         // If errors found, stop
         if (!empty($errors)) {
             throw new Exception(implode('<br>', $errors));
         }
-
-        // Generate product code
-        $prefix = 'PRD';
-        $stmt = $db->query("SELECT MAX(CAST(SUBSTRING(product_code, 4) AS UNSIGNED)) as max_num FROM products WHERE product_code LIKE 'PRD%'");
-        $max_num = $stmt->fetch()['max_num'] ?? 0;
-        $product_code = $prefix . str_pad($max_num + 1, 5, '0', STR_PAD_LEFT);
 
         // Get prices from form
         $sell_price = floatval($_POST['sell_price'] ?? 0);
@@ -114,9 +118,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $unit3_sell_price = $sell_price / $unit1_to_unit3;
         }
 
-        // Insert product
+        // Insert product WITHOUT product_code (will be set to id after insert)
         $sql = "INSERT INTO products SET
-            product_code = :product_code,
+            product_code = NULL,
             product_name = :product_name,
             product_name_en = :product_name_en,
             scientific_name = :scientific_name,
@@ -156,7 +160,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare($sql);
 
         $stmt->execute([
-            ':product_code' => $product_code,
             ':product_name' => $product_name,
             ':product_name_en' => !empty($product_name_en) ? $product_name_en : null,
             ':scientific_name' => !empty($_POST['scientific_name']) ? $_POST['scientific_name'] : null,
@@ -191,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':max_discount' => floatval($_POST['max_discount'] ?? 0),
             ':notes' => $_POST['notes'] ?? null,
             ':source' => 'manual',
-            ':manual_code' => 'M-' . str_pad($max_num + 1, 5, '0', STR_PAD_LEFT)
+            ':manual_code' => !empty($manual_code) ? $manual_code : null
         ]);
 
         $product_id = $db->lastInsertId();
@@ -201,6 +204,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $db->query("SELECT MAX(id) as max_id FROM products");
             $product_id = $stmt->fetch()['max_id'];
         }
+
+        // Set product_code = id (sequential number: 1, 2, 3...)
+        $update_stmt = $db->prepare("UPDATE products SET product_code = ? WHERE id = ?");
+        $update_stmt->execute([$product_id, $product_id]);
 
         // Insert barcodes
         if (!empty($_POST['barcodes'])) {
@@ -297,7 +304,6 @@ function getAlertMessage($type) {
 
 require_once __DIR__ . '/../../includes/sidebar.php';
 ?>
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -307,154 +313,38 @@ require_once __DIR__ . '/../../includes/sidebar.php';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        :root {
-            --primary: #667eea;
-            --secondary: #764ba2;
-            --success: #198754;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #0dcaf0;
-        }
-        body {
-            background: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .sidebar {
-            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
-            min-height: 100vh;
-            position: fixed;
-            right: 0;
-            top: 0;
-            width: 260px;
-            z-index: 1000;
-            transition: all 0.3s;
-        }
-        .sidebar-brand {
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .sidebar-brand h4 {
-            color: white;
-            margin: 0;
-            font-weight: 700;
-        }
-        .sidebar-brand small {
-            color: rgba(255,255,255,0.6);
-        }
-        .nav-menu {
-            padding: 15px 0;
-        }
-        .nav-item {
-            margin: 2px 0;
-        }
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 20px;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s;
-            text-decoration: none;
-        }
-        .nav-link:hover, .nav-link.active {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border-right: 3px solid var(--primary);
-        }
-        .nav-link i {
-            width: 25px;
-            margin-left: 10px;
-            font-size: 18px;
-        }
-        .main-content {
-            margin-right: 260px;
-            padding: 20px;
-        }
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        }
-        .card-header {
-            background: white;
-            border-bottom: 1px solid #eee;
-            border-radius: 15px 15px 0 0 !important;
-            padding: 20px;
-        }
-        .nav-tabs .nav-link {
-            color: #666;
-            border: none;
-            padding: 15px 20px;
-        }
-        .nav-tabs .nav-link.active {
-            color: var(--primary);
-            border-bottom: 3px solid var(--primary);
-            background: none;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            border: none;
-        }
-        .sidebar-heading {
-            color: rgba(255,255,255,0.5);
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 15px 20px 5px;
-            font-weight: 600;
-        }
-        .form-label {
-            font-weight: 600;
-            color: #555;
-        }
-        .unit-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .unit-card h6 {
-            color: var(--primary);
-            margin-bottom: 15px;
-        }
-        .price-sync {
-            font-size: 12px;
-            color: #666;
-        }
-        .alert-select {
-            margin-bottom: 10px;
-        }
-        .validation-feedback {
-            font-size: 13px;
-            margin-top: 5px;
-            display: none;
-        }
-        .validation-feedback.valid {
-            color: var(--success);
-            display: block;
-        }
-        .validation-feedback.invalid {
-            color: var(--danger);
-            display: block;
-        }
-        .form-control.is-valid {
-            border-color: var(--success);
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: left calc(0.375em + 0.1875rem) center;
-            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
-        }
-        .form-control.is-invalid {
-            border-color: var(--danger);
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: left calc(0.375em + 0.1875rem) center;
-            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
-        }
-        @media (max-width: 768px) {
-            .sidebar { width: 100%; position: relative; }
-            .main-content { margin-right: 0; }
-        }
+        :root { --primary: #667eea; --secondary: #764ba2; --success: #198754; --warning: #ffc107; --danger: #dc3545; --info: #0dcaf0; }
+        body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .sidebar { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; position: fixed; right: 0; top: 0; width: 260px; z-index: 1000; transition: all 0.3s; }
+        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-brand h4 { color: white; margin: 0; font-weight: 700; }
+        .sidebar-brand small { color: rgba(255,255,255,0.6); }
+        .nav-menu { padding: 15px 0; }
+        .nav-item { margin: 2px 0; }
+        .nav-link { color: rgba(255,255,255,0.8); padding: 12px 20px; display: flex; align-items: center; transition: all 0.3s; text-decoration: none; }
+        .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.1); color: white; border-right: 3px solid var(--primary); }
+        .nav-link i { width: 25px; margin-left: 10px; font-size: 18px; }
+        .main-content { margin-right: 260px; padding: 20px; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+        .card-header { background: white; border-bottom: 1px solid #eee; border-radius: 15px 15px 0 0 !important; padding: 20px; }
+        .nav-tabs .nav-link { color: #666; border: none; padding: 15px 20px; }
+        .nav-tabs .nav-link.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: none; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); border: none; }
+        .sidebar-heading { color: rgba(255,255,255,0.5); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; padding: 15px 20px 5px; font-weight: 600; }
+        .form-label { font-weight: 600; color: #555; }
+        .unit-card { background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .unit-card h6 { color: var(--primary); margin-bottom: 15px; }
+        .price-sync { font-size: 12px; color: #666; }
+        .alert-select { margin-bottom: 10px; }
+        .validation-feedback { font-size: 13px; margin-top: 5px; display: none; }
+        .validation-feedback.valid { color: var(--success); display: block; }
+        .validation-feedback.invalid { color: var(--danger); display: block; }
+        .form-control.is-valid { border-color: var(--success); background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: left calc(0.375em + 0.1875rem) center; background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem); }
+        .form-control.is-invalid { border-color: var(--danger); background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: left calc(0.375em + 0.1875rem) center; background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem); }
+        .code-display { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; }
+        .code-display h5 { margin: 0; font-weight: 700; }
+        .code-display small { opacity: 0.8; }
+        @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
 <body>
@@ -473,6 +363,14 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             <?php if (isset($error)): ?>
                 <div class="alert alert-danger"><?= $error ?></div>
             <?php endif; ?>
+
+            <!-- Product Code Info (shown only after successful insert, but here for layout) -->
+            <div class="alert alert-info d-flex align-items-center mb-4">
+                <i class="bi bi-info-circle-fill me-2"></i>
+                <div>
+                    <strong>ملاحظة:</strong> الكود التسلسلي سيتم توليده تلقائياً بعد الحفظ. الكود المختصر اختياري للأصناف السريعة.
+                </div>
+            </div>
 
             <form method="POST" action="" id="productForm">
 
@@ -513,6 +411,26 @@ require_once __DIR__ . '/../../includes/sidebar.php';
 
                             <!-- Basic Info Tab -->
                             <div class="tab-pane fade show active" id="basic" role="tabpanel">
+                                <!-- Product Codes Row -->
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">الكود التسلسلي</label>
+                                            <input type="text" class="form-control" value="يتم توليده تلقائياً بعد الحفظ" readonly style="background: #e9ecef; font-style: italic;">
+                                            <small class="text-muted">يتم توليده تلقائياً (1, 2, 3...)</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">الكود المختصر (Fast Moving) <span class="text-info"><i class="bi bi-info-circle"></i></span></label>
+                                            <input type="text" name="manual_code" id="manual_code" class="form-control" 
+                                                   value="<?= old('manual_code') ?>" placeholder="مثال: R, RA, CAT, RIVO">
+                                            <small class="text-muted">كود مختصر للأصناف السريعة - حروف/أرقام (مينفعش يتكرر)</small>
+                                            <div class="validation-feedback" id="manual_code_feedback"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
@@ -552,39 +470,39 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     </div>
                                 </div>
 
-<div class="row">
-    <div class="col-md-4">
-        <div class="mb-3">
-            <label class="form-label">القسم</label>
-            <select name="category_id" class="form-select">
-                <option value="">-- اختر القسم --</option>
-                <?php foreach ($categories as $cat): ?>
-                    <option value="<?= $cat['id'] ?>" <?= oldSelect('category_id', $cat['id']) ?>><?= $cat['category_name_ar'] ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="mb-3">
-            <label class="form-label">الشركة المنتجة</label>
-            <select name="company_id" class="form-select">
-                <option value="">-- اختر الشركة --</option>
-                <?php foreach ($companies as $comp): ?>
-                    <option value="<?= $comp['id'] ?>" <?= oldSelect('company_id', $comp['id']) ?>><?= $comp['company_name_ar'] ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="mb-3">
-            <label class="form-label">المصدر <span class="text-danger">*</span></label>
-            <select name="is_imported" class="form-select" required>
-                <option value="0" <?= oldSelect('is_imported', '0') ?>>محلي</option>
-                <option value="1" <?= oldSelect('is_imported', '1') ?>>مستورد</option>
-            </select>
-        </div>
-    </div>
-</div>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">القسم</label>
+                                            <select name="category_id" class="form-select">
+                                                <option value="">-- اختر القسم --</option>
+                                                <?php foreach ($categories as $cat): ?>
+                                                    <option value="<?= $cat['id'] ?>" <?= oldSelect('category_id', $cat['id']) ?>><?= $cat['category_name_ar'] ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">الشركة المنتجة</label>
+                                            <select name="company_id" class="form-select">
+                                                <option value="">-- اختر الشركة --</option>
+                                                <?php foreach ($companies as $comp): ?>
+                                                    <option value="<?= $comp['id'] ?>" <?= oldSelect('company_id', $comp['id']) ?>><?= $comp['company_name_ar'] ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">المصدر <span class="text-danger">*</span></label>
+                                            <select name="is_imported" class="form-select" required>
+                                                <option value="0" <?= oldSelect('is_imported', '0') ?>>محلي</option>
+                                                <option value="1" <?= oldSelect('is_imported', '1') ?>>مستورد</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
 
                                 <div class="row">
                                     <div class="col-md-12">
@@ -622,15 +540,22 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     </div>
                                 </div>
 
-<div class="row mt-3">
-    <div class="col-md-3">
-        <div class="form-check">
-            <input type="checkbox" name="can_be_negative" value="1" class="form-check-input" id="can_be_negative" <?= oldCheck('can_be_negative') ?>>
-            <label class="form-check-label" for="can_be_negative">يسمح بالسالب</label>
-        </div>
-    </div>
-</div>
-</div> <!-- إقفال تاب البيانات الأساسية -->
+                                <div class="row mt-3">
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="can_be_negative" value="1" class="form-check-input" id="can_be_negative" <?= oldCheck('can_be_negative') ?>>
+                                            <label class="form-check-label" for="can_be_negative">يسمح بالسالب</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="form-check">
+                                            <input type="checkbox" name="is_made" value="1" class="form-check-input" id="is_made" <?= oldCheck('is_made') ?>>
+                                            <label class="form-check-label" for="is_made">صناعة محلية</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Barcodes Tab -->
                             <div class="tab-pane fade" id="barcodes" role="tabpanel">
                                 <div class="row">
@@ -1002,7 +927,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // ===== PRICE CALCULATION (FIXED) =====
+        // ===== PRICE CALCULATION =====
         const sellPriceInput = document.getElementById('sell_price');
         const profitMarginInput = document.getElementById('profit_margin');
         const costPriceInput = document.getElementById('cost_price');
@@ -1024,38 +949,30 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             let costPrice = parseFloat(costPriceInput.value) || 0;
             const vatPercent = parseFloat(vatPercentInput.value) || 0;
 
-            // If sell_price is set and profit_margin is set, calculate cost_price
             if (sellPrice > 0 && profitMargin > 0 && (lastEditedField === 'profit_margin' || lastEditedField === 'sell_price')) {
                 costPrice = sellPrice * (1 - (profitMargin / 100));
                 costPriceInput.value = costPrice.toFixed(2);
             }
 
-            // If sell_price is set and cost_price is set, calculate profit_margin
             if (sellPrice > 0 && costPrice > 0 && (lastEditedField === 'cost_price' || lastEditedField === 'sell_price')) {
                 profitMargin = ((sellPrice - costPrice) / sellPrice) * 100;
                 profitMarginInput.value = profitMargin.toFixed(2);
             }
 
-            // Recalculate with updated values
             costPrice = parseFloat(costPriceInput.value) || 0;
             profitMargin = parseFloat(profitMarginInput.value) || 0;
 
-            // Calculate net profit
             const netProfit = sellPrice - costPrice;
             netProfitValue.value = netProfit.toFixed(2);
 
-            // Calculate VAT
             const vatAmount = netProfit * (vatPercent / 100);
             vatValue.value = vatAmount.toFixed(2);
 
-            // Calculate net profit after VAT
             const netProfitAfterVatValue = netProfit - vatAmount;
             netProfitAfterVat.value = netProfitAfterVatValue.toFixed(2);
 
-            // Update unit 1 display price
             unit1DisplayPrice.value = sellPrice.toFixed(2);
 
-            // Calculate unit 2 price
             const unit2Qty = parseInt(unit1ToUnit2.value) || 0;
             if (unit2Qty > 0) {
                 unit2SellPrice.value = (sellPrice / unit2Qty).toFixed(2);
@@ -1063,7 +980,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 unit2SellPrice.value = sellPrice.toFixed(2);
             }
 
-            // Calculate unit 3 price
             const unit3Qty = parseInt(unit1ToUnit3.value) || 0;
             if (unit3Qty > 0) {
                 unit3SellPrice.value = (sellPrice / unit3Qty).toFixed(2);
@@ -1072,7 +988,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             }
         }
 
-        // Track which field was last edited
         sellPriceInput.addEventListener('input', function() { lastEditedField = 'sell_price'; updatePrices(); });
         profitMarginInput.addEventListener('input', function() { lastEditedField = 'profit_margin'; updatePrices(); });
         costPriceInput.addEventListener('input', function() { lastEditedField = 'cost_price'; updatePrices(); });
@@ -1082,11 +997,11 @@ require_once __DIR__ . '/../../includes/sidebar.php';
 
         // ===== REAL-TIME VALIDATION (AJAX) =====
         const validationTimeout = {};
-        
+
         function checkDuplicate(field, value, feedbackId) {
             const feedback = document.getElementById(feedbackId);
             const input = document.getElementById(field);
-            
+
             if (!value || value.trim() === '') {
                 input.classList.remove('is-valid', 'is-invalid');
                 feedback.style.display = 'none';
@@ -1124,19 +1039,22 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             }, 500);
         }
 
-        // Product name validation
         document.getElementById('product_name').addEventListener('blur', function() {
             checkDuplicate('product_name', this.value, 'product_name_feedback');
         });
 
-        // Product name EN validation
         document.getElementById('product_name_en').addEventListener('blur', function() {
             if (this.value.trim() !== '') {
                 checkDuplicate('product_name_en', this.value, 'product_name_en_feedback');
             }
         });
 
-        // Barcode validation
+        document.getElementById('manual_code').addEventListener('blur', function() {
+            if (this.value.trim() !== '') {
+                checkDuplicate('manual_code', this.value, 'manual_code_feedback');
+            }
+        });
+
         document.addEventListener('input', function(e) {
             if (e.target.classList.contains('barcode-input')) {
                 const barcodeValue = e.target.value;
@@ -1146,7 +1064,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             }
         });
 
-        // QR Code validation
         document.getElementById('qr_code').addEventListener('blur', function() {
             if (this.value.trim() !== '') {
                 checkDuplicate('qr_code', this.value, 'qr_code_feedback');
