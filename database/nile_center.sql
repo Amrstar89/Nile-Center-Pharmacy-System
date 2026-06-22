@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 18, 2026 at 01:23 AM
+-- Generation Time: Jun 22, 2026 at 09:06 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -136,7 +136,13 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (69, 1, 'System Administrator', 'update', 'orders', 25, NULL, '{\"order_number\":\"20260006\"}', '26.201.9.238', '2026-06-17 00:52:04'),
 (70, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-17 16:52:02'),
 (71, 1, 'System Administrator', 'update', 'orders', 25, NULL, '{\"order_number\":\"20260006\"}', '26.201.9.238', '2026-06-17 16:59:50'),
-(72, 1, 'System Administrator', 'update', 'orders', 24, NULL, '{\"order_number\":\"20260005\"}', '26.201.9.238', '2026-06-17 17:01:21');
+(72, 1, 'System Administrator', 'update', 'orders', 24, NULL, '{\"order_number\":\"20260005\"}', '26.201.9.238', '2026-06-17 17:01:21'),
+(73, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-17 23:29:05'),
+(74, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-17 23:29:15'),
+(75, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-20 16:00:59'),
+(76, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-20 21:00:32'),
+(77, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-20 21:02:12'),
+(78, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-22 18:15:57');
 
 -- --------------------------------------------------------
 
@@ -486,9 +492,14 @@ CREATE TABLE `products` (
 --
 
 INSERT INTO `products` (`id`, `product_code`, `product_name`, `product_name_en`, `scientific_name`, `product_type_id`, `is_service`, `hide_in_receipt`, `is_shortage`, `max_stock`, `min_stock`, `reorder_point`, `category`, `manufacturer`, `category_id`, `company_id`, `sell_price`, `unit2_sell_price`, `unit3_sell_price`, `has_expire`, `is_drug`, `can_be_negative`, `is_made`, `print_barcode`, `barcode_type`, `group_id`, `cost_price`, `is_imported`, `notes`, `print_internal_barcode`, `allow_discount`, `max_discount`, `unit1_id`, `unit2_id`, `unit3_id`, `unit1_to_unit2`, `unit1_to_unit3`, `default_sale_unit`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`, `manual_code`) VALUES
-(1, 'PRD001', 'Ozempic', NULL, NULL, 1, 0, 0, 0, 0, 0, 0, 'أدوية السكري', 'Novo Nordisk', NULL, NULL, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, 'طلب متكرر', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
+(1, 'PRD001', 'Ozempic', '', '', 1, 0, 0, 0, 0, 0, 0, 'أدوية السكري', 'Novo Nordisk', 0, 0, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, 'طلب متكرر', 0, 1, 0.00, 0, 0, 0, 0, 0, 1, 0, '2026-06-15 16:53:16', '2026-06-17 23:59:30', 'estock', NULL, NULL),
 (2, 'PRD002', 'Humira', NULL, NULL, 1, 0, 0, 0, 0, 0, 0, 'أدوية المناعة', 'AbbVie', NULL, NULL, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, NULL, 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
-(3, 'PRD003', 'Eliquis', NULL, NULL, 1, 0, 0, 0, 0, 0, 0, 'مميعات الدم', 'Bristol Myers Squibb', NULL, NULL, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, NULL, 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL);
+(3, 'PRD003', 'Eliquis', NULL, NULL, 1, 0, 0, 0, 0, 0, 0, 'مميعات الدم', 'Bristol Myers Squibb', NULL, NULL, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, NULL, 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
+(4, 'PRD00004', 'بيكتول برتقال 24 شريط', 'Pectol Orange 24strips', NULL, 1, 1, 1, 1, 0, 0, 0, NULL, NULL, NULL, NULL, 600.00, 600.00, 25.00, 1, 0, 0, 0, 1, NULL, NULL, 384.00, 0, '', 0, 1, 50.00, NULL, NULL, NULL, 1, 24, 3, 1, '2026-06-20 17:52:05', '2026-06-20 21:08:36', 'manual', NULL, 'M-00004'),
+(5, 'PRD00005', 'اختبار 1', 'test 1', NULL, 1, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 100.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, '', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-20 21:10:23', '2026-06-20 21:10:23', 'manual', NULL, 'M-00005'),
+(6, 'PRD00006', 'اختبار 2', 'test 2', NULL, 1, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 80.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 60.00, 0, '', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-20 21:17:18', '2026-06-20 21:17:18', 'manual', NULL, 'M-00006'),
+(7, 'PRD00007', 'اختبار 3', 'TEST 3', 'MELATONIN', 3, 1, 1, 1, 10, 2, 3, NULL, NULL, NULL, NULL, 1000.00, 0.00, 0.00, 1, 1, 1, 1, 0, NULL, NULL, 0.00, 1, '', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-20 21:25:52', '2026-06-20 21:25:52', 'manual', NULL, 'M-00007'),
+(8, 'PRD00008', 'اسبوسيد اقراص', 'ASPOCID INF', 'acetylsalysilic acid', 1, 1, 1, 1, 0, 0, 0, NULL, NULL, NULL, NULL, 100.00, 100.00, 100.00, 1, 0, 0, 0, 0, NULL, NULL, 37.50, 0, '', 0, 1, 0.00, NULL, NULL, NULL, 1, 1, 1, 1, '2026-06-20 21:27:38', '2026-06-20 21:30:04', 'manual', NULL, 'M-00008');
 
 -- --------------------------------------------------------
 
@@ -506,6 +517,15 @@ CREATE TABLE `product_alerts` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `product_alerts`
+--
+
+INSERT INTO `product_alerts` (`id`, `product_id`, `alert_type`, `alert_message`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 0, 'CONTRAINDICATION', 'CONTRAINDICATION - موانع استخدام', 1, '2026-06-20 17:52:05', '2026-06-20 17:52:05'),
+(2, 7, 'HIGH_ALERT', 'HIGH ALERT - يتطلب انتباه خاص', 1, '2026-06-20 21:25:52', '2026-06-20 21:25:52'),
+(3, 7, 'PREGNANCY', 'PREGNANCY - حذر خلال الحمل', 1, '2026-06-20 21:25:52', '2026-06-20 21:25:52');
+
 -- --------------------------------------------------------
 
 --
@@ -520,6 +540,20 @@ CREATE TABLE `product_barcodes` (
   `is_primary` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `product_barcodes`
+--
+
+INSERT INTO `product_barcodes` (`id`, `product_id`, `barcode`, `unit_id`, `is_primary`, `created_at`) VALUES
+(1, 0, '8411500101425', 1, 1, '2026-06-20 17:52:05'),
+(2, 0, '84115713', 3, 0, '2026-06-20 17:52:05'),
+(3, 0, 'sads1231564asdk', 1, 0, '2026-06-20 17:52:05'),
+(4, 6, '12345679812564', 1, 1, '2026-06-20 21:17:18'),
+(5, 6, '123564897412136', 2, 0, '2026-06-20 21:17:18'),
+(6, 6, '879452131654897', 1, 0, '2026-06-20 21:17:18'),
+(7, 6, 'hr123456', 1, 0, '2026-06-20 21:17:18'),
+(8, 7, '55555555555555', 1, 1, '2026-06-20 21:25:52');
 
 -- --------------------------------------------------------
 
@@ -783,7 +817,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-17 18:52:02', '2026-06-15 16:53:16', '2026-06-17 16:52:02'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-22 20:15:57', '2026-06-15 16:53:16', '2026-06-22 18:15:57'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -1001,7 +1035,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=73;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
 
 --
 -- AUTO_INCREMENT for table `branches`
@@ -1013,7 +1047,7 @@ ALTER TABLE `branches`
 -- AUTO_INCREMENT for table `delivery_times`
 --
 ALTER TABLE `delivery_times`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `inventory_batches`
@@ -1040,16 +1074,22 @@ ALTER TABLE `order_statuses`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
+-- AUTO_INCREMENT for table `products`
+--
+ALTER TABLE `products`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
 -- AUTO_INCREMENT for table `product_alerts`
 --
 ALTER TABLE `product_alerts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `product_barcodes`
 --
 ALTER TABLE `product_barcodes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `product_locations`

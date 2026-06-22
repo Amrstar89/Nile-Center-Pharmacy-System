@@ -7,6 +7,19 @@ $db = getDB();
 
 $page_title = 'إضافة صنف جديد';
 
+// Helper functions for retaining form data
+function old($field, $default = '') {
+    return isset($_POST[$field]) ? htmlspecialchars($_POST[$field]) : $default;
+}
+
+function oldCheck($field) {
+    return isset($_POST[$field]) ? 'checked' : '';
+}
+
+function oldSelect($field, $value) {
+    return isset($_POST[$field]) && $_POST[$field] == $value ? 'selected' : '';
+}
+
 // Get lookup data
 $categories = $db->query("SELECT * FROM product_categories WHERE is_active = 1 ORDER BY category_name_ar")->fetchAll();
 $companies = $db->query("SELECT * FROM product_companies WHERE is_active = 1 ORDER BY company_name_ar")->fetchAll();
@@ -17,6 +30,63 @@ $product_types = $db->query("SELECT * FROM product_types WHERE is_active = 1 ORD
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $db->beginTransaction();
+
+        // ===== VALIDATION BEFORE INSERT =====
+        $errors = [];
+        
+        // Check product_name (Arabic)
+        $product_name = trim($_POST['product_name'] ?? '');
+        if (empty($product_name)) {
+            $errors[] = 'اسم الصنف العربي مطلوب';
+        } else {
+            $stmt = $db->prepare("SELECT id FROM products WHERE product_name = ? AND is_active = 1");
+            $stmt->execute([$product_name]);
+            if ($stmt->fetch()) {
+                $errors[] = 'اسم الصنف العربي مستخدم بالفعل!';
+            }
+        }
+        
+        // Check product_name_en (English) - if not empty
+        $product_name_en = trim($_POST['product_name_en'] ?? '');
+        if (!empty($product_name_en)) {
+            $stmt = $db->prepare("SELECT id FROM products WHERE product_name_en = ? AND is_active = 1");
+            $stmt->execute([$product_name_en]);
+            if ($stmt->fetch()) {
+                $errors[] = 'اسم الصنف الإنجليزي مستخدم بالفعل!';
+            }
+        }
+        
+        // Check barcodes
+        if (!empty($_POST['barcodes'])) {
+            foreach ($_POST['barcodes'] as $barcode) {
+                if (!empty($barcode)) {
+                    $stmt = $db->prepare("SELECT pb.id FROM product_barcodes pb 
+                                         JOIN products p ON pb.product_id = p.id 
+                                         WHERE pb.barcode = ? AND p.is_active = 1");
+                    $stmt->execute([$barcode]);
+                    if ($stmt->fetch()) {
+                        $errors[] = "الباركود '{$barcode}' مستخدم بالفعل!";
+                    }
+                }
+            }
+        }
+        
+        // Check QR code
+        $qr_code = trim($_POST['qr_code'] ?? '');
+        if (!empty($qr_code)) {
+            $stmt = $db->prepare("SELECT pb.id FROM product_barcodes pb 
+                                 JOIN products p ON pb.product_id = p.id 
+                                 WHERE pb.barcode = ? AND p.is_active = 1");
+            $stmt->execute([$qr_code]);
+            if ($stmt->fetch()) {
+                $errors[] = 'QR Code مستخدم بالفعل!';
+            }
+        }
+        
+        // If errors found, stop
+        if (!empty($errors)) {
+            throw new Exception(implode('<br>', $errors));
+        }
 
         // Generate product code
         $prefix = 'PRD';
@@ -30,22 +100,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $profit_margin = floatval($_POST['profit_margin'] ?? 0);
         $vat_percent = floatval($_POST['vat_percent'] ?? 0);
 
-        // If cost_price is empty, calculate from sell_price and profit_margin
-        if ($cost_price == 0 && $profit_margin > 0) {
-            $cost_price = $sell_price * (1 - ($profit_margin / 100));
-        }
-
-        // If profit_margin is empty, calculate from sell_price and cost_price
-        if ($profit_margin == 0 && $cost_price > 0) {
-            $profit_margin = (($sell_price - $cost_price) / $sell_price) * 100;
-        }
-
         // Calculate unit prices
         $unit2_sell_price = 0;
         $unit3_sell_price = 0;
 
-        $unit1_to_unit2 = intval($_POST['unit1_to_unit2'] ?? 0);
-        $unit1_to_unit3 = intval($_POST['unit1_to_unit3'] ?? 0);
+        $unit1_to_unit2 = intval($_POST['unit1_to_unit2'] ?? 1);
+        $unit1_to_unit3 = intval($_POST['unit1_to_unit3'] ?? 1);
 
         if ($unit1_to_unit2 > 0) {
             $unit2_sell_price = $sell_price / $unit1_to_unit2;
@@ -54,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $unit3_sell_price = $sell_price / $unit1_to_unit3;
         }
 
-        // Insert product with named columns
+        // Insert product
         $sql = "INSERT INTO products SET
             product_code = :product_code,
             product_name = :product_name,
@@ -81,7 +141,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             unit1_to_unit3 = :unit1_to_unit3,
             default_sale_unit = :default_sale_unit,
             has_expire = :has_expire,
-            is_drug = :is_drug,
             is_imported = :is_imported,
             can_be_negative = :can_be_negative,
             is_made = :is_made,
@@ -98,9 +157,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt->execute([
             ':product_code' => $product_code,
-            ':product_name' => $_POST['product_name'] ?? '',
-            ':product_name_en' => $_POST['product_name_en'] ?? null,
-            ':scientific_name' => $_POST['scientific_name'] ?? null,
+            ':product_name' => $product_name,
+            ':product_name_en' => !empty($product_name_en) ? $product_name_en : null,
+            ':scientific_name' => !empty($_POST['scientific_name']) ? $_POST['scientific_name'] : null,
             ':product_type_id' => intval($_POST['product_type_id'] ?? 1),
             ':is_service' => isset($_POST['is_service']) ? 1 : 0,
             ':hide_in_receipt' => isset($_POST['hide_in_receipt']) ? 1 : 0,
@@ -118,12 +177,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':unit1_id' => !empty($_POST['unit1_id']) ? intval($_POST['unit1_id']) : null,
             ':unit2_id' => !empty($_POST['unit2_id']) ? intval($_POST['unit2_id']) : null,
             ':unit3_id' => !empty($_POST['unit3_id']) ? intval($_POST['unit3_id']) : null,
-            ':unit1_to_unit2' => !empty($_POST['unit1_to_unit2']) ? intval($_POST['unit1_to_unit2']) : null,
-            ':unit1_to_unit3' => !empty($_POST['unit1_to_unit3']) ? intval($_POST['unit1_to_unit3']) : null,
+            ':unit1_to_unit2' => $unit1_to_unit2,
+            ':unit1_to_unit3' => $unit1_to_unit3,
             ':default_sale_unit' => intval($_POST['default_sale_unit'] ?? 1),
             ':has_expire' => isset($_POST['has_expire']) ? 1 : 0,
-            ':is_drug' => isset($_POST['is_drug']) ? 1 : 0,
-            ':is_imported' => isset($_POST['is_imported']) ? 1 : 0,
+            ':is_imported' => intval($_POST['is_imported'] ?? 0),
             ':can_be_negative' => isset($_POST['can_be_negative']) ? 1 : 0,
             ':is_made' => isset($_POST['is_made']) ? 1 : 0,
             ':print_barcode' => isset($_POST['print_barcode']) ? 1 : 0,
@@ -138,7 +196,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $product_id = $db->lastInsertId();
 
-        // Insert barcodes (including QR code)
+        // Fallback if lastInsertId returns 0
+        if ($product_id == 0 || $product_id == false) {
+            $stmt = $db->query("SELECT MAX(id) as max_id FROM products");
+            $product_id = $stmt->fetch()['max_id'];
+        }
+
+        // Insert barcodes
         if (!empty($_POST['barcodes'])) {
             $barcode_stmt = $db->prepare("INSERT INTO product_barcodes (product_id, barcode, unit_id, is_primary) VALUES (?, ?, ?, ?)");
             foreach ($_POST['barcodes'] as $index => $barcode) {
@@ -153,12 +217,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Insert QR code if provided
-        if (!empty($_POST['qr_code'])) {
+        // Insert QR code
+        if (!empty($qr_code)) {
             $qr_stmt = $db->prepare("INSERT INTO product_barcodes (product_id, barcode, unit_id, is_primary) VALUES (?, ?, ?, ?)");
             $qr_stmt->execute([
                 $product_id,
-                $_POST['qr_code'],
+                $qr_code,
                 1,
                 0
             ]);
@@ -205,7 +269,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $db->commit();
 
-        header("Location: view.php?id=" . $product_id);
+        if ($product_id > 0) {
+            header("Location: view.php?id=" . $product_id);
+        } else {
+            header("Location: index.php?error=insert_failed");
+        }
         exit;
 
     } catch (Exception $e) {
@@ -356,6 +424,33 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         .alert-select {
             margin-bottom: 10px;
         }
+        .validation-feedback {
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+        }
+        .validation-feedback.valid {
+            color: var(--success);
+            display: block;
+        }
+        .validation-feedback.invalid {
+            color: var(--danger);
+            display: block;
+        }
+        .form-control.is-valid {
+            border-color: var(--success);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: left calc(0.375em + 0.1875rem) center;
+            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        }
+        .form-control.is-invalid {
+            border-color: var(--danger);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: left calc(0.375em + 0.1875rem) center;
+            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        }
         @media (max-width: 768px) {
             .sidebar { width: 100%; position: relative; }
             .main-content { margin-right: 0; }
@@ -422,15 +517,17 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">اسم الصنف <span class="text-danger">*</span></label>
-                                            <input type="text" name="product_name" class="form-control" required 
-                                                   placeholder="اسم الصنف بالعربي">
+                                            <input type="text" name="product_name" id="product_name" class="form-control" required 
+                                                   value="<?= old('product_name') ?>" placeholder="اسم الصنف بالعربي">
+                                            <div class="validation-feedback" id="product_name_feedback"></div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">اسم الصنف بالإنجليزي</label>
-                                            <input type="text" name="product_name_en" class="form-control" 
-                                                   placeholder="Product Name in English">
+                                            <input type="text" name="product_name_en" id="product_name_en" class="form-control" 
+                                                   value="<?= old('product_name_en') ?>" placeholder="Product Name in English">
+                                            <div class="validation-feedback" id="product_name_en_feedback"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -440,7 +537,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <div class="mb-3">
                                             <label class="form-label">المادة الفعالة (الاسم العلمي)</label>
                                             <input type="text" name="scientific_name" class="form-control" 
-                                                   placeholder="Active Ingredient">
+                                                   value="<?= old('scientific_name') ?>" placeholder="Active Ingredient">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -448,43 +545,52 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                             <label class="form-label">نوع الصنف <span class="text-danger">*</span></label>
                                             <select name="product_type_id" class="form-select" required>
                                                 <?php foreach ($product_types as $type): ?>
-                                                    <option value="<?= $type['id'] ?>"><?= $type['type_name_ar'] ?></option>
+                                                    <option value="<?= $type['id'] ?>" <?= oldSelect('product_type_id', $type['id']) ?>><?= $type['type_name_ar'] ?></option>
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">القسم</label>
-                                            <select name="category_id" class="form-select">
-                                                <option value="">-- اختر القسم --</option>
-                                                <?php foreach ($categories as $cat): ?>
-                                                    <option value="<?= $cat['id'] ?>"><?= $cat['category_name_ar'] ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">الشركة المنتجة</label>
-                                            <select name="company_id" class="form-select">
-                                                <option value="">-- اختر الشركة --</option>
-                                                <?php foreach ($companies as $comp): ?>
-                                                    <option value="<?= $comp['id'] ?>"><?= $comp['company_name_ar'] ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
+<div class="row">
+    <div class="col-md-4">
+        <div class="mb-3">
+            <label class="form-label">القسم</label>
+            <select name="category_id" class="form-select">
+                <option value="">-- اختر القسم --</option>
+                <?php foreach ($categories as $cat): ?>
+                    <option value="<?= $cat['id'] ?>" <?= oldSelect('category_id', $cat['id']) ?>><?= $cat['category_name_ar'] ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="mb-3">
+            <label class="form-label">الشركة المنتجة</label>
+            <select name="company_id" class="form-select">
+                <option value="">-- اختر الشركة --</option>
+                <?php foreach ($companies as $comp): ?>
+                    <option value="<?= $comp['id'] ?>" <?= oldSelect('company_id', $comp['id']) ?>><?= $comp['company_name_ar'] ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="mb-3">
+            <label class="form-label">المصدر <span class="text-danger">*</span></label>
+            <select name="is_imported" class="form-select" required>
+                <option value="0" <?= oldSelect('is_imported', '0') ?>>محلي</option>
+                <option value="1" <?= oldSelect('is_imported', '1') ?>>مستورد</option>
+            </select>
+        </div>
+    </div>
+</div>
 
                                 <div class="row">
                                     <div class="col-md-12">
                                         <div class="mb-3">
                                             <label class="form-label">ملاحظات</label>
-                                            <textarea name="notes" class="form-control" rows="3" placeholder="ملاحظات عامة..."></textarea>
+                                            <textarea name="notes" class="form-control" rows="3" placeholder="ملاحظات عامة..."><?= old('notes') ?></textarea>
                                         </div>
                                     </div>
                                 </div>
@@ -492,31 +598,39 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 <div class="row">
                                     <div class="col-md-3">
                                         <div class="form-check">
-                                            <input type="checkbox" name="is_service" value="1" class="form-check-input" id="is_service">
+                                            <input type="checkbox" name="is_service" value="1" class="form-check-input" id="is_service" <?= oldCheck('is_service') ?>>
                                             <label class="form-check-label" for="is_service">صنف خدمي</label>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="form-check">
-                                            <input type="checkbox" name="hide_in_receipt" value="1" class="form-check-input" id="hide_in_receipt">
+                                            <input type="checkbox" name="hide_in_receipt" value="1" class="form-check-input" id="hide_in_receipt" <?= oldCheck('hide_in_receipt') ?>>
                                             <label class="form-check-label" for="hide_in_receipt">إخفاء في الريسيت</label>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="form-check">
-                                            <input type="checkbox" name="is_shortage" value="1" class="form-check-input" id="is_shortage">
+                                            <input type="checkbox" name="is_shortage" value="1" class="form-check-input" id="is_shortage" <?= oldCheck('is_shortage') ?>>
                                             <label class="form-check-label" for="is_shortage">نواقص عامة</label>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="form-check">
-                                            <input type="checkbox" name="has_expire" value="1" class="form-check-input" id="has_expire">
+                                            <input type="checkbox" name="has_expire" value="1" class="form-check-input" id="has_expire" <?= oldCheck('has_expire') ?>>
                                             <label class="form-check-label" for="has_expire">له تاريخ صلاحية</label>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
+<div class="row mt-3">
+    <div class="col-md-3">
+        <div class="form-check">
+            <input type="checkbox" name="can_be_negative" value="1" class="form-check-input" id="can_be_negative" <?= oldCheck('can_be_negative') ?>>
+            <label class="form-check-label" for="can_be_negative">يسمح بالسالب</label>
+        </div>
+    </div>
+</div>
+</div> <!-- إقفال تاب البيانات الأساسية -->
                             <!-- Barcodes Tab -->
                             <div class="tab-pane fade" id="barcodes" role="tabpanel">
                                 <div class="row">
@@ -525,7 +639,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <div id="barcodesContainer">
                                             <div class="barcode-row row mb-2">
                                                 <div class="col-md-8">
-                                                    <input type="text" name="barcodes[]" class="form-control" placeholder="باركود دولي 1">
+                                                    <input type="text" name="barcodes[]" class="form-control barcode-input" placeholder="باركود دولي 1">
                                                 </div>
                                                 <div class="col-md-4">
                                                     <select name="barcode_units[]" class="form-select">
@@ -539,15 +653,21 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <button type="button" class="btn btn-success btn-sm add-barcode">
                                             <i class="bi bi-plus-lg"></i> إضافة باركود
                                         </button>
+                                        <div class="validation-feedback" id="barcodes_feedback"></div>
                                     </div>
                                     <div class="col-md-6">
                                         <h6><i class="bi bi-qr-code"></i> QR Code</h6>
                                         <div class="mb-3">
-                                            <input type="text" name="qr_code" class="form-control" placeholder="QR Code">
+                                            <input type="text" name="qr_code" id="qr_code" class="form-control" placeholder="QR Code">
+                                            <div class="validation-feedback" id="qr_code_feedback"></div>
                                         </div>
                                         <div class="form-check">
-                                            <input type="checkbox" name="print_barcode" value="1" class="form-check-input" id="print_barcode">
+                                            <input type="checkbox" name="print_barcode" value="1" class="form-check-input" id="print_barcode" <?= oldCheck('print_barcode') ?>>
                                             <label class="form-check-label" for="print_barcode">طباعة باركود داخلي</label>
+                                        </div>
+                                        <div class="form-check mt-2">
+                                            <input type="checkbox" name="print_internal_barcode" value="1" class="form-check-input" id="print_internal_barcode" <?= oldCheck('print_internal_barcode') ?>>
+                                            <label class="form-check-label" for="print_internal_barcode">طباعة باركود داخلي</label>
                                         </div>
                                     </div>
                                 </div>
@@ -560,14 +680,16 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     <div class="col-md-3">
                                         <div class="mb-3">
                                             <label class="form-label">سعر البيع (الكبرى) <span class="text-danger">*</span></label>
-                                            <input type="number" name="sell_price" id="sell_price" class="form-control" step="0.01" placeholder="0.00" required>
+                                            <input type="number" name="sell_price" id="sell_price" class="form-control" step="0.01" placeholder="0.00" required
+                                                   value="<?= old('sell_price') ?>">
                                         </div>
                                     </div>
                                     <div class="col-md-3">
                                         <div class="mb-3">
                                             <label class="form-label">نسبة الخصم (الربح) %</label>
                                             <div class="input-group">
-                                                <input type="number" name="profit_margin" id="profit_margin" class="form-control" step="0.01" placeholder="0.00">
+                                                <input type="number" name="profit_margin" id="profit_margin" class="form-control" step="0.01" placeholder="0.00"
+                                                       value="<?= old('profit_margin') ?>">
                                                 <span class="input-group-text">%</span>
                                             </div>
                                             <small class="text-muted">نسبة الخصم من سعر البيع</small>
@@ -577,7 +699,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <div class="mb-3">
                                             <label class="form-label">سعر الشراء (يدوي)</label>
                                             <div class="input-group">
-                                                <input type="number" name="cost_price" id="cost_price" class="form-control" step="0.01" placeholder="0.00">
+                                                <input type="number" name="cost_price" id="cost_price" class="form-control" step="0.01" placeholder="0.00"
+                                                       value="<?= old('cost_price') ?>">
                                                 <span class="input-group-text">ج</span>
                                             </div>
                                             <small class="text-muted">اتركه فارغاً لحسابه تلقائياً</small>
@@ -587,7 +710,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <div class="mb-3">
                                             <label class="form-label">ضريبة القيمة المضافة</label>
                                             <div class="input-group">
-                                                <input type="number" name="vat_percent" id="vat_percent" class="form-control" step="0.01" value="0">
+                                                <input type="number" name="vat_percent" id="vat_percent" class="form-control" step="0.01" value="0"
+                                                       value="<?= old('vat_percent', '0') ?>">
                                                 <span class="input-group-text">%</span>
                                             </div>
                                             <small class="text-muted">0% افتراضي</small>
@@ -596,17 +720,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 </div>
 
                                 <div class="row mb-3">
-                                    <div class="col-md-3">
-                                        <div class="mb-3">
-                                            <label class="form-label">نسبة صافي الربح</label>
-                                            <div class="input-group">
-                                                <input type="number" class="form-control" id="net_profit_percent" readonly style="background: #e9ecef;">
-                                                <span class="input-group-text">%</span>
-                                            </div>
-                                            <small class="text-muted">(سعر البيع - سعر الشراء) / سعر الشراء</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-4">
                                         <div class="mb-3">
                                             <label class="form-label">قيمة صافي الربح</label>
                                             <div class="input-group">
@@ -616,7 +730,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                             <small class="text-muted">سعر البيع - سعر الشراء</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-4">
                                         <div class="mb-3">
                                             <label class="form-label">قيمة الضريبة</label>
                                             <div class="input-group">
@@ -626,7 +740,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                             <small class="text-muted">صافي الربح × نسبة الضريبة</small>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-4">
                                         <div class="mb-3">
                                             <label class="form-label">صافي الربح بعد الضريبة</label>
                                             <div class="input-group">
@@ -651,7 +765,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 <select name="unit1_id" class="form-select">
                                                     <option value="">-- اختر --</option>
                                                     <?php foreach ($units as $unit): ?>
-                                                        <option value="<?= $unit['id'] ?>"><?= $unit['unit_name_ar'] ?></option>
+                                                        <option value="<?= $unit['id'] ?>" <?= oldSelect('unit1_id', $unit['id']) ?>><?= $unit['unit_name_ar'] ?></option>
                                                     <?php endforeach; ?>
                                                 </select>
                                             </div>
@@ -670,13 +784,15 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 <select name="unit2_id" class="form-select">
                                                     <option value="">-- اختر --</option>
                                                     <?php foreach ($units as $unit): ?>
-                                                        <option value="<?= $unit['id'] ?>"><?= $unit['unit_name_ar'] ?></option>
+                                                        <option value="<?= $unit['id'] ?>" <?= oldSelect('unit2_id', $unit['id']) ?>><?= $unit['unit_name_ar'] ?></option>
                                                     <?php endforeach; ?>
                                                 </select>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">عدد الوحدات</label>
-                                                <input type="number" name="unit1_to_unit2" id="unit1_to_unit2" class="form-control" placeholder="مثال: 10">
+                                                <input type="number" name="unit1_to_unit2" id="unit1_to_unit2" class="form-control" placeholder="1"
+                                                       value="<?= old('unit1_to_unit2', '1') ?>">
+                                                <small class="text-muted">الوحدة الكبرى = كم وحدة وسطى؟ (افتراضي: 1)</small>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">سعر البيع</label>
@@ -693,13 +809,15 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 <select name="unit3_id" class="form-select">
                                                     <option value="">-- اختر --</option>
                                                     <?php foreach ($units as $unit): ?>
-                                                        <option value="<?= $unit['id'] ?>"><?= $unit['unit_name_ar'] ?></option>
+                                                        <option value="<?= $unit['id'] ?>" <?= oldSelect('unit3_id', $unit['id']) ?>><?= $unit['unit_name_ar'] ?></option>
                                                     <?php endforeach; ?>
                                                 </select>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">عدد الوحدات</label>
-                                                <input type="number" name="unit1_to_unit3" id="unit1_to_unit3" class="form-control" placeholder="مثال: 100">
+                                                <input type="number" name="unit1_to_unit3" id="unit1_to_unit3" class="form-control" placeholder="1"
+                                                       value="<?= old('unit1_to_unit3', '1') ?>">
+                                                <small class="text-muted">الوحدة الكبرى = كم وحدة صغرى؟ (افتراضي: 1)</small>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">سعر البيع</label>
@@ -714,9 +832,9 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <div class="mb-3">
                                             <label class="form-label">وحدة البيع الافتراضية</label>
                                             <select name="default_sale_unit" class="form-select">
-                                                <option value="1">الوحدة الكبرى</option>
-                                                <option value="2">الوحدة الوسطى</option>
-                                                <option value="3">الوحدة الصغرى</option>
+                                                <option value="1" <?= oldSelect('default_sale_unit', '1') ?>>الوحدة الكبرى</option>
+                                                <option value="2" <?= oldSelect('default_sale_unit', '2') ?>>الوحدة الوسطى</option>
+                                                <option value="3" <?= oldSelect('default_sale_unit', '3') ?>>الوحدة الصغرى</option>
                                             </select>
                                         </div>
                                     </div>
@@ -736,7 +854,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <div class="mb-3">
                                             <label class="form-label">أقصى نسبة خصم مسموحة</label>
                                             <div class="input-group">
-                                                <input type="number" name="max_discount" id="max_discount" class="form-control" step="0.01" placeholder="0.00">
+                                                <input type="number" name="max_discount" id="max_discount" class="form-control" step="0.01" placeholder="0.00"
+                                                       value="<?= old('max_discount') ?>">
                                                 <span class="input-group-text">%</span>
                                             </div>
                                             <small class="text-muted">النسبة القصوى للخصم على هذا الصنف</small>
@@ -751,19 +870,22 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     <div class="col-md-4">
                                         <div class="mb-3">
                                             <label class="form-label">الحد الأقصى للمخزون</label>
-                                            <input type="number" name="max_stock" class="form-control" placeholder="0">
+                                            <input type="number" name="max_stock" class="form-control" placeholder="0"
+                                                   value="<?= old('max_stock') ?>">
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <div class="mb-3">
                                             <label class="form-label">الحد الأدنى للمخزون</label>
-                                            <input type="number" name="min_stock" class="form-control" placeholder="0">
+                                            <input type="number" name="min_stock" class="form-control" placeholder="0"
+                                                   value="<?= old('min_stock') ?>">
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <div class="mb-3">
                                             <label class="form-label">حد الطلب (Reorder Point)</label>
-                                            <input type="number" name="reorder_point" class="form-control" placeholder="0">
+                                            <input type="number" name="reorder_point" class="form-control" placeholder="0"
+                                                   value="<?= old('reorder_point') ?>">
                                         </div>
                                     </div>
                                 </div>
@@ -795,7 +917,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 </div>
                             </div>
 
-                            <!-- Alerts Tab - Dropdown Only -->
+                            <!-- Alerts Tab -->
                             <div class="tab-pane fade" id="alerts" role="tabpanel">
                                 <h6 class="mb-3">اختر التحذيرات المناسبة:</h6>
                                 <div class="row">
@@ -853,7 +975,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         <hr>
                                         <div class="mb-3">
                                             <label class="form-label">تحذير مخصص (اختياري)</label>
-                                            <input type="text" name="custom_alert" class="form-control" placeholder="اكتب تحذير مخصص...">
+                                            <input type="text" name="custom_alert" class="form-control" placeholder="اكتب تحذير مخصص..."
+                                                   value="<?= old('custom_alert') ?>">
                                         </div>
                                     </div>
                                 </div>
@@ -863,7 +986,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                     </div>
 
                     <div class="card-footer">
-                        <button type="submit" class="btn btn-primary btn-lg">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
                             <i class="bi bi-save"></i> حفظ الصنف
                         </button>
                         <a href="index.php" class="btn btn-secondary btn-lg">
@@ -879,12 +1002,11 @@ require_once __DIR__ . '/../../includes/sidebar.php';
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Price synchronization
+        // ===== PRICE CALCULATION (FIXED) =====
         const sellPriceInput = document.getElementById('sell_price');
         const profitMarginInput = document.getElementById('profit_margin');
         const costPriceInput = document.getElementById('cost_price');
         const vatPercentInput = document.getElementById('vat_percent');
-        const netProfitPercent = document.getElementById('net_profit_percent');
         const netProfitValue = document.getElementById('net_profit_value');
         const vatValue = document.getElementById('vat_value');
         const netProfitAfterVat = document.getElementById('net_profit_after_vat');
@@ -894,39 +1016,33 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         const unit1ToUnit2 = document.getElementById('unit1_to_unit2');
         const unit1ToUnit3 = document.getElementById('unit1_to_unit3');
 
+        let lastEditedField = null;
+
         function updatePrices() {
             const sellPrice = parseFloat(sellPriceInput.value) || 0;
-            const profitMargin = parseFloat(profitMarginInput.value) || 0;
+            let profitMargin = parseFloat(profitMarginInput.value) || 0;
+            let costPrice = parseFloat(costPriceInput.value) || 0;
             const vatPercent = parseFloat(vatPercentInput.value) || 0;
 
-            // Get current cost price (manual or calculated)
-            let costPrice = parseFloat(costPriceInput.value) || 0;
-
-            // If cost_price is empty and profit_margin is filled, calculate cost_price
-            if (costPrice === 0 && profitMargin > 0) {
+            // If sell_price is set and profit_margin is set, calculate cost_price
+            if (sellPrice > 0 && profitMargin > 0 && (lastEditedField === 'profit_margin' || lastEditedField === 'sell_price')) {
                 costPrice = sellPrice * (1 - (profitMargin / 100));
                 costPriceInput.value = costPrice.toFixed(2);
             }
 
-            // If cost_price is filled and profit_margin is empty, calculate profit_margin
-            if (costPrice > 0 && profitMargin === 0) {
-                const calculatedMargin = ((sellPrice - costPrice) / sellPrice) * 100;
-                profitMarginInput.value = calculatedMargin.toFixed(2);
+            // If sell_price is set and cost_price is set, calculate profit_margin
+            if (sellPrice > 0 && costPrice > 0 && (lastEditedField === 'cost_price' || lastEditedField === 'sell_price')) {
+                profitMargin = ((sellPrice - costPrice) / sellPrice) * 100;
+                profitMarginInput.value = profitMargin.toFixed(2);
             }
 
             // Recalculate with updated values
             costPrice = parseFloat(costPriceInput.value) || 0;
+            profitMargin = parseFloat(profitMarginInput.value) || 0;
 
             // Calculate net profit
             const netProfit = sellPrice - costPrice;
             netProfitValue.value = netProfit.toFixed(2);
-
-            // Calculate net profit percentage
-            let netProfitPct = 0;
-            if (costPrice > 0) {
-                netProfitPct = (netProfit / costPrice) * 100;
-            }
-            netProfitPercent.value = netProfitPct.toFixed(2);
 
             // Calculate VAT
             const vatAmount = netProfit * (vatPercent / 100);
@@ -956,22 +1072,105 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             }
         }
 
-        // Add event listeners to all pricing inputs
-        sellPriceInput.addEventListener('input', updatePrices);
-        profitMarginInput.addEventListener('input', updatePrices);
-        costPriceInput.addEventListener('input', updatePrices);
-        vatPercentInput.addEventListener('input', updatePrices);
+        // Track which field was last edited
+        sellPriceInput.addEventListener('input', function() { lastEditedField = 'sell_price'; updatePrices(); });
+        profitMarginInput.addEventListener('input', function() { lastEditedField = 'profit_margin'; updatePrices(); });
+        costPriceInput.addEventListener('input', function() { lastEditedField = 'cost_price'; updatePrices(); });
+        vatPercentInput.addEventListener('input', function() { lastEditedField = 'vat_percent'; updatePrices(); });
         unit1ToUnit2.addEventListener('input', updatePrices);
         unit1ToUnit3.addEventListener('input', updatePrices);
 
-        // Add barcode row
+        // ===== REAL-TIME VALIDATION (AJAX) =====
+        const validationTimeout = {};
+        
+        function checkDuplicate(field, value, feedbackId) {
+            const feedback = document.getElementById(feedbackId);
+            const input = document.getElementById(field);
+            
+            if (!value || value.trim() === '') {
+                input.classList.remove('is-valid', 'is-invalid');
+                feedback.style.display = 'none';
+                return;
+            }
+
+            if (validationTimeout[field]) {
+                clearTimeout(validationTimeout[field]);
+            }
+
+            feedback.innerHTML = '<i class="bi bi-hourglass-split"></i> جاري الفحص...';
+            feedback.className = 'validation-feedback';
+            feedback.style.display = 'block';
+
+            validationTimeout[field] = setTimeout(() => {
+                fetch(`../../api/check-product.php?field=${field}&value=${encodeURIComponent(value)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.exists) {
+                            input.classList.remove('is-valid');
+                            input.classList.add('is-invalid');
+                            feedback.innerHTML = '<i class="bi bi-x-circle"></i> ' + data.message;
+                            feedback.className = 'validation-feedback invalid';
+                        } else {
+                            input.classList.remove('is-invalid');
+                            input.classList.add('is-valid');
+                            feedback.innerHTML = '<i class="bi bi-check-circle"></i> متاح';
+                            feedback.className = 'validation-feedback valid';
+                        }
+                    })
+                    .catch(err => {
+                        feedback.style.display = 'none';
+                        input.classList.remove('is-valid', 'is-invalid');
+                    });
+            }, 500);
+        }
+
+        // Product name validation
+        document.getElementById('product_name').addEventListener('blur', function() {
+            checkDuplicate('product_name', this.value, 'product_name_feedback');
+        });
+
+        // Product name EN validation
+        document.getElementById('product_name_en').addEventListener('blur', function() {
+            if (this.value.trim() !== '') {
+                checkDuplicate('product_name_en', this.value, 'product_name_en_feedback');
+            }
+        });
+
+        // Barcode validation
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('barcode-input')) {
+                const barcodeValue = e.target.value;
+                if (barcodeValue.length > 3) {
+                    checkDuplicate('barcode', barcodeValue, 'barcodes_feedback');
+                }
+            }
+        });
+
+        // QR Code validation
+        document.getElementById('qr_code').addEventListener('blur', function() {
+            if (this.value.trim() !== '') {
+                checkDuplicate('qr_code', this.value, 'qr_code_feedback');
+            }
+        });
+
+        // ===== FORM SUBMISSION VALIDATION =====
+        document.getElementById('productForm').addEventListener('submit', function(e) {
+            const invalidFields = document.querySelectorAll('.is-invalid');
+            if (invalidFields.length > 0) {
+                e.preventDefault();
+                alert('يوجد حقول تحتوي على قيم مكررة. يرجى تصحيحها قبل الحفظ.');
+                invalidFields[0].focus();
+            }
+        });
+
+        // ===== ADD BARCODE ROW =====
         document.querySelector('.add-barcode').addEventListener('click', function() {
             var container = document.getElementById('barcodesContainer');
             var newRow = document.createElement('div');
             newRow.className = 'barcode-row row mb-2';
             newRow.innerHTML = `
                 <div class="col-md-8">
-                    <input type="text" name="barcodes[]" class="form-control" placeholder="باركود">
+                    <input type="text" name="barcodes[]" class="form-control barcode-input" placeholder="باركود">
                 </div>
                 <div class="col-md-4">
                     <select name="barcode_units[]" class="form-select">
@@ -984,7 +1183,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             container.appendChild(newRow);
         });
 
-        // Add location row
+        // ===== ADD LOCATION ROW =====
         document.querySelector('.add-location').addEventListener('click', function() {
             var container = document.getElementById('locationsContainer');
             var newRow = document.createElement('div');

@@ -12,16 +12,22 @@ if (!$product_id) {
     exit;
 }
 
-// Get product data
+// Get product data with all joins
 $stmt = $db->prepare("
     SELECT p.*, 
         c.category_name_ar as category_name,
         co.company_name_ar as company_name,
-        pt.type_name_ar as product_type_name
+        pt.type_name_ar as product_type_name,
+        u1.unit_name_ar as unit1_name,
+        u2.unit_name_ar as unit2_name,
+        u3.unit_name_ar as unit3_name
     FROM products p
     LEFT JOIN product_categories c ON p.category_id = c.id
     LEFT JOIN product_companies co ON p.company_id = co.id
     LEFT JOIN product_types pt ON p.product_type_id = pt.id
+    LEFT JOIN product_units u1 ON p.unit1_id = u1.id
+    LEFT JOIN product_units u2 ON p.unit2_id = u2.id
+    LEFT JOIN product_units u3 ON p.unit3_id = u3.id
     WHERE p.id = ?
 ");
 $stmt->execute([$product_id]);
@@ -87,6 +93,11 @@ $total_stock = array_sum(array_column($stock_batches, 'quantity'));
 $total_stock_value = array_sum(array_map(function($b) { 
     return $b['quantity'] * $b['purchase_price']; 
 }, $stock_batches));
+
+// Calculate profit
+$profit = $product['sell_price'] - $product['cost_price'];
+$profit_margin = $product['sell_price'] > 0 ? (($product['sell_price'] - $product['cost_price']) / $product['sell_price'] * 100) : 0;
+$profit_pct = $product['cost_price'] > 0 ? (($product['sell_price'] - $product['cost_price']) / $product['cost_price'] * 100) : 0;
 
 $page_title = 'كارت الصنف: ' . $product['product_name'];
 
@@ -219,6 +230,57 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         .alert-CONTRAINDICATION { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
         .alert-PREGNANCY { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
         .alert-OTHER { background: #e2e3e5; border: 1px solid #d6d8db; color: #383d41; }
+        .info-row {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #555;
+            width: 150px;
+            display: inline-block;
+        }
+        .info-value {
+            color: #333;
+        }
+        .unit-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            height: 100%;
+        }
+        .unit-card h5 {
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+        .unit-card .price {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--success);
+        }
+        .unit-card .ratio {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .feature-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            margin: 2px;
+            font-size: 0.85rem;
+        }
+        .feature-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        .feature-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
         @media (max-width: 768px) {
             .sidebar { width: 100%; position: relative; }
             .main-content { margin-right: 0; }
@@ -262,65 +324,96 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <table class="table table-borderless">
-                                        <tr>
-                                            <td class="fw-bold">كود الصنف:</td>
-                                            <td><code class="bg-light px-2 py-1 rounded"><?= htmlspecialchars($product['product_code']) ?></code></td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold">الاسم:</td>
-                                            <td><?= htmlspecialchars($product['product_name']) ?></td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold">الاسم الإنجليزي:</td>
-                                            <td><?= htmlspecialchars($product['product_name_en'] ?? '-') ?></td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold">المادة الفعالة:</td>
-                                            <td><?= htmlspecialchars($product['scientific_name'] ?? '-') ?></td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold">النوع:</td>
-                                            <td><span class="badge bg-info"><?= htmlspecialchars($product['product_type_name'] ?? 'غير محدد') ?></span></td>
-                                        </tr>
-                                    </table>
+                                    <div class="info-row">
+                                        <span class="info-label">كود الصنف:</span>
+                                        <span class="info-value"><code class="bg-light px-2 py-1 rounded"><?= htmlspecialchars($product['product_code']) ?></code></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">الاسم:</span>
+                                        <span class="info-value fw-bold"><?= htmlspecialchars($product['product_name']) ?></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">الاسم الإنجليزي:</span>
+                                        <span class="info-value"><?= htmlspecialchars($product['product_name_en'] ?? '-') ?></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">المادة الفعالة:</span>
+                                        <span class="info-value"><?= htmlspecialchars($product['scientific_name'] ?? '-') ?></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">النوع:</span>
+                                        <span class="info-value"><span class="badge bg-info"><?= htmlspecialchars($product['product_type_name'] ?? 'غير محدد') ?></span></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">القسم:</span>
+                                        <span class="info-value"><?= htmlspecialchars($product['category_name'] ?? '-') ?></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">الشركة:</span>
+                                        <span class="info-value"><?= htmlspecialchars($product['company_name'] ?? '-') ?></span>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <table class="table table-borderless">
-                                        <tr>
-                                            <td class="fw-bold">القسم:</td>
-                                            <td><?= htmlspecialchars($product['category_name'] ?? '-') ?></td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold">الشركة:</td>
-                                            <td><?= htmlspecialchars($product['company_name'] ?? '-') ?></td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold">المصدر:</td>
-                                            <td>
-                                                <?php if ($product['is_imported']): ?>
-                                                    <span class="badge bg-warning">مستورد</span>
-                                                <?php else: ?>
-                                                    <span class="badge bg-success">محلي</span>
-                                                <?php endif; ?>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold">الحالة:</td>
-                                            <td>
-                                                <?php if ($product['is_active']): ?>
-                                                    <span class="badge bg-success">نشط</span>
-                                                <?php else: ?>
-                                                    <span class="badge bg-danger">موقوف</span>
-                                                <?php endif; ?>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold">تاريخ الإضافة:</td>
-                                            <td><?= date('Y-m-d H:i', strtotime($product['created_at'])) ?></td>
-                                        </tr>
-                                    </table>
+                                    <div class="info-row">
+                                        <span class="info-label">الكود المختصر:</span>
+                                        <span class="info-value"><?= htmlspecialchars($product['manual_code'] ?? '-') ?></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">المصدر:</span>
+                                        <span class="info-value">
+                                            <?php if ($product['is_imported']): ?>
+                                                <span class="badge bg-warning">مستورد</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-success">محلي</span>
+                                            <?php endif; ?>
+                                        </span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">الحالة:</span>
+                                        <span class="info-value">
+                                            <?php if ($product['is_active']): ?>
+                                                <span class="badge bg-success">نشط</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-danger">موقوف</span>
+                                            <?php endif; ?>
+                                        </span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">تاريخ الإضافة:</span>
+                                        <span class="info-value"><?= date('Y-m-d H:i', strtotime($product['created_at'])) ?></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">آخر تحديث:</span>
+                                        <span class="info-value"><?= date('Y-m-d H:i', strtotime($product['updated_at'])) ?></span>
+                                    </div>
                                 </div>
+                            </div>
+                            
+                            <!-- Features -->
+                            <hr>
+                            <h6 class="mb-3"><i class="bi bi-sliders"></i> خصائص الصنف</h6>
+                            <div>
+                                <span class="feature-badge <?= $product['is_service'] ? 'feature-active' : 'feature-inactive' ?>">
+                                    <i class="bi bi-<?= $product['is_service'] ? 'check' : 'x' ?>-circle"></i> صنف خدمي
+                                </span>
+                                <span class="feature-badge <?= $product['hide_in_receipt'] ? 'feature-active' : 'feature-inactive' ?>">
+                                    <i class="bi bi-<?= $product['hide_in_receipt'] ? 'check' : 'x' ?>-circle"></i> إخفاء في الريسيت
+                                </span>
+                                <span class="feature-badge <?= $product['is_shortage'] ? 'feature-active' : 'feature-inactive' ?>">
+                                    <i class="bi bi-<?= $product['is_shortage'] ? 'check' : 'x' ?>-circle"></i> نواقص عامة
+                                </span>
+                                <span class="feature-badge <?= $product['has_expire'] ? 'feature-active' : 'feature-inactive' ?>">
+                                    <i class="bi bi-<?= $product['has_expire'] ? 'check' : 'x' ?>-circle"></i> له تاريخ صلاحية
+                                </span>
+                                <span class="feature-badge <?= $product['is_drug'] ? 'feature-active' : 'feature-inactive' ?>">
+                                    <i class="bi bi-<?= $product['is_drug'] ? 'check' : 'x' ?>-circle"></i> دواء
+                                </span>
+                                <span class="feature-badge <?= $product['can_be_negative'] ? 'feature-active' : 'feature-inactive' ?>">
+                                    <i class="bi bi-<?= $product['can_be_negative'] ? 'check' : 'x' ?>-circle"></i> يسمح بالسالب
+                                </span>
+                                <span class="feature-badge <?= $product['allow_discount'] ? 'feature-active' : 'feature-inactive' ?>">
+                                    <i class="bi bi-<?= $product['allow_discount'] ? 'check' : 'x' ?>-circle"></i> مسموح بالخصم
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -367,13 +460,15 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     <td class="text-start fw-bold text-primary"><?= number_format($product['sell_price'], 2) ?> ج</td>
                                 </tr>
                                 <tr>
-                                    <td>الربح:</td>
+                                    <td>صافي الربح:</td>
                                     <td class="text-start fw-bold text-success">
-                                        <?php 
-                                        $profit = $product['sell_price'] - $product['cost_price'];
-                                        $profit_pct = $product['cost_price'] > 0 ? ($profit / $product['cost_price'] * 100) : 0;
-                                        echo number_format($profit, 2) . ' ج (' . number_format($profit_pct, 1) . '%)';
-                                        ?>
+                                        <?= number_format($profit, 2) ?> ج
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>نسبة الخصم:</td>
+                                    <td class="text-start fw-bold text-warning">
+                                        <?= number_format($profit_margin, 2) ?>%
                                     </td>
                                 </tr>
                                 <tr>
@@ -381,6 +476,64 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     <td class="text-start"><?= number_format($product['max_discount'], 1) ?>%</td>
                                 </tr>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Units Section -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0"><i class="bi bi-balance-scale"></i> الوحدات والتسعير</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Unit 1 (Large) -->
+                                <div class="col-md-4 mb-3">
+                                    <div class="unit-card border border-primary">
+                                        <h5><i class="bi bi-box"></i> الوحدة الكبرى</h5>
+                                        <p class="text-muted mb-2"><?= htmlspecialchars($product['unit1_name'] ?? 'غير محدد') ?></p>
+                                        <div class="price"><?= number_format($product['sell_price'], 2) ?> ج</div>
+                                        <div class="ratio mt-2">
+                                            <span class="badge bg-primary">وحدة البيع الافتراضية</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Unit 2 (Medium) -->
+                                <div class="col-md-4 mb-3">
+                                    <div class="unit-card border border-info">
+                                        <h5><i class="bi bi-box-seam"></i> الوحدة الوسطى</h5>
+                                        <p class="text-muted mb-2"><?= htmlspecialchars($product['unit2_name'] ?? 'غير محدد') ?></p>
+                                        <div class="price"><?= number_format($product['unit2_sell_price'], 2) ?> ج</div>
+                                        <div class="ratio mt-2">
+                                            <?php if ($product['unit1_to_unit2'] > 0): ?>
+                                                <span class="badge bg-info">1 : <?= number_format($product['unit1_to_unit2']) ?></span>
+                                                <small class="d-block text-muted">الكبرى = <?= number_format($product['unit1_to_unit2']) ?> وسطى</small>
+                                            <?php else: ?>
+                                                <span class="badge bg-secondary">غير محدد</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Unit 3 (Small) -->
+                                <div class="col-md-4 mb-3">
+                                    <div class="unit-card border border-success">
+                                        <h5><i class="bi bi-box2"></i> الوحدة الصغرى</h5>
+                                        <p class="text-muted mb-2"><?= htmlspecialchars($product['unit3_name'] ?? 'غير محدد') ?></p>
+                                        <div class="price"><?= number_format($product['unit3_sell_price'], 2) ?> ج</div>
+                                        <div class="ratio mt-2">
+                                            <?php if ($product['unit1_to_unit3'] > 0): ?>
+                                                <span class="badge bg-success">1 : <?= number_format($product['unit1_to_unit3']) ?></span>
+                                                <small class="d-block text-muted">الكبرى = <?= number_format($product['unit1_to_unit3']) ?> صغرى</small>
+                                            <?php else: ?>
+                                                <span class="badge bg-secondary">غير محدد</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -565,8 +718,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 </thead>
                                                 <tbody>
                                                     <?php foreach ($supplier_prices as $sp): 
-                                                        $profit = $sp['sell_price'] - $sp['purchase_price'];
-                                                        $profit_pct = $sp['purchase_price'] > 0 ? ($profit / $sp['purchase_price'] * 100) : 0;
+                                                        $sp_profit = $sp['sell_price'] - $sp['purchase_price'];
+                                                        $sp_profit_pct = $sp['purchase_price'] > 0 ? ($sp_profit / $sp['purchase_price'] * 100) : 0;
                                                     ?>
                                                         <tr class="<?= $sp['is_default'] ? 'table-primary' : '' ?>">
                                                             <td>
@@ -577,8 +730,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                             <td><?= number_format($sp['sell_price'], 2) ?> ج</td>
                                                             <td><?= number_format($sp['discount_percent'], 1) ?>%</td>
                                                             <td><?= number_format($sp['vat_percent'], 1) ?>%</td>
-                                                            <td class="<?= $profit > 0 ? 'text-success' : 'text-danger' ?>">
-                                                                <?= number_format($profit, 2) ?> ج (<?= number_format($profit_pct, 1) ?>%)
+                                                            <td class="<?= $sp_profit > 0 ? 'text-success' : 'text-danger' ?>">
+                                                                <?= number_format($sp_profit, 2) ?> ج (<?= number_format($sp_profit_pct, 1) ?>%)
                                                             </td>
                                                             <td><?= $sp['last_supply_date'] ? date('Y-m-d', strtotime($sp['last_supply_date'])) : '-' ?></td>
                                                             <td>
