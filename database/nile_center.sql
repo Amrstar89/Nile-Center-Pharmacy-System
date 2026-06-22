@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 22, 2026 at 09:06 PM
+-- Generation Time: Jun 22, 2026 at 11:48 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -147,6 +147,22 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `areas`
+--
+
+CREATE TABLE `areas` (
+  `id` int(11) NOT NULL,
+  `area_code` varchar(20) DEFAULT NULL,
+  `area_name_ar` varchar(100) NOT NULL,
+  `area_name_en` varchar(100) DEFAULT NULL,
+  `governorate_id` int(11) DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `branches`
 --
 
@@ -173,10 +189,10 @@ INSERT INTO `branches` (`id`, `branch_code`, `branch_name`, `address`, `phone`, 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `customers`
+-- Table structure for table `customers_backup`
 --
 
-CREATE TABLE `customers` (
+CREATE TABLE `customers_backup` (
   `id` int(11) NOT NULL,
   `customer_code` varchar(50) NOT NULL,
   `customer_name` varchar(100) NOT NULL,
@@ -195,10 +211,10 @@ CREATE TABLE `customers` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- Dumping data for table `customers`
+-- Dumping data for table `customers_backup`
 --
 
-INSERT INTO `customers` (`id`, `customer_code`, `customer_name`, `phone`, `phone2`, `email`, `address`, `branch_code`, `notes`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`, `manual_code`) VALUES
+INSERT INTO `customers_backup` (`id`, `customer_code`, `customer_name`, `phone`, `phone2`, `email`, `address`, `branch_code`, `notes`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`, `manual_code`) VALUES
 (1, 'CUST001', 'أحمد محمد', '01001234567', NULL, NULL, NULL, 'BR001', 'عميل دائم', 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
 (2, 'CUST002', 'محمد علي', '01002345678', NULL, NULL, NULL, 'BR001', NULL, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
 (3, 'CUST003', 'فاطمة أحمد', '01003456789', NULL, NULL, NULL, 'BR001', NULL, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
@@ -233,6 +249,11 @@ CREATE TABLE `customer_classes` (
   `class_code` varchar(50) DEFAULT NULL,
   `class_name_ar` varchar(50) NOT NULL,
   `class_name_en` varchar(50) DEFAULT NULL,
+  `class_type` enum('wholesale','retail','cost') DEFAULT 'retail',
+  `local_margin` decimal(5,2) DEFAULT 0.00,
+  `imported_margin` decimal(5,2) DEFAULT 0.00,
+  `local_discount` decimal(5,2) DEFAULT 0.00,
+  `imported_discount` decimal(5,2) DEFAULT 0.00,
   `is_active` tinyint(1) DEFAULT 1,
   `source` enum('estock','manual') DEFAULT 'estock',
   `estock_id` decimal(18,0) DEFAULT NULL,
@@ -292,6 +313,37 @@ INSERT INTO `delivery_times` (`id`, `time_code`, `time_name`, `sort_order`, `is_
 (4, 'TD', 'نفس اليوم', 4, 1, '2026-06-17 00:13:03'),
 (5, '1D', 'يوم عمل', 5, 1, '2026-06-17 00:13:03'),
 (6, '1W', 'أسبوع', 6, 1, '2026-06-17 00:13:03');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `delivery_zones`
+--
+
+CREATE TABLE `delivery_zones` (
+  `id` int(11) NOT NULL,
+  `zone_code` varchar(20) DEFAULT NULL,
+  `zone_name_ar` varchar(100) NOT NULL,
+  `zone_name_en` varchar(100) DEFAULT NULL,
+  `delivery_fee` decimal(10,2) DEFAULT 0.00,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `governorates`
+--
+
+CREATE TABLE `governorates` (
+  `id` int(11) NOT NULL,
+  `governorate_code` varchar(20) DEFAULT NULL,
+  `governorate_name_ar` varchar(100) NOT NULL,
+  `governorate_name_en` varchar(100) DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -492,14 +544,14 @@ CREATE TABLE `products` (
 --
 
 INSERT INTO `products` (`id`, `product_code`, `product_name`, `product_name_en`, `scientific_name`, `product_type_id`, `is_service`, `hide_in_receipt`, `is_shortage`, `max_stock`, `min_stock`, `reorder_point`, `category`, `manufacturer`, `category_id`, `company_id`, `sell_price`, `unit2_sell_price`, `unit3_sell_price`, `has_expire`, `is_drug`, `can_be_negative`, `is_made`, `print_barcode`, `barcode_type`, `group_id`, `cost_price`, `is_imported`, `notes`, `print_internal_barcode`, `allow_discount`, `max_discount`, `unit1_id`, `unit2_id`, `unit3_id`, `unit1_to_unit2`, `unit1_to_unit3`, `default_sale_unit`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`, `manual_code`) VALUES
-(1, 'PRD001', 'Ozempic', '', '', 1, 0, 0, 0, 0, 0, 0, 'أدوية السكري', 'Novo Nordisk', 0, 0, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, 'طلب متكرر', 0, 1, 0.00, 0, 0, 0, 0, 0, 1, 0, '2026-06-15 16:53:16', '2026-06-17 23:59:30', 'estock', NULL, NULL),
-(2, 'PRD002', 'Humira', NULL, NULL, 1, 0, 0, 0, 0, 0, 0, 'أدوية المناعة', 'AbbVie', NULL, NULL, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, NULL, 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
-(3, 'PRD003', 'Eliquis', NULL, NULL, 1, 0, 0, 0, 0, 0, 0, 'مميعات الدم', 'Bristol Myers Squibb', NULL, NULL, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, NULL, 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
-(4, 'PRD00004', 'بيكتول برتقال 24 شريط', 'Pectol Orange 24strips', NULL, 1, 1, 1, 1, 0, 0, 0, NULL, NULL, NULL, NULL, 600.00, 600.00, 25.00, 1, 0, 0, 0, 1, NULL, NULL, 384.00, 0, '', 0, 1, 50.00, NULL, NULL, NULL, 1, 24, 3, 1, '2026-06-20 17:52:05', '2026-06-20 21:08:36', 'manual', NULL, 'M-00004'),
-(5, 'PRD00005', 'اختبار 1', 'test 1', NULL, 1, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 100.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, '', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-20 21:10:23', '2026-06-20 21:10:23', 'manual', NULL, 'M-00005'),
-(6, 'PRD00006', 'اختبار 2', 'test 2', NULL, 1, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 80.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 60.00, 0, '', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-20 21:17:18', '2026-06-20 21:17:18', 'manual', NULL, 'M-00006'),
-(7, 'PRD00007', 'اختبار 3', 'TEST 3', 'MELATONIN', 3, 1, 1, 1, 10, 2, 3, NULL, NULL, NULL, NULL, 1000.00, 0.00, 0.00, 1, 1, 1, 1, 0, NULL, NULL, 0.00, 1, '', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-20 21:25:52', '2026-06-20 21:25:52', 'manual', NULL, 'M-00007'),
-(8, 'PRD00008', 'اسبوسيد اقراص', 'ASPOCID INF', 'acetylsalysilic acid', 1, 1, 1, 1, 0, 0, 0, NULL, NULL, NULL, NULL, 100.00, 100.00, 100.00, 1, 0, 0, 0, 0, NULL, NULL, 37.50, 0, '', 0, 1, 0.00, NULL, NULL, NULL, 1, 1, 1, 1, '2026-06-20 21:27:38', '2026-06-20 21:30:04', 'manual', NULL, 'M-00008');
+(1, '1', 'Ozempic', '', '', 1, 0, 0, 0, 0, 0, 0, 'أدوية السكري', 'Novo Nordisk', 0, 0, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, 'طلب متكرر', 0, 1, 0.00, 0, 0, 0, 0, 0, 1, 0, '2026-06-15 16:53:16', '2026-06-22 19:51:16', 'estock', NULL, NULL),
+(2, '2', 'Humira', NULL, NULL, 1, 0, 0, 0, 0, 0, 0, 'أدوية المناعة', 'AbbVie', NULL, NULL, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, NULL, 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-15 16:53:16', '2026-06-22 19:51:16', 'estock', NULL, NULL),
+(3, '3', 'Eliquis', NULL, NULL, 1, 0, 0, 0, 0, 0, 0, 'مميعات الدم', 'Bristol Myers Squibb', NULL, NULL, 0.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, '', 0, 1, 0.00, NULL, NULL, NULL, 1, 1, 1, 1, '2026-06-15 16:53:16', '2026-06-22 19:59:38', 'estock', NULL, 'el'),
+(4, '4', 'بيكتول برتقال 24 شريط', 'Pectol Orange 24strips', NULL, 1, 1, 1, 1, 0, 0, 0, NULL, NULL, NULL, NULL, 600.00, 600.00, 25.00, 1, 0, 0, 0, 1, NULL, NULL, 384.00, 0, '', 0, 1, 50.00, NULL, NULL, NULL, 1, 24, 3, 1, '2026-06-20 17:52:05', '2026-06-22 19:51:16', 'manual', NULL, 'M-00004'),
+(5, '5', 'اختبار 1', 'test 1', NULL, 1, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 100.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 0.00, 0, '', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-20 21:10:23', '2026-06-22 19:51:16', 'manual', NULL, 'M-00005'),
+(6, '6', 'اختبار 2', 'test 2', NULL, 1, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, 80.00, 0.00, 0.00, 0, 0, 0, 0, 0, NULL, NULL, 60.00, 0, '', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-20 21:17:18', '2026-06-22 19:51:16', 'manual', NULL, 'M-00006'),
+(7, '7', 'اختبار 3', 'TEST 3', 'MELATONIN', 3, 1, 1, 1, 10, 2, 3, NULL, NULL, NULL, NULL, 1000.00, 0.00, 0.00, 1, 1, 1, 1, 0, NULL, NULL, 0.00, 1, '', 0, 1, 0.00, NULL, NULL, NULL, NULL, NULL, 1, 1, '2026-06-20 21:25:52', '2026-06-22 19:51:16', 'manual', NULL, 'M-00007'),
+(8, '8', 'اسبوسيد اقراص', 'ASPOCID INF', 'acetylsalysilic acid', 1, 1, 1, 1, 0, 0, 0, NULL, NULL, NULL, NULL, 100.00, 100.00, 100.00, 1, 0, 0, 0, 0, NULL, NULL, 37.50, 0, '', 0, 1, 0.00, NULL, NULL, NULL, 1, 1, 1, 1, '2026-06-20 21:27:38', '2026-06-22 19:51:16', 'manual', NULL, 'M-00008');
 
 -- --------------------------------------------------------
 
@@ -834,6 +886,14 @@ ALTER TABLE `activity_logs`
   ADD KEY `idx_activity_logs_date` (`created_at`);
 
 --
+-- Indexes for table `areas`
+--
+ALTER TABLE `areas`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `area_code` (`area_code`),
+  ADD KEY `fk_area_governorate` (`governorate_id`);
+
+--
 -- Indexes for table `branches`
 --
 ALTER TABLE `branches`
@@ -841,9 +901,9 @@ ALTER TABLE `branches`
   ADD UNIQUE KEY `branch_code` (`branch_code`);
 
 --
--- Indexes for table `customers`
+-- Indexes for table `customers_backup`
 --
-ALTER TABLE `customers`
+ALTER TABLE `customers_backup`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `customer_code` (`customer_code`);
 
@@ -872,6 +932,20 @@ ALTER TABLE `customer_contracts`
 ALTER TABLE `delivery_times`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `time_code` (`time_code`);
+
+--
+-- Indexes for table `delivery_zones`
+--
+ALTER TABLE `delivery_zones`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `zone_code` (`zone_code`);
+
+--
+-- Indexes for table `governorates`
+--
+ALTER TABLE `governorates`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `governorate_code` (`governorate_code`);
 
 --
 -- Indexes for table `inventory_batches`
@@ -919,6 +993,7 @@ ALTER TABLE `order_statuses`
 ALTER TABLE `products`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `product_code` (`product_code`),
+  ADD UNIQUE KEY `uk_manual_code` (`manual_code`),
   ADD KEY `idx_product_type` (`product_type_id`),
   ADD KEY `idx_product_active` (`is_active`),
   ADD KEY `idx_product_company` (`company_id`),
@@ -1038,6 +1113,12 @@ ALTER TABLE `activity_logs`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=79;
 
 --
+-- AUTO_INCREMENT for table `areas`
+--
+ALTER TABLE `areas`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `branches`
 --
 ALTER TABLE `branches`
@@ -1048,6 +1129,18 @@ ALTER TABLE `branches`
 --
 ALTER TABLE `delivery_times`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+
+--
+-- AUTO_INCREMENT for table `delivery_zones`
+--
+ALTER TABLE `delivery_zones`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `governorates`
+--
+ALTER TABLE `governorates`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `inventory_batches`
@@ -1142,6 +1235,12 @@ ALTER TABLE `users`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `areas`
+--
+ALTER TABLE `areas`
+  ADD CONSTRAINT `fk_area_governorate` FOREIGN KEY (`governorate_id`) REFERENCES `governorates` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `orders`
