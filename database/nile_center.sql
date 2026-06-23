@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 23, 2026 at 02:01 AM
+-- Generation Time: Jun 23, 2026 at 07:02 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -144,7 +144,10 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (77, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-20 21:02:12'),
 (78, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-22 18:15:57'),
 (79, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-22 22:22:55'),
-(80, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.73.167.118', '2026-06-22 23:49:20');
+(80, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.73.167.118', '2026-06-22 23:49:20'),
+(81, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.73.167.118', '2026-06-23 10:57:43'),
+(82, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.73.167.118', '2026-06-23 16:13:19'),
+(83, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 16:38:54');
 
 -- --------------------------------------------------------
 
@@ -314,7 +317,13 @@ CREATE TABLE `customers` (
 
 INSERT INTO `customers` (`id`, `customer_code`, `customer_name`, `customer_name_en`, `customer_type`, `customer_class_id`, `local_margin`, `imported_margin`, `local_discount`, `imported_discount`, `payment_type`, `credit_limit`, `credit_password`, `branch_id`, `phone`, `phone2`, `email`, `address`, `branch_code`, `notes`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`, `manual_code`) VALUES
 (1, '1', 'عمرو حجازي', 'Amr Hegazy', 'individual', 3, 0.00, 0.00, 0.00, 0.00, 'credit', 100000.00, NULL, 1, NULL, NULL, 'Amrstar89@hotmail.com', NULL, NULL, '', 1, '2026-06-22 23:20:33', '2026-06-22 23:20:33', 'manual', NULL, NULL),
-(2, '2', 'عمرو حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-22 23:33:54', '2026-06-22 23:33:54', 'manual', NULL, NULL);
+(2, '2', 'عمرو حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-22 23:33:54', '2026-06-22 23:33:54', 'manual', NULL, NULL),
+(3, '3', 'احمد زين', 'Ahmed Zain', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, 3, NULL, NULL, 'Zain@hotmail.com', NULL, NULL, '', 1, '2026-06-23 16:56:20', '2026-06-23 16:56:20', 'manual', NULL, NULL),
+(4, '4', 'احمد حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:57:18', '2026-06-23 16:57:18', 'manual', NULL, NULL),
+(5, '5', 'عميل 4', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:30', '2026-06-23 16:59:30', 'manual', NULL, NULL),
+(6, '6', 'عميل 5', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:36', '2026-06-23 16:59:36', 'manual', NULL, NULL),
+(7, '7', 'عميل 6', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:43', '2026-06-23 16:59:43', 'manual', NULL, NULL),
+(8, '8', 'عمرو حجازي', 'Amr Hegazy', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 17:00:09', '2026-06-23 17:00:09', 'manual', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -425,7 +434,7 @@ CREATE TABLE `customer_classes` (
 --
 
 INSERT INTO `customer_classes` (`id`, `class_code`, `class_name_ar`, `class_name_en`, `class_type`, `local_margin`, `imported_margin`, `local_discount`, `imported_discount`, `is_active`, `source`, `estock_id`, `created_at`) VALUES
-(0, NULL, 'جملة', 'Wholesale', 'cost', 0.00, 0.00, 0.00, 0.00, 1, 'estock', NULL, '2026-06-22 22:09:19'),
+(0, NULL, 'جملة', 'Wholesale', 'wholesale', 15.00, 20.00, 0.00, 0.00, 1, 'estock', NULL, '2026-06-22 22:09:19'),
 (1, NULL, 'جملة', 'Wholesale', 'wholesale', 15.00, 20.00, 0.00, 0.00, 1, 'estock', NULL, '2026-06-22 22:50:25'),
 (2, NULL, 'تجزئة', 'Retail', 'retail', 0.00, 0.00, 5.00, 10.00, 1, 'estock', NULL, '2026-06-22 22:50:25'),
 (3, NULL, 'تكلفة', 'Cost', 'cost', 0.00, 0.00, 0.00, 0.00, 1, 'estock', NULL, '2026-06-22 22:50:25');
@@ -487,7 +496,9 @@ CREATE TABLE `customer_phones` (
 INSERT INTO `customer_phones` (`id`, `customer_id`, `country_code`, `phone_number`, `phone_type`, `is_primary`, `is_whatsapp`, `created_at`) VALUES
 (1, 1, '+20', '01067788553', 'mobile', 1, 1, '2026-06-22 23:20:33'),
 (2, 1, '+20', '01007837873', 'mobile', 0, 0, '2026-06-22 23:20:33'),
-(3, 2, '+20', '01067788553', 'mobile', 1, 0, '2026-06-22 23:33:54');
+(3, 2, '+20', '01067788553', 'mobile', 1, 0, '2026-06-22 23:33:54'),
+(4, 3, '+20', '01234567891011', 'mobile', 1, 0, '2026-06-23 16:56:20'),
+(5, 3, '+20', '010012013014015', 'mobile', 0, 0, '2026-06-23 16:56:20');
 
 -- --------------------------------------------------------
 
@@ -1112,7 +1123,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-23 01:49:20', '2026-06-15 16:53:16', '2026-06-22 23:49:20'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-23 18:38:54', '2026-06-15 16:53:16', '2026-06-23 16:38:54'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -1393,7 +1404,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=81;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=84;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -1423,7 +1434,7 @@ ALTER TABLE `country_codes`
 -- AUTO_INCREMENT for table `customers`
 --
 ALTER TABLE `customers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `customer_addresses`
@@ -1435,7 +1446,7 @@ ALTER TABLE `customer_addresses`
 -- AUTO_INCREMENT for table `customer_phones`
 --
 ALTER TABLE `customer_phones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `delivery_times`
