@@ -9,7 +9,7 @@ $value = trim($_GET['value'] ?? '');
 $customer_id = intval($_GET['customer_id'] ?? 0); // For edit mode (exclude current customer)
 
 if (empty($field) || empty($value)) {
-    echo json_encode(['valid' => false, 'message' => 'قيمة فارغة']);
+    echo json_encode(['valid' => true, 'message' => '']);
     exit;
 }
 
@@ -51,17 +51,22 @@ switch ($field) {
 
     case 'email':
         // Check email uniqueness (only if not empty)
-        $sql = "SELECT id FROM customers WHERE email = ? AND email IS NOT NULL AND email != ''";
-        $params = [$value];
-        if ($customer_id > 0) {
-            $sql .= " AND id != ?";
-            $params[] = $customer_id;
-        }
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        if ($stmt->fetch()) {
+        if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
             $valid = false;
-            $message = 'البريد الإلكتروني مستخدم بالفعل';
+            $message = 'بريد إلكتروني غير صالح';
+        } else {
+            $sql = "SELECT id FROM customers WHERE email = ? AND email IS NOT NULL AND email != ''";
+            $params = [$value];
+            if ($customer_id > 0) {
+                $sql .= " AND id != ?";
+                $params[] = $customer_id;
+            }
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            if ($stmt->fetch()) {
+                $valid = false;
+                $message = 'البريد الإلكتروني مستخدم بالفعل';
+            }
         }
         break;
 
@@ -126,6 +131,22 @@ switch ($field) {
         if ($stmt->fetch()) {
             $valid = false;
             $message = 'رقم بطاقة المريض موجود بالفعل';
+        }
+        break;
+
+    case 'manual_code':
+        // Check manual_code uniqueness
+        $sql = "SELECT id FROM customers WHERE manual_code = ? AND manual_code IS NOT NULL AND manual_code != ''";
+        $params = [$value];
+        if ($customer_id > 0) {
+            $sql .= " AND id != ?";
+            $params[] = $customer_id;
+        }
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        if ($stmt->fetch()) {
+            $valid = false;
+            $message = 'الكود المختصر مستخدم بالفعل';
         }
         break;
 
