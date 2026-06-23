@@ -3,6 +3,73 @@ require_once __DIR__ . '/../../core/config.php';
 require_once __DIR__ . '/../../core/auth.php';
 requireAuth();
 
+// AJAX Live Validation endpoint
+if (isset($_GET['ajax_validate']) && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $field = $_GET['field'] ?? '';
+    $value = trim($_GET['value'] ?? '');
+
+    if (empty($field) || empty($value)) {
+        echo json_encode(['valid' => true, 'message' => '']);
+        exit;
+    }
+
+    $valid = true;
+    $message = '';
+
+    switch ($field) {
+        case 'customer_name':
+            $stmt = $db->prepare("SELECT id FROM customers WHERE customer_name = ?");
+            $stmt->execute([$value]);
+            if ($stmt->fetch()) { $valid = false; $message = '⚠️ اسم العميل موجود بالفعل'; }
+            break;
+
+        case 'customer_name_en':
+            $stmt = $db->prepare("SELECT id FROM customers WHERE customer_name_en = ? AND customer_name_en IS NOT NULL AND customer_name_en != ''");
+            $stmt->execute([$value]);
+            if ($stmt->fetch()) { $valid = false; $message = '⚠️ الاسم الإنجليزي موجود بالفعل'; }
+            break;
+
+        case 'email':
+            if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                $valid = false; $message = '⚠️ بريد إلكتروني غير صالح';
+            } else {
+                $stmt = $db->prepare("SELECT id FROM customers WHERE email = ? AND email IS NOT NULL AND email != ''");
+                $stmt->execute([$value]);
+                if ($stmt->fetch()) { $valid = false; $message = '⚠️ البريد الإلكتروني مستخدم بالفعل'; }
+            }
+            break;
+
+        case 'phone':
+            $stmt = $db->prepare("SELECT id FROM customer_phones WHERE phone_number = ?");
+            $stmt->execute([$value]);
+            if ($stmt->fetch()) { $valid = false; $message = '⚠️ رقم الهاتف مستخدم بالفعل'; }
+            break;
+
+        case 'contract_number':
+            $stmt = $db->prepare("SELECT id FROM customer_contracts WHERE contract_number = ?");
+            $stmt->execute([$value]);
+            if ($stmt->fetch()) { $valid = false; $message = '⚠️ رقم التعاقد موجود بالفعل'; }
+            break;
+
+        case 'card_number':
+            $stmt = $db->prepare("SELECT id FROM customer_contracts WHERE card_number = ? AND card_number IS NOT NULL AND card_number != ''");
+            $stmt->execute([$value]);
+            if ($stmt->fetch()) { $valid = false; $message = '⚠️ رقم الكارنية موجود بالفعل'; }
+            break;
+
+        case 'patient_card_number':
+            $stmt = $db->prepare("SELECT id FROM customer_contracts WHERE patient_card_number = ? AND patient_card_number IS NOT NULL AND patient_card_number != ''");
+            $stmt->execute([$value]);
+            if ($stmt->fetch()) { $valid = false; $message = '⚠️ رقم بطاقة المريض موجود بالفعل'; }
+            break;
+    }
+
+    echo json_encode(['valid' => $valid, 'message' => $message]);
+    exit;
+}
+
 $db = getDB();
 
 $page_title = 'إضافة عميل جديد';
@@ -70,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':customer_class_id' => !empty($_POST['customer_class_id']) ? intval($_POST['customer_class_id']) : null,
             ':payment_type' => $payment_type,
             ':credit_limit' => $payment_type == 'credit' ? $credit_limit : 0,
-            ':credit_password' => null,
+            ':credit_password' => ($payment_type == 'credit' && !empty($_POST['credit_password'])) ? password_hash($_POST['credit_password'], PASSWORD_DEFAULT) : null,
             ':branch_id' => !empty($_POST['branch_id']) ? intval($_POST['branch_id']) : null,
             ':phone' => !empty($_POST['phone']) ? $_POST['phone'] : null,
             ':email' => !empty($_POST['email']) ? $_POST['email'] : null,
@@ -147,23 +214,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Insert contract if checked
-        if (isset($_POST['has_contract']) && !empty($_POST['contract_number'])) {
-            $contract_stmt = $db->prepare("INSERT INTO customer_contracts 
-                (customer_id, contract_number, contract_type, card_number, patient_card_number, expiry_date, coverage_percent, max_bill_amount) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $contract_stmt->execute([
-                $customer_id,
-                $_POST['contract_number'],
-                $_POST['contract_type'] ?? 'insurance',
-                !empty($_POST['card_number']) ? $_POST['card_number'] : null,
-                !empty($_POST['patient_card_number']) ? $_POST['patient_card_number'] : null,
-                !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null,
-                floatval($_POST['coverage_percent'] ?? 100),
-                floatval($_POST['max_bill_amount'] ?? 0)
-            ]);
-        }
-
         $db->commit();
         header("Location: view.php?id=" . $customer_id);
         exit;
@@ -187,18 +237,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
     <style>
         :root { --primary: #667eea; --secondary: #764ba2; --success: #198754; --warning: #ffc107; --danger: #dc3545; }
         body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .sidebar { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; position: fixed; right: 0; top: 0; width: 260px; z-index: 1000; color: #fff; }
-        .sidebar .nav-link { color: rgba(255,255,255,0.8); padding: 12px 20px; display: flex; align-items: center; transition: all 0.3s; border-radius: 8px; margin: 2px 10px; text-decoration: none; }
-        .sidebar .nav-link:hover { color: #fff; background: rgba(255,255,255,0.1); }
-        .sidebar .nav-link.active { color: #fff; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); }
-        .sidebar .nav-link i { margin-left: 10px; font-size: 18px; color: rgba(255,255,255,0.7); }
-        .sidebar .nav-link:hover i { color: #fff; }
-        .sidebar .nav-link.active i { color: #fff; }
-        .sidebar-brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); color: #fff; }
-        .sidebar-brand h4 { margin: 0; font-size: 20px; }
-        .sidebar-brand small { color: rgba(255,255,255,0.6); font-size: 12px; }
-        .sidebar-heading { color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding: 15px 20px 5px; font-weight: 600; }
-        .nav-menu { padding: 10px 0; }
+        .sidebar { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; position: fixed; right: 0; top: 0; width: 260px; z-index: 1000; }
         .main-content { margin-right: 260px; padding: 20px; }
         .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
         .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); border: none; }
@@ -227,7 +266,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 <div class="alert alert-danger"><?= $error ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="" id="customerForm" novalidate>
+            <form method="POST" action="" id="customerForm">
                 <div class="card">
                     <div class="card-header p-0">
                         <ul class="nav nav-tabs" id="customerTabs" role="tablist">
@@ -270,15 +309,15 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">اسم العميل بالعربي <span class="text-danger">*</span></label>
-                                            <input type="text" name="customer_name" class="form-control" required value="<?= old('customer_name') ?>" placeholder="اسم العميل" onblur="validateField(this, 'customer_name')" data-validate="customer_name">
-                                            <div class="invalid-feedback" id="error_customer_name"></div>
+                                            <input type="text" name="customer_name" class="form-control" required value="<?= old('customer_name') ?>" placeholder="اسم العميل" onblur="validateField(this, 'customer_name')">
+                                            <div class="validation-msg"></div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">اسم العميل بالإنجليزي</label>
-                                            <input type="text" name="customer_name_en" class="form-control" value="<?= old('customer_name_en') ?>" placeholder="Customer Name" onblur="validateField(this, 'customer_name_en')" data-validate="customer_name_en">
-                                            <div class="invalid-feedback" id="error_customer_name_en"></div>
+                                            <input type="text" name="customer_name_en" class="form-control" value="<?= old('customer_name_en') ?>" placeholder="Customer Name" onblur="validateField(this, 'customer_name_en')">
+                                            <div class="validation-msg"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -287,8 +326,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">البريد الإلكتروني</label>
-                                            <input type="email" name="email" class="form-control" value="<?= old('email') ?>" placeholder="email@example.com" onblur="validateField(this, 'email')" data-validate="email">
-                                            <div class="invalid-feedback" id="error_email"></div>
+                                            <input type="email" name="email" class="form-control" value="<?= old('email') ?>" placeholder="email@example.com" onblur="validateField(this, 'email')">
+                                            <div class="validation-msg"></div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -332,8 +371,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label">رقم الهاتف</label>
-                                                <input type="text" name="phones[0][number]" class="form-control" placeholder="01xxxxxxxxx" onblur="validateField(this, 'phone')" data-validate="phone">
-                                                    <div class="invalid-feedback" id="error_phone_0"></div>
+                                                <input type="text" name="phones[0][number]" class="form-control" placeholder="01xxxxxxxxx" onblur="validateField(this, 'phone')">
+                                                    <div class="validation-msg"></div>
                                             </div>
                                             <div class="col-md-3">
                                                 <label class="form-label">نوع</label>
@@ -509,7 +548,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 <!-- Credit Fields (hidden by default) -->
                                 <div id="creditFields" style="display: none;">
                                     <div class="row">
-                                        <div class="col-md-12">
+                                        <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label class="form-label">الحد الأقصى للآجل</label>
                                                 <div class="input-group">
@@ -518,126 +557,24 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">باسورد التجاوز</label>
+                                                <input type="password" name="credit_password" class="form-control" placeholder="لتجاوز الحد عند الطوارئ">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <!-- Class-specific fields -->
                                 <div id="wholesaleFields" style="display: none;">
                                     <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i> هامش ربح الصيدلية (جملة)
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">هامش ربح الصيدلية - محلي (%)</label>
-                                                <input type="number" name="local_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('local_margin', '0') ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">هامش ربح الصيدلية - مستورد (%)</label>
-                                                <input type="number" name="imported_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('imported_margin', '0') ?>">
-                                            </div>
-                                        </div>
+                                        <i class="bi bi-info-circle"></i> سيتم تطبيق هامش الربح المحدد في التصنيف
                                     </div>
                                 </div>
                                 <div id="retailFields" style="display: none;">
                                     <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i> نسبة الخصم للعميل (تجزئة)
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">نسبة الخصم - محلي (%)</label>
-                                                <input type="number" name="local_discount" class="form-control" step="0.01" min="0" max="100" value="<?= old('local_discount', '0') ?>">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">نسبة الخصم - مستورد (%)</label>
-                                                <input type="number" name="imported_discount" class="form-control" step="0.01" min="0" max="100" value="<?= old('imported_discount', '0') ?>">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div id="costFields" style="display: none;">
-                                    <div class="alert alert-warning">
-                                        <i class="bi bi-exclamation-triangle"></i> العميل سيتم بيع الأصناف له بسعر التكلفة
-                                    </div>
-                                </div>
-
-                                <!-- Contract Section -->
-                                <hr class="my-4">
-                                <h5 class="section-title">بيانات التعاقد</h5>
-                                <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="mb-3">
-                                            <div class="form-check form-switch">
-                                                <input type="checkbox" name="has_contract" value="1" class="form-check-input" id="has_contract" onchange="toggleContractFields()">
-                                                <label class="form-check-label" for="has_contract">عميل متعاقد</label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div id="contractFields" style="display: none;">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label class="form-label">رقم التعاقد</label>
-                                                <input type="text" name="contract_number" class="form-control" placeholder="رقم التعاقد" onblur="validateField(this, 'contract_number')" data-validate="contract_number">
-                                                <div class="invalid-feedback" id="error_contract_number"></div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label class="form-label">نوع التعاقد</label>
-                                                <select name="contract_type" class="form-select">
-                                                    <option value="insurance">تأمين</option>
-                                                    <option value="company">شركة</option>
-                                                    <option value="government">حكومي</option>
-                                                    <option value="other">آخر</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label class="form-label">تاريخ انتهاء التعاقد</label>
-                                                <input type="date" name="expiry_date" class="form-control">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label class="form-label">رقم الكارنية</label>
-                                                <input type="text" name="card_number" class="form-control" placeholder="رقم الكارنية" onblur="validateField(this, 'card_number')" data-validate="card_number">
-                                                <div class="invalid-feedback" id="error_card_number"></div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label class="form-label">رقم بطاقة المريض</label>
-                                                <input type="text" name="patient_card_number" class="form-control" placeholder="رقم بطاقة المريض" onblur="validateField(this, 'patient_card_number')" data-validate="patient_card_number">
-                                                <div class="invalid-feedback" id="error_patient_card_number"></div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label class="form-label">نسبة التغطية (%)</label>
-                                                <input type="number" name="coverage_percent" class="form-control" min="0" max="100" step="0.01" value="100">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">الحد الأقصى للفاتورة</label>
-                                                <div class="input-group">
-                                                    <input type="number" name="max_bill_amount" class="form-control" step="0.01" value="0">
-                                                    <span class="input-group-text">ج</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <i class="bi bi-info-circle"></i> سيتم تطبيق نسبة الخصم المحددة في التصنيف
                                     </div>
                                 </div>
                             </div>
@@ -679,7 +616,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         const type = select.options[select.selectedIndex].dataset.type;
         document.getElementById('wholesaleFields').style.display = type === 'wholesale' ? 'block' : 'none';
         document.getElementById('retailFields').style.display = type === 'retail' ? 'block' : 'none';
-        document.getElementById('costFields').style.display = type === 'cost' ? 'block' : 'none';
     }
 
     // Update Flag Emoji
@@ -867,12 +803,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             .catch(err => {
                 console.error('Error loading areas:', err);
             });
-    }
-
-    // Toggle Contract Fields
-    function toggleContractFields() {
-        const hasContract = document.getElementById('has_contract').checked;
-        document.getElementById('contractFields').style.display = hasContract ? 'block' : 'none';
     }
 
     // Initialize
