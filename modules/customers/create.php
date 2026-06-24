@@ -3,6 +3,10 @@ require_once __DIR__ . '/../../core/config.php';
 require_once __DIR__ . '/../../core/auth.php';
 requireAuth();
 
+$db = getDB();
+
+$page_title = 'إضافة عميل جديد';
+
 // AJAX Live Validation endpoint
 if (isset($_GET['ajax_validate']) && $_SERVER['REQUEST_METHOD'] === 'GET') {
     header('Content-Type: application/json; charset=utf-8');
@@ -42,8 +46,10 @@ if (isset($_GET['ajax_validate']) && $_SERVER['REQUEST_METHOD'] === 'GET') {
             break;
 
         case 'phone':
-            $stmt = $db->prepare("SELECT id FROM customer_phones WHERE phone_number = ?");
-            $stmt->execute([$value]);
+            $country_code = trim($_GET['country_code'] ?? '+20');
+            $full_phone = $country_code . $value;
+            $stmt = $db->prepare("SELECT id FROM customer_phones WHERE CONCAT(country_code, phone_number) = ?");
+            $stmt->execute([$full_phone]);
             if ($stmt->fetch()) { $valid = false; $message = '⚠️ رقم الهاتف مستخدم بالفعل'; }
             break;
 
@@ -69,10 +75,6 @@ if (isset($_GET['ajax_validate']) && $_SERVER['REQUEST_METHOD'] === 'GET') {
     echo json_encode(['valid' => $valid, 'message' => $message]);
     exit;
 }
-
-$db = getDB();
-
-$page_title = 'إضافة عميل جديد';
 
 // Helper functions
 function old($field, $default = '') {
@@ -102,6 +104,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $customer_name = trim($_POST['customer_name'] ?? '');
         if (empty($customer_name)) {
             $errors[] = 'اسم العميل مطلوب';
+        }
+
+        // Validate contract fields if has_contract is checked
+        if (isset($_POST['has_contract']) && !empty($_POST['contract_number'])) {
+            $stmt = $db->prepare("SELECT id FROM customer_contracts WHERE contract_number = ?");
+            $stmt->execute([$_POST['contract_number']]);
+            if ($stmt->fetch()) {
+                $errors[] = 'رقم التعاقد موجود بالفعل';
+            }
+
+            if (!empty($_POST['card_number'])) {
+                $stmt = $db->prepare("SELECT id FROM customer_contracts WHERE card_number = ? AND card_number IS NOT NULL AND card_number != ''");
+                $stmt->execute([$_POST['card_number']]);
+                if ($stmt->fetch()) {
+                    $errors[] = 'رقم الكارنية موجود بالفعل';
+                }
+            }
+
+            if (!empty($_POST['patient_card_number'])) {
+                $stmt = $db->prepare("SELECT id FROM customer_contracts WHERE patient_card_number = ? AND patient_card_number IS NOT NULL AND patient_card_number != ''");
+                $stmt->execute([$_POST['patient_card_number']]);
+                if ($stmt->fetch()) {
+                    $errors[] = 'رقم بطاقة المريض موجود بالفعل';
+                }
+            }
         }
 
         if (!empty($errors)) {
@@ -214,6 +241,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Insert contract if has_contract is checked
+        if (isset($_POST['has_contract']) && !empty($_POST['contract_number'])) {
+            $contract_stmt = $db->prepare("INSERT INTO customer_contracts 
+                (customer_id, contract_number, contract_type, card_number, patient_card_number, expiry_date, coverage_percent, max_bill_amount) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $contract_stmt->execute([
+                $customer_id,
+                $_POST['contract_number'],
+                $_POST['contract_type'] ?? 'insurance',
+                !empty($_POST['card_number']) ? $_POST['card_number'] : null,
+                !empty($_POST['patient_card_number']) ? $_POST['patient_card_number'] : null,
+                !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null,
+                floatval($_POST['coverage_percent'] ?? 100),
+                floatval($_POST['max_bill_amount'] ?? 0)
+            ]);
+        }
+
         $db->commit();
         header("Location: view.php?id=" . $customer_id);
         exit;
@@ -250,6 +294,9 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         .form-label { font-weight: 600; color: #555; }
         .nav-tabs .nav-link { color: #666; border: none; padding: 15px 20px; }
         .nav-tabs .nav-link.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: none; }
+        .validation-msg { font-size: 12px; margin-top: 4px; min-height: 18px; }
+        .validation-msg.text-danger { color: var(--danger); }
+        .validation-msg.text-success { color: var(--success); }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -274,6 +321,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                             <li class="nav-item"><a class="nav-link" id="phones-tab" data-bs-toggle="tab" href="#phones" role="tab"><i class="bi bi-telephone"></i> الهواتف</a></li>
                             <li class="nav-item"><a class="nav-link" id="addresses-tab" data-bs-toggle="tab" href="#addresses" role="tab"><i class="bi bi-geo-alt"></i> العناوين</a></li>
                             <li class="nav-item"><a class="nav-link" id="company-tab" data-bs-toggle="tab" href="#company" role="tab" style="display:none;"><i class="bi bi-building"></i> الشركة</a></li>
+                            <li class="nav-item"><a class="nav-link" id="contract-tab" data-bs-toggle="tab" href="#contract" role="tab"><i class="bi bi-file-earmark-text"></i> التعاقد</a></li>
                             <li class="nav-item"><a class="nav-link" id="settings-tab" data-bs-toggle="tab" href="#settings" role="tab"><i class="bi bi-gear"></i> الإعدادات</a></li>
                         </ul>
                     </div>
@@ -362,7 +410,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 <label class="form-label">كود الدولة</label>
                                                 <div class="country-select">
                                                     <span class="flag">🇪🇬</span>
-                                                    <select name="phones[0][country_code]" class="form-select country-code-select" onchange="updateFlag(this)">
+                                                    <select name="phones[0][country_code]" class="form-select country-code-select" onchange="updateFlag(this)" id="country_code_0">
                                                         <?php foreach ($country_codes as $cc): ?>
                                                             <option value="<?= $cc['country_code'] ?>" data-flag="<?= $cc['flag_emoji'] ?>" <?= $cc['country_code'] == '+20' ? 'selected' : '' ?>><?= $cc['country_name_ar'] ?> (<?= $cc['country_code'] ?>)</option>
                                                         <?php endforeach; ?>
@@ -371,8 +419,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label">رقم الهاتف</label>
-                                                <input type="text" name="phones[0][number]" class="form-control" placeholder="01xxxxxxxxx" onblur="validateField(this, 'phone')">
-                                                    <div class="validation-msg"></div>
+                                                <input type="text" name="phones[0][number]" class="form-control" placeholder="01xxxxxxxxx" onblur="validatePhoneField(this, 0)">
+                                                <div class="validation-msg" id="phone_msg_0"></div>
                                             </div>
                                             <div class="col-md-3">
                                                 <label class="form-label">نوع</label>
@@ -509,6 +557,82 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 </button>
                             </div>
 
+                            <!-- Contract Tab -->
+                            <div class="tab-pane fade" id="contract" role="tabpanel">
+                                <h5 class="section-title">بيانات التعاقد</h5>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input type="checkbox" name="has_contract" value="1" class="form-check-input" id="has_contract" onchange="toggleContractFields()">
+                                                <label class="form-check-label" for="has_contract">عميل متعاقد</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="contractFields" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">رقم التعاقد</label>
+                                                <input type="text" name="contract_number" class="form-control" placeholder="رقم التعاقد" onblur="validateField(this, 'contract_number')">
+                                                <div class="validation-msg"></div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">نوع التعاقد</label>
+                                                <select name="contract_type" class="form-select">
+                                                    <option value="insurance">تأمين</option>
+                                                    <option value="company">شركة</option>
+                                                    <option value="government">حكومي</option>
+                                                    <option value="other">آخر</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">تاريخ انتهاء التعاقد</label>
+                                                <input type="date" name="expiry_date" class="form-control">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">رقم الكارنية</label>
+                                                <input type="text" name="card_number" class="form-control" placeholder="رقم الكارنية" onblur="validateField(this, 'card_number')">
+                                                <div class="validation-msg"></div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">رقم بطاقة المريض</label>
+                                                <input type="text" name="patient_card_number" class="form-control" placeholder="رقم بطاقة المريض" onblur="validateField(this, 'patient_card_number')">
+                                                <div class="validation-msg"></div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">نسبة التغطية (%)</label>
+                                                <input type="number" name="coverage_percent" class="form-control" min="0" max="100" step="0.01" value="100">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">الحد الأقصى للفاتورة</label>
+                                                <div class="input-group">
+                                                    <input type="number" name="max_bill_amount" class="form-control" step="0.01" value="0">
+                                                    <span class="input-group-text">ج</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Settings Tab -->
                             <div class="tab-pane fade" id="settings" role="tabpanel">
                                 <h5 class="section-title">إعدادات العميل</h5>
@@ -566,15 +690,52 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     </div>
                                 </div>
 
-                                <!-- Class-specific fields -->
+                                <!-- Wholesale Fields -->
                                 <div id="wholesaleFields" style="display: none;">
                                     <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i> سيتم تطبيق هامش الربح المحدد في التصنيف
+                                        <i class="bi bi-info-circle"></i> هامش ربح الصيدلية (جملة)
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">هامش ربح الصيدلية - محلي (%)</label>
+                                                <input type="number" name="local_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('local_margin', '0') ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">هامش ربح الصيدلية - مستورد (%)</label>
+                                                <input type="number" name="imported_margin" class="form-control" step="0.01" min="0" max="100" value="<?= old('imported_margin', '0') ?>">
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
+
+                                <!-- Retail Fields -->
                                 <div id="retailFields" style="display: none;">
                                     <div class="alert alert-info">
-                                        <i class="bi bi-info-circle"></i> سيتم تطبيق نسبة الخصم المحددة في التصنيف
+                                        <i class="bi bi-info-circle"></i> نسبة الخصم للعميل (تجزئة)
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">نسبة الخصم - محلي (%)</label>
+                                                <input type="number" name="local_discount" class="form-control" step="0.01" min="0" max="100" value="<?= old('local_discount', '0') ?>">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">نسبة الخصم - مستورد (%)</label>
+                                                <input type="number" name="imported_discount" class="form-control" step="0.01" min="0" max="100" value="<?= old('imported_discount', '0') ?>">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cost Fields -->
+                                <div id="costFields" style="display: none;">
+                                    <div class="alert alert-warning">
+                                        <i class="bi bi-exclamation-triangle"></i> العميل سيتم بيع الأصناف له بسعر التكلفة
                                     </div>
                                 </div>
                             </div>
@@ -610,18 +771,76 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         document.getElementById('creditFields').style.display = paymentType === 'credit' ? 'block' : 'none';
     }
 
-    // Toggle Class Fields
+    // Toggle Class Fields - FIXED: Added costFields
     function toggleClassFields() {
         const select = document.getElementById('customer_class');
         const type = select.options[select.selectedIndex].dataset.type;
         document.getElementById('wholesaleFields').style.display = type === 'wholesale' ? 'block' : 'none';
         document.getElementById('retailFields').style.display = type === 'retail' ? 'block' : 'none';
+        document.getElementById('costFields').style.display = type === 'cost' ? 'block' : 'none';
+    }
+
+    // Toggle Contract Fields - FIXED: Added missing function
+    function toggleContractFields() {
+        const hasContract = document.getElementById('has_contract').checked;
+        document.getElementById('contractFields').style.display = hasContract ? 'block' : 'none';
     }
 
     // Update Flag Emoji
     function updateFlag(select) {
         const flag = select.options[select.selectedIndex].dataset.flag;
         select.closest('.country-select').querySelector('.flag').textContent = flag;
+    }
+
+    // Live Validation - FIXED: Added missing function
+    function validateField(input, fieldName) {
+        const value = input.value.trim();
+        const msgDiv = input.parentElement.querySelector('.validation-msg');
+
+        if (!value) {
+            msgDiv.textContent = '';
+            msgDiv.className = 'validation-msg';
+            return;
+        }
+
+        fetch(`?ajax_validate=1&field=${fieldName}&value=${encodeURIComponent(value)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.valid) {
+                    msgDiv.textContent = '✓ متاح';
+                    msgDiv.className = 'validation-msg text-success';
+                } else {
+                    msgDiv.textContent = data.message;
+                    msgDiv.className = 'validation-msg text-danger';
+                }
+            })
+            .catch(err => console.error(err));
+    }
+
+    // Phone Validation with Country Code - FIXED: Added missing function
+    function validatePhoneField(input, index) {
+        const value = input.value.trim();
+        const countryCode = document.getElementById('country_code_' + index).value;
+        const msgDiv = document.getElementById('phone_msg_' + index);
+
+        if (!value) {
+            msgDiv.textContent = '';
+            msgDiv.className = 'validation-msg';
+            return;
+        }
+
+        fetch(`?ajax_validate=1&field=phone&value=${encodeURIComponent(value)}&country_code=${encodeURIComponent(countryCode)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.valid) {
+                    msgDiv.textContent = '✓ متاح';
+                    msgDiv.className = 'validation-msg text-success';
+                } else {
+                    msgDiv.textContent = data.message;
+                    msgDiv.className = 'validation-msg text-danger';
+                }
+            })
+            .catch(err => console.error(err));
     }
 
     // Add Phone
@@ -637,7 +856,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                     <label class="form-label">كود الدولة</label>
                     <div class="country-select">
                         <span class="flag">🇪🇬</span>
-                        <select name="phones[${phoneIndex}][country_code]" class="form-select country-code-select" onchange="updateFlag(this)">
+                        <select name="phones[${phoneIndex}][country_code]" class="form-select country-code-select" onchange="updateFlag(this)" id="country_code_${phoneIndex}">
                             <?php foreach ($country_codes as $cc): ?>
                                 <option value="<?= $cc['country_code'] ?>" data-flag="<?= $cc['flag_emoji'] ?>" <?= $cc['country_code'] == '+20' ? 'selected' : '' ?>><?= $cc['country_name_ar'] ?> (<?= $cc['country_code'] ?>)</option>
                             <?php endforeach; ?>
@@ -646,7 +865,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">رقم الهاتف</label>
-                    <input type="text" name="phones[${phoneIndex}][number]" class="form-control" placeholder="01xxxxxxxxx">
+                    <input type="text" name="phones[${phoneIndex}][number]" class="form-control" placeholder="01xxxxxxxxx" onblur="validatePhoneField(this, ${phoneIndex})">
+                    <div class="validation-msg" id="phone_msg_${phoneIndex}"></div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">نوع</label>
@@ -805,10 +1025,12 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             });
     }
 
-    // Initialize
+    // Initialize - FIXED: Added toggleContractFields and toggleClassFields
     document.addEventListener('DOMContentLoaded', function() {
         toggleCompanyTab();
         toggleCreditFields();
+        toggleClassFields();
+        toggleContractFields();
     });
     </script>
 </body>

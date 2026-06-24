@@ -71,9 +71,12 @@ switch ($field) {
         break;
 
     case 'phone':
-        // Check phone uniqueness in customer_phones table
-        $sql = "SELECT id FROM customer_phones WHERE phone_number = ?";
-        $params = [$value];
+        // Check phone uniqueness with country code
+        $country_code = trim($_GET['country_code'] ?? '+20');
+        $full_phone = $country_code . $value;
+
+        $sql = "SELECT id FROM customer_phones WHERE CONCAT(country_code, phone_number) = ?";
+        $params = [$full_phone];
         if ($customer_id > 0) {
             $sql .= " AND customer_id != ?";
             $params[] = $customer_id;
@@ -131,22 +134,6 @@ switch ($field) {
         if ($stmt->fetch()) {
             $valid = false;
             $message = 'رقم بطاقة المريض موجود بالفعل';
-        }
-        break;
-
-    case 'manual_code':
-        // Check manual_code uniqueness
-        $sql = "SELECT id FROM customers WHERE manual_code = ? AND manual_code IS NOT NULL AND manual_code != ''";
-        $params = [$value];
-        if ($customer_id > 0) {
-            $sql .= " AND id != ?";
-            $params[] = $customer_id;
-        }
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        if ($stmt->fetch()) {
-            $valid = false;
-            $message = 'الكود المختصر مستخدم بالفعل';
         }
         break;
 

@@ -60,8 +60,10 @@ if (isset($_GET['ajax_validate']) && $_SERVER['REQUEST_METHOD'] === 'GET') {
             break;
 
         case 'phone':
-            $stmt = $db->prepare("SELECT id FROM customer_phones WHERE phone_number = ? AND customer_id != ?");
-            $stmt->execute([$value, $customer_id]);
+            $country_code = trim($_GET['country_code'] ?? '+20');
+            $full_phone = $country_code . $value;
+            $stmt = $db->prepare("SELECT id FROM customer_phones WHERE CONCAT(country_code, phone_number) = ? AND customer_id != ?");
+            $stmt->execute([$full_phone, $customer_id]);
             if ($stmt->fetch()) { $valid = false; $message = '⚠️ رقم الهاتف مستخدم بالفعل'; }
             break;
 
@@ -140,6 +142,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $customer_name = trim($_POST['customer_name'] ?? '');
         if (empty($customer_name)) {
             $errors[] = 'اسم العميل مطلوب';
+        }
+
+        // Validate contract fields if has_contract is checked
+        if (isset($_POST['has_contract']) && !empty($_POST['contract_number'])) {
+            $stmt = $db->prepare("SELECT id FROM customer_contracts WHERE contract_number = ? AND customer_id != ?");
+            $stmt->execute([$_POST['contract_number'], $customer_id]);
+            if ($stmt->fetch()) {
+                $errors[] = 'رقم التعاقد موجود بالفعل';
+            }
+
+            if (!empty($_POST['card_number'])) {
+                $stmt = $db->prepare("SELECT id FROM customer_contracts WHERE card_number = ? AND card_number IS NOT NULL AND card_number != '' AND customer_id != ?");
+                $stmt->execute([$_POST['card_number'], $customer_id]);
+                if ($stmt->fetch()) {
+                    $errors[] = 'رقم الكارنية موجود بالفعل';
+                }
+            }
+
+            if (!empty($_POST['patient_card_number'])) {
+                $stmt = $db->prepare("SELECT id FROM customer_contracts WHERE patient_card_number = ? AND patient_card_number IS NOT NULL AND patient_card_number != '' AND customer_id != ?");
+                $stmt->execute([$_POST['patient_card_number'], $customer_id]);
+                if ($stmt->fetch()) {
+                    $errors[] = 'رقم بطاقة المريض موجود بالفعل';
+                }
+            }
         }
 
         if (!empty($errors)) {
@@ -304,6 +331,9 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         .form-label { font-weight: 600; color: #555; }
         .nav-tabs .nav-link { color: #666; border: none; padding: 15px 20px; }
         .nav-tabs .nav-link.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: none; }
+        .validation-msg { font-size: 12px; margin-top: 4px; min-height: 18px; }
+        .validation-msg.text-danger { color: var(--danger); }
+        .validation-msg.text-success { color: var(--success); }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -422,7 +452,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                     <label class="form-label">كود الدولة</label>
                                                     <div class="country-select">
                                                         <span class="flag"><?= htmlspecialchars($phone['country_code'] == '+20' ? '🇪🇬' : '') ?></span>
-                                                        <select name="phones[<?= $pIndex ?>][country_code]" class="form-select country-code-select" onchange="updateFlag(this)">
+                                                        <select name="phones[<?= $pIndex ?>][country_code]" class="form-select country-code-select" onchange="updateFlag(this)" id="country_code_<?= $pIndex ?>">
                                                             <?php foreach ($country_codes as $cc): ?>
                                                                 <option value="<?= $cc['country_code'] ?>" data-flag="<?= $cc['flag_emoji'] ?>" <?= $phone['country_code'] == $cc['country_code'] ? 'selected' : '' ?>><?= $cc['country_name_ar'] ?> (<?= $cc['country_code'] ?>)</option>
                                                             <?php endforeach; ?>
@@ -431,8 +461,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label">رقم الهاتف</label>
-                                                    <input type="text" name="phones[<?= $pIndex ?>][number]" class="form-control" value="<?= htmlspecialchars($phone['phone_number']) ?>" placeholder="01xxxxxxxxx" onblur="validateField(this, 'phone')">
-                                                    <div class="validation-msg"></div>
+                                                    <input type="text" name="phones[<?= $pIndex ?>][number]" class="form-control" value="<?= htmlspecialchars($phone['phone_number']) ?>" placeholder="01xxxxxxxxx" onblur="validatePhoneField(this, <?= $pIndex ?>)">
+                                                    <div class="validation-msg" id="phone_msg_<?= $pIndex ?>"></div>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <label class="form-label">نوع</label>
@@ -460,7 +490,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                     <label class="form-label">كود الدولة</label>
                                                     <div class="country-select">
                                                         <span class="flag">🇪🇬</span>
-                                                        <select name="phones[0][country_code]" class="form-select country-code-select" onchange="updateFlag(this)">
+                                                        <select name="phones[0][country_code]" class="form-select country-code-select" onchange="updateFlag(this)" id="country_code_0">
                                                             <?php foreach ($country_codes as $cc): ?>
                                                                 <option value="<?= $cc['country_code'] ?>" data-flag="<?= $cc['flag_emoji'] ?>" <?= $cc['country_code'] == '+20' ? 'selected' : '' ?>><?= $cc['country_name_ar'] ?> (<?= $cc['country_code'] ?>)</option>
                                                             <?php endforeach; ?>
@@ -469,7 +499,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label">رقم الهاتف</label>
-                                                    <input type="text" name="phones[0][number]" class="form-control" placeholder="01xxxxxxxxx">
+                                                    <input type="text" name="phones[0][number]" class="form-control" placeholder="01xxxxxxxxx" onblur="validatePhoneField(this, 0)">
+                                                    <div class="validation-msg" id="phone_msg_0"></div>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <label class="form-label">نوع</label>
@@ -848,7 +879,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     </div>
                                 </div>
 
-                                <!-- Class-specific fields -->
+                                <!-- Wholesale Fields -->
                                 <?php 
                                 $class_type = '';
                                 foreach ($customer_classes as $class) {
@@ -877,6 +908,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Retail Fields -->
                                 <div id="retailFields" style="display: <?= $class_type == 'retail' ? 'block' : 'none' ?>;">
                                     <div class="alert alert-info">
                                         <i class="bi bi-info-circle"></i> نسبة الخصم للعميل (تجزئة)
@@ -896,6 +929,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Cost Fields -->
                                 <div id="costFields" style="display: <?= $class_type == 'cost' ? 'block' : 'none' ?>;">
                                     <div class="alert alert-warning">
                                         <i class="bi bi-exclamation-triangle"></i> العميل سيتم بيع الأصناف له بسعر التكلفة
@@ -934,7 +969,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         document.getElementById('creditFields').style.display = paymentType === 'credit' ? 'block' : 'none';
     }
 
-    // Toggle Class Fields
+    // Toggle Class Fields - FIXED: Added costFields
     function toggleClassFields() {
         const select = document.getElementById('customer_class');
         const type = select.options[select.selectedIndex].dataset.type;
@@ -943,7 +978,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         document.getElementById('costFields').style.display = type === 'cost' ? 'block' : 'none';
     }
 
-    // Toggle Contract Fields
+    // Toggle Contract Fields - FIXED: Added missing function
     function toggleContractFields() {
         const hasContract = document.getElementById('has_contract').checked;
         document.getElementById('contractFields').style.display = hasContract ? 'block' : 'none';
@@ -955,8 +990,59 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         select.closest('.country-select').querySelector('.flag').textContent = flag;
     }
 
+    // Live Validation - FIXED: Added missing function
+    function validateField(input, fieldName) {
+        const value = input.value.trim();
+        const msgDiv = input.parentElement.querySelector('.validation-msg');
+
+        if (!value) {
+            msgDiv.textContent = '';
+            msgDiv.className = 'validation-msg';
+            return;
+        }
+
+        fetch(`?ajax_validate=1&field=${fieldName}&value=${encodeURIComponent(value)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.valid) {
+                    msgDiv.textContent = '✓ متاح';
+                    msgDiv.className = 'validation-msg text-success';
+                } else {
+                    msgDiv.textContent = data.message;
+                    msgDiv.className = 'validation-msg text-danger';
+                }
+            })
+            .catch(err => console.error(err));
+    }
+
+    // Phone Validation with Country Code - FIXED: Added missing function
+    function validatePhoneField(input, index) {
+        const value = input.value.trim();
+        const countryCode = document.getElementById('country_code_' + index).value;
+        const msgDiv = document.getElementById('phone_msg_' + index);
+
+        if (!value) {
+            msgDiv.textContent = '';
+            msgDiv.className = 'validation-msg';
+            return;
+        }
+
+        fetch(`?ajax_validate=1&field=phone&value=${encodeURIComponent(value)}&country_code=${encodeURIComponent(countryCode)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.valid) {
+                    msgDiv.textContent = '✓ متاح';
+                    msgDiv.className = 'validation-msg text-success';
+                } else {
+                    msgDiv.textContent = data.message;
+                    msgDiv.className = 'validation-msg text-danger';
+                }
+            })
+            .catch(err => console.error(err));
+    }
+
     // Add Phone
-    let phoneIndex = <?= count($phones) > 0 ? count($phones) : 1 ?>;
+    let phoneIndex = 1;
     function addPhone() {
         const container = document.getElementById('phonesContainer');
         const newRow = document.createElement('div');
@@ -968,7 +1054,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                     <label class="form-label">كود الدولة</label>
                     <div class="country-select">
                         <span class="flag">🇪🇬</span>
-                        <select name="phones[${phoneIndex}][country_code]" class="form-select country-code-select" onchange="updateFlag(this)">
+                        <select name="phones[${phoneIndex}][country_code]" class="form-select country-code-select" onchange="updateFlag(this)" id="country_code_${phoneIndex}">
                             <?php foreach ($country_codes as $cc): ?>
                                 <option value="<?= $cc['country_code'] ?>" data-flag="<?= $cc['flag_emoji'] ?>" <?= $cc['country_code'] == '+20' ? 'selected' : '' ?>><?= $cc['country_name_ar'] ?> (<?= $cc['country_code'] ?>)</option>
                             <?php endforeach; ?>
@@ -977,7 +1063,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">رقم الهاتف</label>
-                    <input type="text" name="phones[${phoneIndex}][number]" class="form-control" placeholder="01xxxxxxxxx">
+                    <input type="text" name="phones[${phoneIndex}][number]" class="form-control" placeholder="01xxxxxxxxx" onblur="validatePhoneField(this, ${phoneIndex})">
+                    <div class="validation-msg" id="phone_msg_${phoneIndex}"></div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">نوع</label>
@@ -1001,7 +1088,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
     }
 
     // Add Address
-    let addressIndex = <?= count($addresses) > 0 ? count($addresses) : 1 ?>;
+    let addressIndex = 1;
     function addAddress() {
         const container = document.getElementById('addressesContainer');
         const newRow = document.createElement('div');
@@ -1072,7 +1159,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
     }
 
     // Add Employee
-    let employeeIndex = <?= count($employees) > 0 ? count($employees) : 1 ?>;
+    let employeeIndex = 1;
     function addEmployee() {
         const container = document.getElementById('employeesContainer');
         const newRow = document.createElement('div');
@@ -1136,7 +1223,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             });
     }
 
-    // Initialize
+    // Initialize - FIXED: Added toggleContractFields and toggleClassFields
     document.addEventListener('DOMContentLoaded', function() {
         toggleCompanyTab();
         toggleCreditFields();
