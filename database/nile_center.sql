@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 25, 2026 at 06:35 PM
+-- Generation Time: Jun 25, 2026 at 10:38 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -152,7 +152,8 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (85, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 19:25:17'),
 (86, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 23:57:07'),
 (87, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 23:57:15'),
-(88, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 16:29:45');
+(88, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 16:29:45'),
+(89, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 17:49:43');
 
 -- --------------------------------------------------------
 
@@ -300,7 +301,6 @@ CREATE TABLE `customers` (
   `imported_discount` decimal(5,2) DEFAULT 0.00,
   `payment_type` enum('cash','credit') DEFAULT 'cash',
   `credit_limit` decimal(12,2) DEFAULT 0.00,
-  `credit_password` varchar(255) DEFAULT NULL,
   `branch_id` int(11) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
   `phone2` varchar(20) DEFAULT NULL,
@@ -319,17 +319,17 @@ CREATE TABLE `customers` (
 -- Dumping data for table `customers`
 --
 
-INSERT INTO `customers` (`id`, `customer_code`, `customer_name`, `customer_name_en`, `customer_type`, `customer_class_id`, `local_margin`, `imported_margin`, `local_discount`, `imported_discount`, `payment_type`, `credit_limit`, `credit_password`, `branch_id`, `phone`, `phone2`, `email`, `address`, `branch_code`, `notes`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`) VALUES
-(1, '1', 'عمرو حجازي', 'Amr Hegazy', 'individual', 3, 0.00, 0.00, 0.00, 0.00, 'credit', 100000.00, NULL, 1, NULL, NULL, 'Amrstar89@hotmail.com', NULL, NULL, '', 1, '2026-06-22 23:20:33', '2026-06-22 23:20:33', 'manual', NULL),
-(2, '2', 'عمرو حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-22 23:33:54', '2026-06-22 23:33:54', 'manual', NULL),
-(3, '3', 'احمد زين', 'Ahmed Zain', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, 3, NULL, NULL, 'Zain@hotmail.com', NULL, NULL, '', 1, '2026-06-23 16:56:20', '2026-06-23 16:56:20', 'manual', NULL),
-(4, '4', 'احمد حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:57:18', '2026-06-23 16:57:18', 'manual', NULL),
-(5, '5', 'عميل 4', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:30', '2026-06-23 16:59:30', 'manual', NULL),
-(6, '6', 'عميل 5', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:36', '2026-06-23 16:59:36', 'manual', NULL),
-(7, '7', 'عميل 6', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:43', '2026-06-23 16:59:43', 'manual', NULL),
-(8, '8', 'عمرو حجازي', 'Amr Hegazy', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 17:00:09', '2026-06-23 17:00:09', 'manual', NULL),
-(9, '9', 'عمرو حجازي', 'Amr Hegazy', 'company', 2, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 20:55:01', '2026-06-23 20:55:01', 'manual', NULL),
-(10, '10', 'محمد سعد', 'mohmed saad', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, 'mohamed@hotmail.com', NULL, NULL, '', 1, '2026-06-23 20:55:38', '2026-06-23 20:55:38', 'manual', NULL);
+INSERT INTO `customers` (`id`, `customer_code`, `customer_name`, `customer_name_en`, `customer_type`, `customer_class_id`, `local_margin`, `imported_margin`, `local_discount`, `imported_discount`, `payment_type`, `credit_limit`, `branch_id`, `phone`, `phone2`, `email`, `address`, `branch_code`, `notes`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`) VALUES
+(1, '1', 'عمرو حجازي', 'Amr Hegazy', 'individual', 3, 0.00, 0.00, 0.00, 0.00, 'credit', 100000.00, 1, NULL, NULL, 'Amrstar89@hotmail.com', NULL, NULL, '', 1, '2026-06-22 23:20:33', '2026-06-22 23:20:33', 'manual', NULL),
+(2, '2', 'عمرو حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-22 23:33:54', '2026-06-22 23:33:54', 'manual', NULL),
+(3, '3', 'احمد زين', 'Ahmed Zain', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, 3, NULL, NULL, 'Zain@hotmail.com', NULL, NULL, '', 1, '2026-06-23 16:56:20', '2026-06-23 16:56:20', 'manual', NULL),
+(4, '4', 'احمد حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:57:18', '2026-06-23 16:57:18', 'manual', NULL),
+(5, '5', 'عميل 4', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:30', '2026-06-23 16:59:30', 'manual', NULL),
+(6, '6', 'عميل 5', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:36', '2026-06-23 16:59:36', 'manual', NULL),
+(7, '7', 'عميل 6', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:43', '2026-06-23 16:59:43', 'manual', NULL),
+(8, '8', 'عمرو حجازي', 'Amr Hegazy', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 17:00:09', '2026-06-23 17:00:09', 'manual', NULL),
+(9, '9', 'عمرو حجازي', 'Amr Hegazy', 'company', 2, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 20:55:01', '2026-06-23 20:55:01', 'manual', NULL),
+(10, '10', 'محمد سعد', 'mohmed saad', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, 'mohamed@hotmail.com', NULL, NULL, '', 1, '2026-06-23 20:55:38', '2026-06-23 20:55:38', 'manual', NULL);
 
 -- --------------------------------------------------------
 
@@ -411,6 +411,39 @@ CREATE TABLE `customer_areas` (
   `estock_id` decimal(18,0) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `customer_balances`
+--
+
+CREATE TABLE `customer_balances` (
+  `id` int(11) NOT NULL,
+  `customer_id` int(11) NOT NULL,
+  `balance` decimal(12,2) DEFAULT 0.00 COMMENT 'الرصيد الحالي (مدين إذا موجب، دائن إذا سالب)',
+  `total_invoices` decimal(12,2) DEFAULT 0.00 COMMENT 'إجمالي قيمة الفواتير',
+  `total_payments` decimal(12,2) DEFAULT 0.00 COMMENT 'إجمالي المدفوعات',
+  `total_returns` decimal(12,2) DEFAULT 0.00 COMMENT 'إجمالي المردودات',
+  `last_transaction_date` datetime DEFAULT NULL COMMENT 'تاريخ آخر حركة',
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='أرصدة العملاء';
+
+--
+-- Dumping data for table `customer_balances`
+--
+
+INSERT INTO `customer_balances` (`id`, `customer_id`, `balance`, `total_invoices`, `total_payments`, `total_returns`, `last_transaction_date`, `updated_at`) VALUES
+(1, 2, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16'),
+(2, 3, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16'),
+(3, 4, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16'),
+(4, 5, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16'),
+(5, 6, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16'),
+(6, 7, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16'),
+(7, 8, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16'),
+(8, 10, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16'),
+(9, 9, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16'),
+(10, 1, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 17:11:16');
 
 -- --------------------------------------------------------
 
@@ -504,6 +537,27 @@ INSERT INTO `customer_phones` (`id`, `customer_id`, `country_code`, `phone_numbe
 (4, 3, '+20', '01234567891011', 'mobile', 1, 0, '2026-06-23 16:56:20'),
 (5, 3, '+20', '010012013014015', 'mobile', 0, 0, '2026-06-23 16:56:20'),
 (6, 10, '+20', '0123456789', 'mobile', 1, 1, '2026-06-23 20:55:38');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `customer_transactions`
+--
+
+CREATE TABLE `customer_transactions` (
+  `id` int(11) NOT NULL,
+  `customer_id` int(11) NOT NULL,
+  `transaction_type` enum('invoice','payment','return','refund','adjustment') NOT NULL COMMENT 'نوع الحركة',
+  `reference_type` enum('order','invoice','payment','return','manual') DEFAULT 'manual' COMMENT 'نوع المرجع',
+  `reference_id` int(11) DEFAULT NULL COMMENT 'رقم المرجع (رقم الفاتورة/الدفعة/المردود)',
+  `reference_number` varchar(50) DEFAULT NULL COMMENT 'رقم المرجع النصي',
+  `debit` decimal(12,2) DEFAULT 0.00 COMMENT 'مدين (زيادة على العميل)',
+  `credit` decimal(12,2) DEFAULT 0.00 COMMENT 'دائن (نقصان من العميل)',
+  `balance_after` decimal(12,2) DEFAULT 0.00 COMMENT 'الرصيد بعد الحركة',
+  `notes` text DEFAULT NULL COMMENT 'ملاحظات',
+  `created_by` int(11) DEFAULT NULL COMMENT 'الموظف الذي أنشأ الحركة',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='حركات حسابات العملاء';
 
 -- --------------------------------------------------------
 
@@ -1032,7 +1086,7 @@ CREATE TABLE `shift_handovers` (
 
 CREATE TABLE `suppliers` (
   `id` int(11) NOT NULL,
-  `supplier_code` varchar(20) NOT NULL,
+  `supplier_code` varchar(20) NOT NULL COMMENT 'كود المورد التسلسلي',
   `supplier_name` varchar(100) NOT NULL,
   `phone` varchar(20) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
@@ -1061,6 +1115,126 @@ INSERT INTO `suppliers` (`id`, `supplier_code`, `supplier_name`, `phone`, `email
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `supplier_addresses`
+--
+
+CREATE TABLE `supplier_addresses` (
+  `id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `address_type` enum('main','warehouse','branch','other') DEFAULT 'main' COMMENT 'نوع العنوان',
+  `building_number` varchar(20) DEFAULT NULL,
+  `floor_number` varchar(10) DEFAULT NULL,
+  `apartment_number` varchar(20) DEFAULT NULL,
+  `street_name` varchar(200) DEFAULT NULL,
+  `landmark` varchar(200) DEFAULT NULL,
+  `area_id` int(11) DEFAULT NULL,
+  `governorate_id` int(11) DEFAULT NULL,
+  `delivery_zone_id` int(11) DEFAULT NULL,
+  `is_primary` tinyint(1) DEFAULT 0,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='عناوين الموردين';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supplier_balances`
+--
+
+CREATE TABLE `supplier_balances` (
+  `id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `balance` decimal(12,2) DEFAULT 0.00 COMMENT 'الرصيد الحالي (دائن إذا موجب = علينا فلوس، مدين إذا سالب = المورد عليه)',
+  `total_purchases` decimal(12,2) DEFAULT 0.00 COMMENT 'إجمالي المشتريات',
+  `total_payments` decimal(12,2) DEFAULT 0.00 COMMENT 'إجمالي المدفوعات',
+  `total_returns` decimal(12,2) DEFAULT 0.00 COMMENT 'إجمالي المرتجعات',
+  `last_transaction_date` datetime DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='أرصدة الموردين';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supplier_bank_accounts`
+--
+
+CREATE TABLE `supplier_bank_accounts` (
+  `id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `account_number` varchar(50) NOT NULL COMMENT 'رقم الحساب',
+  `bank_name` varchar(100) NOT NULL COMMENT 'اسم البنك',
+  `iban` varchar(50) DEFAULT NULL COMMENT 'IBAN',
+  `swift_code` varchar(20) DEFAULT NULL COMMENT 'Swift Code',
+  `branch_name` varchar(100) DEFAULT NULL COMMENT 'فرع البنك',
+  `is_primary` tinyint(1) DEFAULT 0,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='حسابات بنكية للموردين';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supplier_contacts`
+--
+
+CREATE TABLE `supplier_contacts` (
+  `id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `contact_type` enum('manager','representative','distributor','other') NOT NULL COMMENT 'نوع التواصل',
+  `contact_name` varchar(100) NOT NULL COMMENT 'الاسم',
+  `job_title` varchar(100) DEFAULT NULL COMMENT 'المسمى الوظيفي',
+  `phone` varchar(20) DEFAULT NULL COMMENT 'رقم الهاتف',
+  `email` varchar(100) DEFAULT NULL,
+  `is_primary` tinyint(1) DEFAULT 0 COMMENT 'رئيسي',
+  `notes` text DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='موظفين ومناديب الموردين';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supplier_due_payments`
+--
+
+CREATE TABLE `supplier_due_payments` (
+  `id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `transaction_id` int(11) DEFAULT NULL COMMENT 'رقم الحركة المرتبطة',
+  `reference_number` varchar(50) DEFAULT NULL COMMENT 'رقم الفاتورة/الشيك',
+  `amount` decimal(12,2) NOT NULL DEFAULT 0.00 COMMENT 'المبلغ المستحق',
+  `paid_amount` decimal(12,2) DEFAULT 0.00 COMMENT 'المبلغ المدفوع',
+  `remaining_amount` decimal(12,2) DEFAULT 0.00 COMMENT 'المبلغ المتبقي',
+  `due_type` enum('credit','cheque') DEFAULT 'credit' COMMENT 'نوع الاستحقاق',
+  `due_date` date NOT NULL COMMENT 'تاريخ الاستحقاق',
+  `cheque_number` varchar(50) DEFAULT NULL COMMENT 'رقم الشيك (لو شيك)',
+  `bank_name` varchar(100) DEFAULT NULL COMMENT 'البنك (لو شيك)',
+  `status` enum('pending','partial','paid','overdue') DEFAULT 'pending' COMMENT 'الحالة',
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='مستحقات الموردين';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supplier_phones`
+--
+
+CREATE TABLE `supplier_phones` (
+  `id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `country_code` varchar(10) DEFAULT '+20',
+  `phone_number` varchar(20) NOT NULL,
+  `phone_type` enum('mobile','landline','fax','whatsapp') DEFAULT 'mobile',
+  `is_primary` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='أرقام هاتف الموردين';
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `supplier_prices`
 --
 
@@ -1079,6 +1253,29 @@ CREATE TABLE `supplier_prices` (
   `profit_margin` decimal(5,2) DEFAULT 0.00,
   `delivery_time_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supplier_products`
+--
+
+CREATE TABLE `supplier_products` (
+  `id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL COMMENT 'رقم الصنف من جدول products',
+  `product_code` varchar(50) DEFAULT NULL COMMENT 'كود الصنف عند المورد',
+  `purchase_price` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT 'سعر الشراء',
+  `discount_percent` decimal(5,2) DEFAULT 0.00 COMMENT 'نسبة الخصم',
+  `vat_percent` decimal(5,2) DEFAULT 0.00 COMMENT 'نسبة الضريبة',
+  `net_price` decimal(10,2) DEFAULT 0.00 COMMENT 'السعر بعد الخصم والضريبة',
+  `last_purchase_date` date DEFAULT NULL COMMENT 'تاريخ آخر شراء',
+  `is_default` tinyint(1) DEFAULT 0 COMMENT 'السعر الافتراضي الحالي',
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='أصناف الموردين وأسعار الشراء';
 
 -- --------------------------------------------------------
 
@@ -1106,6 +1303,27 @@ CREATE TABLE `supplier_product_pricing` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `supplier_transactions`
+--
+
+CREATE TABLE `supplier_transactions` (
+  `id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `transaction_type` enum('purchase','payment','return','refund','adjustment') NOT NULL COMMENT 'نوع الحركة',
+  `reference_type` enum('purchase_invoice','payment','return_invoice','manual') DEFAULT 'manual' COMMENT 'نوع المرجع',
+  `reference_id` int(11) DEFAULT NULL COMMENT 'رقم المرجع',
+  `reference_number` varchar(50) DEFAULT NULL COMMENT 'رقم المرجع النصي (رقم الفاتورة/الشيك)',
+  `debit` decimal(12,2) DEFAULT 0.00 COMMENT 'مدين (علينا للمورد)',
+  `credit` decimal(12,2) DEFAULT 0.00 COMMENT 'دائن (المورد عليه / دفعنا له)',
+  `balance_after` decimal(12,2) DEFAULT 0.00 COMMENT 'الرصيد بعد الحركة',
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='حركات حسابات الموردين';
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `users`
 --
 
@@ -1128,7 +1346,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-25 18:29:45', '2026-06-15 16:53:16', '2026-06-25 16:29:45'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-25 19:49:43', '2026-06-15 16:53:16', '2026-06-25 17:49:43'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -1206,6 +1424,14 @@ ALTER TABLE `customer_areas`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `customer_balances`
+--
+ALTER TABLE `customer_balances`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_customer` (`customer_id`),
+  ADD KEY `idx_customer` (`customer_id`);
+
+--
 -- Indexes for table `customer_classes`
 --
 ALTER TABLE `customer_classes`
@@ -1224,6 +1450,17 @@ ALTER TABLE `customer_contracts`
 ALTER TABLE `customer_phones`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_customer` (`customer_id`);
+
+--
+-- Indexes for table `customer_transactions`
+--
+ALTER TABLE `customer_transactions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_customer` (`customer_id`),
+  ADD KEY `idx_transaction_type` (`transaction_type`),
+  ADD KEY `idx_created_at` (`created_at`),
+  ADD KEY `idx_reference` (`reference_type`,`reference_id`),
+  ADD KEY `fk_transaction_user` (`created_by`);
 
 --
 -- Indexes for table `delivery_times`
@@ -1375,7 +1612,58 @@ ALTER TABLE `shift_handovers`
 --
 ALTER TABLE `suppliers`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `supplier_code` (`supplier_code`);
+  ADD UNIQUE KEY `supplier_code` (`supplier_code`),
+  ADD UNIQUE KEY `uk_supplier_code` (`supplier_code`);
+
+--
+-- Indexes for table `supplier_addresses`
+--
+ALTER TABLE `supplier_addresses`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supplier` (`supplier_id`),
+  ADD KEY `fk_supp_addr_area` (`area_id`),
+  ADD KEY `fk_supp_addr_gov` (`governorate_id`),
+  ADD KEY `fk_supp_addr_zone` (`delivery_zone_id`);
+
+--
+-- Indexes for table `supplier_balances`
+--
+ALTER TABLE `supplier_balances`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_supplier` (`supplier_id`),
+  ADD KEY `idx_supplier` (`supplier_id`);
+
+--
+-- Indexes for table `supplier_bank_accounts`
+--
+ALTER TABLE `supplier_bank_accounts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supplier` (`supplier_id`);
+
+--
+-- Indexes for table `supplier_contacts`
+--
+ALTER TABLE `supplier_contacts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supplier` (`supplier_id`),
+  ADD KEY `idx_contact_type` (`contact_type`);
+
+--
+-- Indexes for table `supplier_due_payments`
+--
+ALTER TABLE `supplier_due_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supplier` (`supplier_id`),
+  ADD KEY `idx_due_date` (`due_date`),
+  ADD KEY `idx_status` (`status`),
+  ADD KEY `fk_due_user` (`created_by`);
+
+--
+-- Indexes for table `supplier_phones`
+--
+ALTER TABLE `supplier_phones`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supplier` (`supplier_id`);
 
 --
 -- Indexes for table `supplier_prices`
@@ -1383,6 +1671,16 @@ ALTER TABLE `suppliers`
 ALTER TABLE `supplier_prices`
   ADD PRIMARY KEY (`id`),
   ADD KEY `supplier_id` (`supplier_id`);
+
+--
+-- Indexes for table `supplier_products`
+--
+ALTER TABLE `supplier_products`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_supplier_product` (`supplier_id`,`product_id`),
+  ADD KEY `idx_supplier` (`supplier_id`),
+  ADD KEY `idx_product` (`product_id`),
+  ADD KEY `idx_last_purchase` (`last_purchase_date`);
 
 --
 -- Indexes for table `supplier_product_pricing`
@@ -1393,6 +1691,17 @@ ALTER TABLE `supplier_product_pricing`
   ADD KEY `idx_product` (`product_id`),
   ADD KEY `idx_supplier` (`supplier_id`),
   ADD KEY `idx_default` (`is_default`);
+
+--
+-- Indexes for table `supplier_transactions`
+--
+ALTER TABLE `supplier_transactions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_supplier` (`supplier_id`),
+  ADD KEY `idx_transaction_type` (`transaction_type`),
+  ADD KEY `idx_created_at` (`created_at`),
+  ADD KEY `idx_reference` (`reference_type`,`reference_id`),
+  ADD KEY `fk_transaction_user_sup` (`created_by`);
 
 --
 -- Indexes for table `users`
@@ -1409,7 +1718,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=89;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=90;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -1448,10 +1757,22 @@ ALTER TABLE `customer_addresses`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `customer_balances`
+--
+ALTER TABLE `customer_balances`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+
+--
 -- AUTO_INCREMENT for table `customer_phones`
 --
 ALTER TABLE `customer_phones`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `customer_transactions`
+--
+ALTER TABLE `customer_transactions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `delivery_times`
@@ -1544,15 +1865,63 @@ ALTER TABLE `shift_handovers`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `supplier_addresses`
+--
+ALTER TABLE `supplier_addresses`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supplier_balances`
+--
+ALTER TABLE `supplier_balances`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supplier_bank_accounts`
+--
+ALTER TABLE `supplier_bank_accounts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supplier_contacts`
+--
+ALTER TABLE `supplier_contacts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supplier_due_payments`
+--
+ALTER TABLE `supplier_due_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supplier_phones`
+--
+ALTER TABLE `supplier_phones`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `supplier_prices`
 --
 ALTER TABLE `supplier_prices`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
+-- AUTO_INCREMENT for table `supplier_products`
+--
+ALTER TABLE `supplier_products`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `supplier_product_pricing`
 --
 ALTER TABLE `supplier_product_pricing`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supplier_transactions`
+--
+ALTER TABLE `supplier_transactions`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -1594,10 +1963,23 @@ ALTER TABLE `customer_addresses`
   ADD CONSTRAINT `fk_address_zone` FOREIGN KEY (`delivery_zone_id`) REFERENCES `delivery_zones` (`id`) ON DELETE SET NULL;
 
 --
+-- Constraints for table `customer_balances`
+--
+ALTER TABLE `customer_balances`
+  ADD CONSTRAINT `fk_balance_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `customer_phones`
 --
 ALTER TABLE `customer_phones`
   ADD CONSTRAINT `fk_phone_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `customer_transactions`
+--
+ALTER TABLE `customer_transactions`
+  ADD CONSTRAINT `fk_transaction_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_transaction_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `orders`
@@ -1629,10 +2011,57 @@ ALTER TABLE `shift_handovers`
   ADD CONSTRAINT `shift_handovers_ibfk_2` FOREIGN KEY (`to_user`) REFERENCES `users` (`id`);
 
 --
+-- Constraints for table `supplier_addresses`
+--
+ALTER TABLE `supplier_addresses`
+  ADD CONSTRAINT `fk_addr_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_supp_addr_area` FOREIGN KEY (`area_id`) REFERENCES `areas` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_supp_addr_gov` FOREIGN KEY (`governorate_id`) REFERENCES `governorates` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_supp_addr_zone` FOREIGN KEY (`delivery_zone_id`) REFERENCES `delivery_zones` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `supplier_balances`
+--
+ALTER TABLE `supplier_balances`
+  ADD CONSTRAINT `fk_balance_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `supplier_bank_accounts`
+--
+ALTER TABLE `supplier_bank_accounts`
+  ADD CONSTRAINT `fk_bank_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `supplier_contacts`
+--
+ALTER TABLE `supplier_contacts`
+  ADD CONSTRAINT `fk_contact_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `supplier_due_payments`
+--
+ALTER TABLE `supplier_due_payments`
+  ADD CONSTRAINT `fk_due_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_due_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `supplier_phones`
+--
+ALTER TABLE `supplier_phones`
+  ADD CONSTRAINT `fk_phone_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `supplier_prices`
 --
 ALTER TABLE `supplier_prices`
   ADD CONSTRAINT `supplier_prices_ibfk_1` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`);
+
+--
+-- Constraints for table `supplier_products`
+--
+ALTER TABLE `supplier_products`
+  ADD CONSTRAINT `fk_sp_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_sp_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `supplier_product_pricing`
@@ -1640,6 +2069,13 @@ ALTER TABLE `supplier_prices`
 ALTER TABLE `supplier_product_pricing`
   ADD CONSTRAINT `fk_supp_pricing_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_supp_pricing_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `supplier_transactions`
+--
+ALTER TABLE `supplier_transactions`
+  ADD CONSTRAINT `fk_transaction_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_transaction_user_sup` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
