@@ -1,4 +1,5 @@
 <?php
+ob_start();
 require_once __DIR__ . '/../../core/config.php';
 require_once __DIR__ . '/../../core/auth.php';
 requireAuth();
@@ -12,14 +13,14 @@ if ($supplier_id <= 0) {
 }
 
 // Get supplier
-$stmt = $db->prepare("SELECT * FROM suppliers WHERE id = ?");
+$stmt = $db->prepare("SELECT * FROM suppliers WHERE id = ? AND (deleted_at IS NULL OR deleted_at = '')");
 $stmt->execute([$supplier_id]);
 $supplier = $stmt->fetch();
 if (!$supplier) {
     redirect('index.php');
 }
 
-// Get related data - FIX: separate execute and fetchAll
+// Get related data
 $phone_stmt = $db->prepare("SELECT * FROM supplier_phones WHERE supplier_id = ? ORDER BY is_primary DESC, id ASC");
 $phone_stmt->execute([$supplier_id]);
 $phones = $phone_stmt->fetchAll();
@@ -46,45 +47,107 @@ $areas = $db->query("SELECT * FROM areas WHERE is_active = 1 ORDER BY area_name_
 $governorates = $db->query("SELECT * FROM governorates WHERE is_active = 1 ORDER BY governorate_name_ar")->fetchAll();
 $zones = $db->query("SELECT * FROM delivery_zones WHERE is_active = 1 ORDER BY zone_name_ar")->fetchAll();
 
+// Helper: retain POST data (for edit, use POST if available, else DB value)
+function old_edit($key, $db_value = '', $default = '') {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Update session activity to prevent timeout during form processing
+    $_SESSION['LAST_ACTIVITY'] = time();
+        return old_post($key, $default);
+    }
+    return $db_value !== null ? $db_value : $default;
+}
+function old_post($key, $default = '') {
+    if (strpos($key, '[') !== false) {
+        preg_match('/^(\w+)\[(\d+)\]\[(\w+)\]$/', $key, $matches);
+        if ($matches) {
+            $arr = $matches[1];
+            $idx = $matches[2];
+            $sub = $matches[3];
+            return $_POST[$arr][$idx][$sub] ?? $default;
+        }
+        return $default;
+    }
+    return $_POST[$key] ?? $default;
+}
+function old_checked_edit($key, $db_value = 1) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Update session activity to prevent timeout during form processing
+    $_SESSION['LAST_ACTIVITY'] = time();
+        return isset($_POST[$key]) ? 'checked' : '';
+    }
+    return $db_value ? 'checked' : '';
+}
+function old_selected_edit($key, $value, $db_value = '') {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Update session activity to prevent timeout during form processing
+    $_SESSION['LAST_ACTIVITY'] = time();
+        return (isset($_POST[$key]) && $_POST[$key] == $value) ? 'selected' : '';
+    }
+    return ($db_value == $value) ? 'selected' : '';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Update session activity to prevent timeout during form processing
+    $_SESSION['LAST_ACTIVITY'] = time();
     try {
         $db->beginTransaction();
 
-        // Validate supplier name
+        // ========== VALIDATION ==========
+        $errors = [];
+
+        // 1. Validate Arabic name (required, unique excluding current)
         $supplier_name = trim($_POST['supplier_name'] ?? '');
         if (empty($supplier_name)) {
-            throw new Exception('اسم المورد مطلوب');
-        }
-        $stmt = $db->prepare("SELECT id FROM suppliers WHERE supplier_name = ? AND id != ?");
-        $stmt->execute([$supplier_name, $supplier_id]);
-        if ($stmt->fetch()) {
-            throw new Exception('اسم المورد موجود بالفعل');
-        }
-
-        // Validate English name (if provided)
-        $supplier_name_en = trim($_POST['supplier_name_en'] ?? '');
-        if (!empty($supplier_name_en)) {
-            $stmt = $db->prepare("SELECT id FROM suppliers WHERE supplier_name_en = ? AND id != ?");
-            $stmt->execute([$supplier_name_en, $supplier_id]);
+            $errors[] = 'اسم المورد مطلوب';
+        } else {
+            $stmt = $db->prepare("SELECT id FROM suppliers WHERE supplier_name = ? AND id != ? AND (deleted_at IS NULL OR deleted_at = '')");
+            $stmt->execute([$supplier_name, $supplier_id]);
             if ($stmt->fetch()) {
-                throw new Exception('الاسم الإنجليزي موجود بالفعل');
+                $errors[] = 'اسم المورد موجود بالفعل';
             }
         }
 
-        // Validate phones
+        // 2. Validate English name (optional, but if provided must be unique excluding current)
+        $supplier_name_en = trim($_POST['supplier_name_en'] ?? '');
+        if (!empty($supplier_name_en)) {
+            $stmt = $db->prepare("SELECT id FROM suppliers WHERE supplier_name_en = ? AND supplier_name_en IS NOT NULL AND supplier_name_en != '' AND id != ? AND (deleted_at IS NULL OR deleted_at = '')");
+            $stmt->execute([$supplier_name_en, $supplier_id]);
+            if ($stmt->fetch()) {
+                $errors[] = 'الاسم الإنجليزي موجود بالفعل';
+            }
+        }
+
+        // 3. Validate phones (unique across all suppliers, excluding current)
         if (!empty($_POST['phones'])) {
             foreach ($_POST['phones'] as $phone) {
                 if (!empty($phone['number'])) {
-                    $stmt = $db->prepare("SELECT sp.*, s.supplier_name FROM supplier_phones sp JOIN suppliers s ON sp.supplier_id = s.id WHERE sp.phone_number = ? AND sp.supplier_id != ?");
+                    $stmt = $db->prepare("SELECT sp.*, s.supplier_name FROM supplier_phones sp JOIN suppliers s ON sp.supplier_id = s.id WHERE sp.phone_number = ? AND sp.supplier_id != ? AND (s.deleted_at IS NULL OR s.deleted_at = '')");
                     $stmt->execute([$phone['number'], $supplier_id]);
                     if ($existing = $stmt->fetch()) {
-                        throw new Exception('رقم الهاتف ' . $phone['number'] . ' مسجل لمورد: ' . $existing['supplier_name']);
+                        $errors[] = 'رقم الهاتف ' . $phone['number'] . ' مسجل لمورد: ' . $existing['supplier_name'];
                     }
                 }
             }
         }
 
-        // Update supplier
+        // 4. Validate supplier_type (required)
+        $supplier_type = $_POST['supplier_type'] ?? '';
+        if (empty($supplier_type)) {
+            $errors[] = 'تصنيف المورد مطلوب';
+        }
+
+        // 5. Validate payment_type (required)
+        $payment_type = $_POST['payment_type'] ?? '';
+        if (empty($payment_type)) {
+            $errors[] = 'نوع التعامل مطلوب';
+        }
+
+        // If validation errors, throw exception
+        if (!empty($errors)) {
+            throw new Exception(implode('<br>', $errors));
+        }
+
+        // ========== UPDATE SUPPLIER ==========
         $stmt = $db->prepare("
             UPDATE suppliers SET 
                 supplier_name = ?, supplier_name_en = ?, supplier_type = ?, 
@@ -95,8 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([
             $supplier_name,
             !empty($supplier_name_en) ? $supplier_name_en : null,
-            $_POST['supplier_type'] ?? 'company',
-            $_POST['payment_type'] ?? 'cash',
+            $supplier_type,
+            $payment_type,
             floatval($_POST['credit_limit'] ?? 0),
             intval($_POST['grace_period'] ?? 0),
             trim($_POST['return_policy'] ?? '') ?: null,
@@ -107,10 +170,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $supplier_id
         ]);
 
-        // Update phones - delete old, insert new
+        // ========== UPDATE PHONES ==========
         $db->prepare("DELETE FROM supplier_phones WHERE supplier_id = ?")->execute([$supplier_id]);
         if (!empty($_POST['phones'])) {
             $phone_stmt = $db->prepare("INSERT INTO supplier_phones (supplier_id, country_code, phone_number, phone_type, is_primary) VALUES (?, ?, ?, ?, ?)");
+            $primary_set = false;
             foreach ($_POST['phones'] as $i => $phone) {
                 if (!empty($phone['number'])) {
                     $phone_stmt->execute([
@@ -118,13 +182,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $phone['country_code'] ?? '+20',
                         $phone['number'],
                         $phone['type'] ?? 'mobile',
-                        $i === 0 ? 1 : 0
+                        !$primary_set ? 1 : 0
                     ]);
+                    $primary_set = true;
                 }
             }
         }
 
-        // Update addresses
+        // ========== UPDATE ADDRESSES ==========
         $db->prepare("DELETE FROM supplier_addresses WHERE supplier_id = ?")->execute([$supplier_id]);
         if (!empty($_POST['addresses'])) {
             $addr_stmt = $db->prepare("
@@ -132,6 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     apartment_number, street_name, landmark, area_id, governorate_id, delivery_zone_id, is_primary)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
+            $primary_set = false;
             foreach ($_POST['addresses'] as $i => $addr) {
                 if (!empty($addr['street_name'])) {
                     $addr_stmt->execute([
@@ -145,19 +211,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         !empty($addr['area_id']) ? $addr['area_id'] : null,
                         !empty($addr['governorate_id']) ? $addr['governorate_id'] : null,
                         !empty($addr['zone_id']) ? $addr['zone_id'] : null,
-                        $i === 0 ? 1 : 0
+                        !$primary_set ? 1 : 0
                     ]);
+                    $primary_set = true;
                 }
             }
         }
 
-        // Update contacts
+        // ========== UPDATE CONTACTS ==========
         $db->prepare("DELETE FROM supplier_contacts WHERE supplier_id = ?")->execute([$supplier_id]);
         if (!empty($_POST['contacts'])) {
             $contact_stmt = $db->prepare("
                 INSERT INTO supplier_contacts (supplier_id, contact_type, contact_name, job_title, phone, email, is_primary)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
+            $primary_set = false;
             foreach ($_POST['contacts'] as $i => $contact) {
                 if (!empty($contact['name'])) {
                     $contact_stmt->execute([
@@ -167,19 +235,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $contact['job_title'] ?? null,
                         $contact['phone'] ?? null,
                         $contact['email'] ?? null,
-                        $i === 0 ? 1 : 0
+                        !$primary_set ? 1 : 0
                     ]);
+                    $primary_set = true;
                 }
             }
         }
 
-        // Update bank accounts
+        // ========== UPDATE BANK ACCOUNTS ==========
         $db->prepare("DELETE FROM supplier_bank_accounts WHERE supplier_id = ?")->execute([$supplier_id]);
         if (!empty($_POST['bank_accounts'])) {
             $bank_stmt = $db->prepare("
                 INSERT INTO supplier_bank_accounts (supplier_id, account_number, bank_name, iban, swift_code, branch_name, is_primary)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
+            $primary_set = false;
             foreach ($_POST['bank_accounts'] as $i => $bank) {
                 if (!empty($bank['account_number']) && !empty($bank['bank_name'])) {
                     $bank_stmt->execute([
@@ -189,15 +259,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $bank['iban'] ?? null,
                         $bank['swift'] ?? null,
                         $bank['branch'] ?? null,
-                        $i === 0 ? 1 : 0
+                        !$primary_set ? 1 : 0
                     ]);
+                    $primary_set = true;
                 }
             }
         }
 
         $db->commit();
+        session_write_close();
         header("Location: index.php?updated=1");
-        exit;
+        exit();
 
     } catch (Exception $e) {
         $db->rollBack();
@@ -299,40 +371,46 @@ function selected_option($value, $current) {
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">اسم المورد <span class="text-danger">*</span></label>
-                                    <input type="text" name="supplier_name" id="supplierName" class="form-control" value="<?= htmlspecialchars($supplier['supplier_name'], ENT_QUOTES) ?>" required>
+                                    <input type="text" name="supplier_name" id="supplierName" class="form-control" 
+                                           value="<?= htmlspecialchars(old_edit('supplier_name', $supplier['supplier_name']), ENT_QUOTES) ?>" required>
                                     <div class="validation-error" id="nameError">اسم المورد مطلوب</div>
                                     <div class="validation-error" id="nameDuplicateError">اسم المورد موجود بالفعل</div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">الاسم بالإنجليزي</label>
-                                    <input type="text" name="supplier_name_en" id="supplierNameEn" class="form-control" value="<?= htmlspecialchars($supplier['supplier_name_en'] ?? '', ENT_QUOTES) ?>">
+                                    <input type="text" name="supplier_name_en" id="supplierNameEn" class="form-control" 
+                                           value="<?= htmlspecialchars(old_edit('supplier_name_en', $supplier['supplier_name_en'] ?? ''), ENT_QUOTES) ?>">
                                     <div class="validation-error" id="nameEnDuplicateError">الاسم الإنجليزي موجود بالفعل</div>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label">تصنيف المورد <span class="text-danger">*</span></label>
                                     <select name="supplier_type" class="form-select" required>
-                                        <option value="b2b"<?= selected_option('b2b', $supplier['supplier_type']) ?>>صيدلية (B2B)</option>
-                                        <option value="private_office"<?= selected_option('private_office', $supplier['supplier_type']) ?>>مكتب خاص</option>
-                                        <option value="warehouse"<?= selected_option('warehouse', $supplier['supplier_type']) ?>>مخزن</option>
-                                        <option value="distributor"<?= selected_option('distributor', $supplier['supplier_type']) ?>>موزع</option>
-                                        <option value="company"<?= selected_option('company', $supplier['supplier_type']) ?>>شركة</option>
+                                        <option value="">-- اختر --</option>
+                                        <option value="b2b"<?= old_selected_edit('supplier_type', 'b2b', $supplier['supplier_type']) ?>>صيدلية (B2B)</option>
+                                        <option value="private_office"<?= old_selected_edit('supplier_type', 'private_office', $supplier['supplier_type']) ?>>مكتب خاص</option>
+                                        <option value="warehouse"<?= old_selected_edit('supplier_type', 'warehouse', $supplier['supplier_type']) ?>>مخزن</option>
+                                        <option value="distributor"<?= old_selected_edit('supplier_type', 'distributor', $supplier['supplier_type']) ?>>موزع</option>
+                                        <option value="company"<?= old_selected_edit('supplier_type', 'company', $supplier['supplier_type']) ?>>شركة</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label class="form-label">نوع التعامل</label>
-                                    <select name="payment_type" class="form-select" id="paymentType">
-                                        <option value="cash"<?= selected_option('cash', $supplier['payment_type']) ?>>نقدي</option>
-                                        <option value="credit"<?= selected_option('credit', $supplier['payment_type']) ?>>آجل</option>
-                                        <option value="cheque"<?= selected_option('cheque', $supplier['payment_type']) ?>>شيك</option>
+                                    <label class="form-label">نوع التعامل <span class="text-danger">*</span></label>
+                                    <select name="payment_type" class="form-select" id="paymentType" required>
+                                        <option value="">-- اختر --</option>
+                                        <option value="cash"<?= old_selected_edit('payment_type', 'cash', $supplier['payment_type']) ?>>نقدي</option>
+                                        <option value="credit"<?= old_selected_edit('payment_type', 'credit', $supplier['payment_type']) ?>>آجل</option>
+                                        <option value="cheque"<?= old_selected_edit('payment_type', 'cheque', $supplier['payment_type']) ?>>شيك</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4 mb-3" id="creditLimitDiv" style="display:<?= $supplier['payment_type']!='cash'?'block':'none' ?>;">
+                                <div class="col-md-4 mb-3" id="creditLimitDiv" style="display:<?= old_edit('payment_type', $supplier['payment_type']) != 'cash' ? 'block' : 'none' ?>;">
                                     <label class="form-label">حد التعامل</label>
-                                    <div class="input-group"><input type="number" name="credit_limit" class="form-control" step="0.01" value="<?= $supplier['credit_limit'] ?>"><span class="input-group-text">ج</span></div>
+                                    <div class="input-group"><input type="number" name="credit_limit" class="form-control" step="0.01" 
+                                           value="<?= old_edit('credit_limit', $supplier['credit_limit']) ?>"><span class="input-group-text">ج</span></div>
                                 </div>
-                                <div class="col-md-4 mb-3" id="gracePeriodDiv" style="display:<?= $supplier['payment_type']!='cash'?'block':'none' ?>;">
+                                <div class="col-md-4 mb-3" id="gracePeriodDiv" style="display:<?= old_edit('payment_type', $supplier['payment_type']) != 'cash' ? 'block' : 'none' ?>;">
                                     <label class="form-label">فترة السماح (يوم)</label>
-                                    <input type="number" name="grace_period" class="form-control" value="<?= $supplier['grace_period'] ?>">
+                                    <input type="number" name="grace_period" class="form-control" 
+                                           value="<?= old_edit('grace_period', $supplier['grace_period']) ?>">
                                 </div>
                             </div>
                         </div></div>
@@ -343,28 +421,38 @@ function selected_option($value, $current) {
                         <div class="card"><div class="card-body">
                             <h5 class="section-title"><i class="bi bi-telephone"></i> أرقام الهاتف</h5>
                             <div id="phonesContainer">
-                                <?php foreach ($phones as $i => $phone): ?>
+                                <?php
+                                $phone_count = 0;
+                                $phone_data = ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['phones'])) ? $_POST['phones'] : $phones;
+                                if (!empty($phone_data)):
+                                    foreach ($phone_data as $i => $phone):
+                                        if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($phone['number']) && $i > 0) continue;
+                                        $cc = $phone['country_code'] ?? ($phone['country_code'] ?? '+20');
+                                        $num = $phone['number'] ?? ($phone['phone_number'] ?? '');
+                                        $type = $phone['type'] ?? ($phone['phone_type'] ?? 'mobile');
+                                ?>
                                 <div class="dynamic-row row">
                                     <div class="col-md-3"><select name="phones[<?= $i ?>][country_code]" class="form-select">
-                                        <option value="+20"<?= selected_option('+20', $phone['country_code']) ?>>🇪🇬 +20</option>
-                                        <option value="+966"<?= selected_option('+966', $phone['country_code']) ?>>🇸🇦 +966</option>
-                                        <option value="+971"<?= selected_option('+971', $phone['country_code']) ?>>🇦🇪 +971</option>
-                                        <option value="+965"<?= selected_option('+965', $phone['country_code']) ?>>🇰🇼 +965</option>
-                                        <option value="+974"<?= selected_option('+974', $phone['country_code']) ?>>🇶🇦 +974</option>
+                                        <option value="+20"<?= selected_option('+20', $cc) ?>>🇪🇬 +20</option>
+                                        <option value="+966"<?= selected_option('+966', $cc) ?>>🇸🇦 +966</option>
+                                        <option value="+971"<?= selected_option('+971', $cc) ?>>🇦🇪 +971</option>
+                                        <option value="+965"<?= selected_option('+965', $cc) ?>>🇰🇼 +965</option>
+                                        <option value="+974"<?= selected_option('+974', $cc) ?>>🇶🇦 +974</option>
                                     </select></div>
-                                    <div class="col-md-3"><input type="text" name="phones[<?= $i ?>][number]" class="form-control phone-number" value="<?= htmlspecialchars($phone['phone_number'], ENT_QUOTES) ?>" placeholder="رقم الهاتف" data-index="<?= $i ?>">
+                                    <div class="col-md-3"><input type="text" name="phones[<?= $i ?>][number]" class="form-control phone-number" value="<?= htmlspecialchars($num, ENT_QUOTES) ?>" placeholder="رقم الهاتف" data-index="<?= $i ?>">
                                         <div class="validation-error phone-duplicate-error" data-index="<?= $i ?>">رقم الهاتف مسجل لمورد آخر</div>
                                     </div>
                                     <div class="col-md-3"><select name="phones[<?= $i ?>][type]" class="form-select">
-                                        <option value="mobile"<?= selected_option('mobile', $phone['phone_type']) ?>>موبايل</option>
-                                        <option value="landline"<?= selected_option('landline', $phone['phone_type']) ?>>أرضي</option>
-                                        <option value="fax"<?= selected_option('fax', $phone['phone_type']) ?>>فاكس</option>
-                                        <option value="whatsapp"<?= selected_option('whatsapp', $phone['phone_type']) ?>>واتساب</option>
+                                        <option value="mobile"<?= selected_option('mobile', $type) ?>>موبايل</option>
+                                        <option value="landline"<?= selected_option('landline', $type) ?>>أرضي</option>
+                                        <option value="fax"<?= selected_option('fax', $type) ?>>فاكس</option>
+                                        <option value="whatsapp"<?= selected_option('whatsapp', $type) ?>>واتساب</option>
                                     </select></div>
                                     <div class="col-md-3"><span class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i> حذف</span></div>
                                 </div>
-                                <?php endforeach; ?>
-                                <?php if (empty($phones)): ?>
+                                <?php $phone_count = $i + 1; endforeach; ?>
+                                <?php endif; ?>
+                                <?php if (empty($phone_data)): ?>
                                 <div class="dynamic-row row">
                                     <div class="col-md-3"><select name="phones[0][country_code]" class="form-select"><option value="+20" selected>🇪🇬 +20</option><option value="+966">🇸🇦 +966</option><option value="+971">🇦🇪 +971</option><option value="+965">🇰🇼 +965</option><option value="+974">🇶🇦 +974</option></select></div>
                                     <div class="col-md-3"><input type="text" name="phones[0][number]" class="form-control phone-number" placeholder="رقم الهاتف" data-index="0">
@@ -384,26 +472,42 @@ function selected_option($value, $current) {
                         <div class="card"><div class="card-body">
                             <h5 class="section-title"><i class="bi bi-geo-alt"></i> العناوين</h5>
                             <div id="addressesContainer">
-                                <?php foreach ($addresses as $i => $addr): ?>
+                                <?php
+                                $addr_count = 0;
+                                $addr_data = ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['addresses'])) ? $_POST['addresses'] : $addresses;
+                                if (!empty($addr_data)):
+                                    foreach ($addr_data as $i => $addr):
+                                        if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($addr['street_name']) && $i > 0) continue;
+                                        $atype = $addr['type'] ?? ($addr['address_type'] ?? 'main');
+                                        $street = $addr['street_name'] ?? ($addr['street_name'] ?? '');
+                                        $bldg = $addr['building'] ?? ($addr['building_number'] ?? '');
+                                        $flr = $addr['floor'] ?? ($addr['floor_number'] ?? '');
+                                        $apt = $addr['apartment'] ?? ($addr['apartment_number'] ?? '');
+                                        $lm = $addr['landmark'] ?? ($addr['landmark'] ?? '');
+                                        $gov = $addr['governorate_id'] ?? ($addr['governorate_id'] ?? '');
+                                        $ar = $addr['area_id'] ?? ($addr['area_id'] ?? '');
+                                        $zn = $addr['zone_id'] ?? ($addr['delivery_zone_id'] ?? '');
+                                ?>
                                 <div class="dynamic-row"><div class="row">
                                     <div class="col-md-3 mb-2"><select name="addresses[<?= $i ?>][type]" class="form-select">
-                                        <option value="main"<?= selected_option('main', $addr['address_type']) ?>>رئيسي</option>
-                                        <option value="warehouse"<?= selected_option('warehouse', $addr['address_type']) ?>>مخزن</option>
-                                        <option value="branch"<?= selected_option('branch', $addr['address_type']) ?>>فرع</option>
-                                        <option value="other"<?= selected_option('other', $addr['address_type']) ?>>أخرى</option>
+                                        <option value="main"<?= selected_option('main', $atype) ?>>رئيسي</option>
+                                        <option value="warehouse"<?= selected_option('warehouse', $atype) ?>>مخزن</option>
+                                        <option value="branch"<?= selected_option('branch', $atype) ?>>فرع</option>
+                                        <option value="other"<?= selected_option('other', $atype) ?>>أخرى</option>
                                     </select></div>
-                                    <div class="col-md-9 mb-2"><input type="text" name="addresses[<?= $i ?>][street_name]" class="form-control" value="<?= htmlspecialchars($addr['street_name'] ?? '', ENT_QUOTES) ?>" placeholder="اسم الشارع"></div>
-                                    <div class="col-md-3 mb-2"><input type="text" name="addresses[<?= $i ?>][building]" class="form-control" value="<?= htmlspecialchars($addr['building_number'] ?? '', ENT_QUOTES) ?>" placeholder="رقم العمارة"></div>
-                                    <div class="col-md-3 mb-2"><input type="text" name="addresses[<?= $i ?>][floor]" class="form-control" value="<?= htmlspecialchars($addr['floor_number'] ?? '', ENT_QUOTES) ?>" placeholder="الدور"></div>
-                                    <div class="col-md-3 mb-2"><input type="text" name="addresses[<?= $i ?>][apartment]" class="form-control" value="<?= htmlspecialchars($addr['apartment_number'] ?? '', ENT_QUOTES) ?>" placeholder="الشقة"></div>
-                                    <div class="col-md-3 mb-2"><input type="text" name="addresses[<?= $i ?>][landmark]" class="form-control" value="<?= htmlspecialchars($addr['landmark'] ?? '', ENT_QUOTES) ?>" placeholder="علامة مميزة"></div>
-                                    <div class="col-md-4 mb-2"><select name="addresses[<?= $i ?>][governorate_id]" class="form-select"><option value="">-- المحافظة --</option><?php foreach ($governorates as $gov): ?><option value="<?= $gov['id'] ?>"<?= selected_option($gov['id'], $addr['governorate_id']) ?>><?= htmlspecialchars($gov['governorate_name_ar']) ?></option><?php endforeach; ?></select></div>
-                                    <div class="col-md-4 mb-2"><select name="addresses[<?= $i ?>][area_id]" class="form-select"><option value="">-- المنطقة --</option><?php foreach ($areas as $area): ?><option value="<?= $area['id'] ?>"<?= selected_option($area['id'], $addr['area_id']) ?>><?= htmlspecialchars($area['area_name_ar']) ?></option><?php endforeach; ?></select></div>
-                                    <div class="col-md-3 mb-2"><select name="addresses[<?= $i ?>][zone_id]" class="form-select"><option value="">-- Zone --</option><?php foreach ($zones as $zone): ?><option value="<?= $zone['id'] ?>"<?= selected_option($zone['id'], $addr['delivery_zone_id']) ?>><?= htmlspecialchars($zone['zone_name_ar']) ?> (<?= $zone['delivery_fee'] ?> ج)</option><?php endforeach; ?></select></div>
+                                    <div class="col-md-9 mb-2"><input type="text" name="addresses[<?= $i ?>][street_name]" class="form-control" value="<?= htmlspecialchars($street, ENT_QUOTES) ?>" placeholder="اسم الشارع"></div>
+                                    <div class="col-md-3 mb-2"><input type="text" name="addresses[<?= $i ?>][building]" class="form-control" value="<?= htmlspecialchars($bldg, ENT_QUOTES) ?>" placeholder="رقم العمارة"></div>
+                                    <div class="col-md-3 mb-2"><input type="text" name="addresses[<?= $i ?>][floor]" class="form-control" value="<?= htmlspecialchars($flr, ENT_QUOTES) ?>" placeholder="الدور"></div>
+                                    <div class="col-md-3 mb-2"><input type="text" name="addresses[<?= $i ?>][apartment]" class="form-control" value="<?= htmlspecialchars($apt, ENT_QUOTES) ?>" placeholder="الشقة"></div>
+                                    <div class="col-md-3 mb-2"><input type="text" name="addresses[<?= $i ?>][landmark]" class="form-control" value="<?= htmlspecialchars($lm, ENT_QUOTES) ?>" placeholder="علامة مميزة"></div>
+                                    <div class="col-md-4 mb-2"><select name="addresses[<?= $i ?>][governorate_id]" class="form-select"><option value="">-- المحافظة --</option><?php foreach ($governorates as $gov_item): ?><option value="<?= $gov_item['id'] ?>"<?= selected_option($gov_item['id'], $gov) ?>><?= htmlspecialchars($gov_item['governorate_name_ar']) ?></option><?php endforeach; ?></select></div>
+                                    <div class="col-md-4 mb-2"><select name="addresses[<?= $i ?>][area_id]" class="form-select"><option value="">-- المنطقة --</option><?php foreach ($areas as $area_item): ?><option value="<?= $area_item['id'] ?>"<?= selected_option($area_item['id'], $ar) ?>><?= htmlspecialchars($area_item['area_name_ar']) ?></option><?php endforeach; ?></select></div>
+                                    <div class="col-md-3 mb-2"><select name="addresses[<?= $i ?>][zone_id]" class="form-select"><option value="">-- Zone --</option><?php foreach ($zones as $zone_item): ?><option value="<?= $zone_item['id'] ?>"<?= selected_option($zone_item['id'], $zn) ?>><?= htmlspecialchars($zone_item['zone_name_ar']) ?> (<?= $zone_item['delivery_fee'] ?> ج)</option><?php endforeach; ?></select></div>
                                     <div class="col-md-1 mb-2 text-end"><span class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></span></div>
                                 </div></div>
-                                <?php endforeach; ?>
-                                <?php if (empty($addresses)): ?>
+                                <?php $addr_count = $i + 1; endforeach; ?>
+                                <?php endif; ?>
+                                <?php if (empty($addr_data)): ?>
                                 <div class="dynamic-row"><div class="row">
                                     <div class="col-md-3 mb-2"><select name="addresses[0][type]" class="form-select"><option value="main">رئيسي</option><option value="warehouse">مخزن</option><option value="branch">فرع</option><option value="other">أخرى</option></select></div>
                                     <div class="col-md-9 mb-2"><input type="text" name="addresses[0][street_name]" class="form-control" placeholder="اسم الشارع"></div>
@@ -427,21 +531,32 @@ function selected_option($value, $current) {
                         <div class="card"><div class="card-body">
                             <h5 class="section-title"><i class="bi bi-people"></i> الموظفين والمناديب</h5>
                             <div id="contactsContainer">
-                                <?php foreach ($contacts as $i => $contact): ?>
+                                <?php
+                                $contact_count = 0;
+                                $contact_data = ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['contacts'])) ? $_POST['contacts'] : $contacts;
+                                if (!empty($contact_data)):
+                                    foreach ($contact_data as $i => $contact):
+                                        if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($contact['name']) && $i > 0) continue;
+                                        $ctype = $contact['type'] ?? ($contact['contact_type'] ?? 'manager');
+                                        $cname = $contact['name'] ?? ($contact['contact_name'] ?? '');
+                                        $job = $contact['job_title'] ?? ($contact['job_title'] ?? '');
+                                        $cphone = $contact['phone'] ?? ($contact['phone'] ?? '');
+                                ?>
                                 <div class="dynamic-row row">
                                     <div class="col-md-3 mb-2"><select name="contacts[<?= $i ?>][type]" class="form-select">
-                                        <option value="manager"<?= selected_option('manager', $contact['contact_type']) ?>>مدير</option>
-                                        <option value="representative"<?= selected_option('representative', $contact['contact_type']) ?>>مندوب</option>
-                                        <option value="distributor"<?= selected_option('distributor', $contact['contact_type']) ?>>موزع</option>
-                                        <option value="other"<?= selected_option('other', $contact['contact_type']) ?>>أخرى</option>
+                                        <option value="manager"<?= selected_option('manager', $ctype) ?>>مدير</option>
+                                        <option value="representative"<?= selected_option('representative', $ctype) ?>>مندوب</option>
+                                        <option value="distributor"<?= selected_option('distributor', $ctype) ?>>موزع</option>
+                                        <option value="other"<?= selected_option('other', $ctype) ?>>أخرى</option>
                                     </select></div>
-                                    <div class="col-md-3 mb-2"><input type="text" name="contacts[<?= $i ?>][name]" class="form-control" value="<?= htmlspecialchars($contact['contact_name'], ENT_QUOTES) ?>" placeholder="الاسم"></div>
-                                    <div class="col-md-3 mb-2"><input type="text" name="contacts[<?= $i ?>][job_title]" class="form-control" value="<?= htmlspecialchars($contact['job_title'] ?? '', ENT_QUOTES) ?>" placeholder="المسمى الوظيفي"></div>
-                                    <div class="col-md-2 mb-2"><input type="text" name="contacts[<?= $i ?>][phone]" class="form-control" value="<?= htmlspecialchars($contact['phone'] ?? '', ENT_QUOTES) ?>" placeholder="الهاتف"></div>
+                                    <div class="col-md-3 mb-2"><input type="text" name="contacts[<?= $i ?>][name]" class="form-control" value="<?= htmlspecialchars($cname, ENT_QUOTES) ?>" placeholder="الاسم"></div>
+                                    <div class="col-md-3 mb-2"><input type="text" name="contacts[<?= $i ?>][job_title]" class="form-control" value="<?= htmlspecialchars($job, ENT_QUOTES) ?>" placeholder="المسمى الوظيفي"></div>
+                                    <div class="col-md-2 mb-2"><input type="text" name="contacts[<?= $i ?>][phone]" class="form-control" value="<?= htmlspecialchars($cphone, ENT_QUOTES) ?>" placeholder="الهاتف"></div>
                                     <div class="col-md-1 mb-2 text-end"><span class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></span></div>
                                 </div>
-                                <?php endforeach; ?>
-                                <?php if (empty($contacts)): ?>
+                                <?php $contact_count = $i + 1; endforeach; ?>
+                                <?php endif; ?>
+                                <?php if (empty($contact_data)): ?>
                                 <div class="dynamic-row row">
                                     <div class="col-md-3 mb-2"><select name="contacts[0][type]" class="form-select"><option value="manager">مدير</option><option value="representative">مندوب</option><option value="distributor">موزع</option><option value="other">أخرى</option></select></div>
                                     <div class="col-md-3 mb-2"><input type="text" name="contacts[0][name]" class="form-control" placeholder="الاسم"></div>
@@ -460,17 +575,29 @@ function selected_option($value, $current) {
                         <div class="card"><div class="card-body">
                             <h5 class="section-title"><i class="bi bi-bank"></i> الحسابات البنكية</h5>
                             <div id="bankContainer">
-                                <?php foreach ($bank_accounts as $i => $bank): ?>
+                                <?php
+                                $bank_count = 0;
+                                $bank_data = ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['bank_accounts'])) ? $_POST['bank_accounts'] : $bank_accounts;
+                                if (!empty($bank_data)):
+                                    foreach ($bank_data as $i => $bank):
+                                        if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($bank['account_number']) && $i > 0) continue;
+                                        $bname = $bank['bank_name'] ?? ($bank['bank_name'] ?? '');
+                                        $bacc = $bank['account_number'] ?? ($bank['account_number'] ?? '');
+                                        $biban = $bank['iban'] ?? ($bank['iban'] ?? '');
+                                        $bswift = $bank['swift'] ?? ($bank['swift_code'] ?? '');
+                                        $bbranch = $bank['branch'] ?? ($bank['branch_name'] ?? '');
+                                ?>
                                 <div class="dynamic-row row">
-                                    <div class="col-md-3 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][bank_name]" class="form-control" value="<?= htmlspecialchars($bank['bank_name'], ENT_QUOTES) ?>" placeholder="اسم البنك"></div>
-                                    <div class="col-md-3 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][account_number]" class="form-control" value="<?= htmlspecialchars($bank['account_number'], ENT_QUOTES) ?>" placeholder="رقم الحساب"></div>
-                                    <div class="col-md-2 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][iban]" class="form-control" value="<?= htmlspecialchars($bank['iban'] ?? '', ENT_QUOTES) ?>" placeholder="IBAN"></div>
-                                    <div class="col-md-2 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][swift]" class="form-control" value="<?= htmlspecialchars($bank['swift_code'] ?? '', ENT_QUOTES) ?>" placeholder="Swift"></div>
-                                    <div class="col-md-1 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][branch]" class="form-control" value="<?= htmlspecialchars($bank['branch_name'] ?? '', ENT_QUOTES) ?>" placeholder="فرع"></div>
+                                    <div class="col-md-3 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][bank_name]" class="form-control" value="<?= htmlspecialchars($bname, ENT_QUOTES) ?>" placeholder="اسم البنك"></div>
+                                    <div class="col-md-3 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][account_number]" class="form-control" value="<?= htmlspecialchars($bacc, ENT_QUOTES) ?>" placeholder="رقم الحساب"></div>
+                                    <div class="col-md-2 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][iban]" class="form-control" value="<?= htmlspecialchars($biban, ENT_QUOTES) ?>" placeholder="IBAN"></div>
+                                    <div class="col-md-2 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][swift]" class="form-control" value="<?= htmlspecialchars($bswift, ENT_QUOTES) ?>" placeholder="Swift"></div>
+                                    <div class="col-md-1 mb-2"><input type="text" name="bank_accounts[<?= $i ?>][branch]" class="form-control" value="<?= htmlspecialchars($bbranch, ENT_QUOTES) ?>" placeholder="فرع"></div>
                                     <div class="col-md-1 mb-2 text-end"><span class="remove-btn" onclick="removeRow(this)"><i class="bi bi-trash"></i></span></div>
                                 </div>
-                                <?php endforeach; ?>
-                                <?php if (empty($bank_accounts)): ?>
+                                <?php $bank_count = $i + 1; endforeach; ?>
+                                <?php endif; ?>
+                                <?php if (empty($bank_data)): ?>
                                 <div class="dynamic-row row">
                                     <div class="col-md-3 mb-2"><input type="text" name="bank_accounts[0][bank_name]" class="form-control" placeholder="اسم البنك"></div>
                                     <div class="col-md-3 mb-2"><input type="text" name="bank_accounts[0][account_number]" class="form-control" placeholder="رقم الحساب"></div>
@@ -490,11 +617,11 @@ function selected_option($value, $current) {
                         <div class="card"><div class="card-body">
                             <h5 class="section-title"><i class="bi bi-gear"></i> الإعدادات</h5>
                             <div class="row">
-                                <div class="col-md-6 mb-3"><label class="form-label">رقم الإنستاباي</label><input type="text" name="instapay_number" class="form-control" value="<?= htmlspecialchars($supplier['instapay_number'] ?? '', ENT_QUOTES) ?>"></div>
-                                <div class="col-md-6 mb-3"><label class="form-label">رقم المحفظة</label><input type="text" name="wallet_number" class="form-control" value="<?= htmlspecialchars($supplier['wallet_number'] ?? '', ENT_QUOTES) ?>"></div>
-                                <div class="col-md-12 mb-3"><label class="form-label">سياسة المرتجعات</label><textarea name="return_policy" class="form-control" rows="3"><?= htmlspecialchars($supplier['return_policy'] ?? '') ?></textarea></div>
-                                <div class="col-md-12 mb-3"><label class="form-label">ملاحظات</label><textarea name="notes" class="form-control" rows="3"><?= htmlspecialchars($supplier['notes'] ?? '') ?></textarea></div>
-                                <div class="col-md-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_active" id="isActive" <?= $supplier['is_active'] ? 'checked' : '' ?>><label class="form-check-label" for="isActive">مورد نشط</label></div></div>
+                                <div class="col-md-6 mb-3"><label class="form-label">رقم الإنستاباي</label><input type="text" name="instapay_number" class="form-control" value="<?= htmlspecialchars(old_edit('instapay_number', $supplier['instapay_number'] ?? ''), ENT_QUOTES) ?>"></div>
+                                <div class="col-md-6 mb-3"><label class="form-label">رقم المحفظة</label><input type="text" name="wallet_number" class="form-control" value="<?= htmlspecialchars(old_edit('wallet_number', $supplier['wallet_number'] ?? ''), ENT_QUOTES) ?>"></div>
+                                <div class="col-md-12 mb-3"><label class="form-label">سياسة المرتجعات</label><textarea name="return_policy" class="form-control" rows="3"><?= htmlspecialchars(old_edit('return_policy', $supplier['return_policy'] ?? '')) ?></textarea></div>
+                                <div class="col-md-12 mb-3"><label class="form-label">ملاحظات</label><textarea name="notes" class="form-control" rows="3"><?= htmlspecialchars(old_edit('notes', $supplier['notes'] ?? '')) ?></textarea></div>
+                                <div class="col-md-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_active" id="isActive" <?= old_checked_edit('is_active', $supplier['is_active']) ?>><label class="form-check-label" for="isActive">مورد نشط</label></div></div>
                             </div>
                         </div></div>
                     </div>
@@ -607,10 +734,10 @@ function selected_option($value, $current) {
             return true;
         });
 
-        let phoneCount = <?= count($phones) ?: 1 ?>;
-        let addressCount = <?= count($addresses) ?: 1 ?>;
-        let contactCount = <?= count($contacts) ?: 1 ?>;
-        let bankCount = <?= count($bank_accounts) ?: 1 ?>;
+        let phoneCount = <?= $phone_count ?: 1 ?>;
+        let addressCount = <?= $addr_count ?: 1 ?>;
+        let contactCount = <?= $contact_count ?: 1 ?>;
+        let bankCount = <?= $bank_count ?: 1 ?>;
 
         function addPhone() {
             const container = document.getElementById('phonesContainer');

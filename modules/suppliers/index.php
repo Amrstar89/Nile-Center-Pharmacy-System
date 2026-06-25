@@ -14,7 +14,7 @@ $offset = ($page - 1) * $per_page;
 
 // Search
 $search = trim($_GET['search'] ?? '');
-$where = "WHERE s.is_active = 1";
+$where = "WHERE s.is_active = 1 AND (s.deleted_at IS NULL OR s.deleted_at = '')";
 $params = [];
 
 if (!empty($search)) {
@@ -30,18 +30,18 @@ $count_stmt->execute($params);
 $total = $count_stmt->fetch()['total'];
 $total_pages = ceil($total / $per_page);
 
-// Get suppliers with balance and primary phone
+// Get suppliers with balance and primary phone - ORDER BY numeric code
 $sql = "SELECT 
     s.*,
     sb.balance,
     sb.total_purchases,
     sb.total_payments,
     sb.total_returns,
-    (SELECT CONCAT(sp.country_code, sp.phone_number) FROM supplier_phones sp WHERE sp.supplier_id = s.id AND sp.is_primary = 1 LIMIT 1) as primary_phone
+    (SELECT CONCAT(sp.country_code, ' ', sp.phone_number) FROM supplier_phones sp WHERE sp.supplier_id = s.id AND sp.is_primary = 1 LIMIT 1) as primary_phone
 FROM suppliers s
 LEFT JOIN supplier_balances sb ON s.id = sb.supplier_id
 {$where}
-ORDER BY s.id DESC
+ORDER BY CAST(s.supplier_code AS UNSIGNED) ASC
 LIMIT {$per_page} OFFSET {$offset}";
 
 $stmt = $db->prepare($sql);

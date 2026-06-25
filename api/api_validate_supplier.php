@@ -16,7 +16,7 @@ try {
                 $response = ['valid' => false, 'message' => 'اسم المورد مطلوب'];
                 break;
             }
-            $sql = "SELECT id FROM suppliers WHERE supplier_name = ?";
+            $sql = "SELECT id FROM suppliers WHERE supplier_name = ? AND (deleted_at IS NULL OR deleted_at = '')";
             $params = [$name];
             if ($exclude_id > 0) {
                 $sql .= " AND id != ?";
@@ -36,7 +36,7 @@ try {
                 $response = ['valid' => true]; // English name is optional
                 break;
             }
-            $sql = "SELECT id FROM suppliers WHERE supplier_name_en = ?";
+            $sql = "SELECT id FROM suppliers WHERE supplier_name_en = ? AND supplier_name_en IS NOT NULL AND supplier_name_en != '' AND (deleted_at IS NULL OR deleted_at = '')";
             $params = [$name_en];
             if ($exclude_id > 0) {
                 $sql .= " AND id != ?";
@@ -53,12 +53,12 @@ try {
             $phone = trim($_GET['phone'] ?? '');
             $exclude_id = intval($_GET['exclude_id'] ?? 0);
             if (empty($phone)) {
-                $response = ['valid' => false, 'message' => 'رقم الهاتف مطلوب'];
+                $response = ['valid' => true]; // Phone is optional
                 break;
             }
             $sql = "SELECT sp.*, s.supplier_name FROM supplier_phones sp 
                     JOIN suppliers s ON sp.supplier_id = s.id 
-                    WHERE sp.phone_number = ?";
+                    WHERE sp.phone_number = ? AND (s.deleted_at IS NULL OR s.deleted_at = '')";
             $params = [$phone];
             if ($exclude_id > 0) {
                 $sql .= " AND sp.supplier_id != ?";
@@ -78,7 +78,7 @@ try {
                 $response = ['valid' => false, 'message' => 'كود المورد مطلوب'];
                 break;
             }
-            $sql = "SELECT id FROM suppliers WHERE supplier_code = ?";
+            $sql = "SELECT id FROM suppliers WHERE supplier_code = ? AND (deleted_at IS NULL OR deleted_at = '')";
             $params = [$code];
             if ($exclude_id > 0) {
                 $sql .= " AND id != ?";

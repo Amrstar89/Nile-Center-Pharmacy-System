@@ -15,7 +15,7 @@ $stmt = $db->prepare("
     SELECT s.*, sb.balance, sb.total_purchases, sb.total_payments, sb.total_returns
     FROM suppliers s
     LEFT JOIN supplier_balances sb ON s.id = sb.supplier_id
-    WHERE s.id = ?
+    WHERE s.id = ? AND (s.deleted_at IS NULL OR s.deleted_at = '')
 ");
 $stmt->execute([$supplier_id]);
 $supplier = $stmt->fetch();

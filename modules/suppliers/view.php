@@ -15,7 +15,7 @@ $stmt = $db->prepare("
     SELECT s.*, sb.balance, sb.total_purchases, sb.total_payments, sb.total_returns
     FROM suppliers s
     LEFT JOIN supplier_balances sb ON s.id = sb.supplier_id
-    WHERE s.id = ?
+    WHERE s.id = ? AND (s.deleted_at IS NULL OR s.deleted_at = '')
 ");
 $stmt->execute([$supplier_id]);
 $supplier = $stmt->fetch();
@@ -33,11 +33,18 @@ $addresses = $db->query("SELECT sa.*, a.area_name_ar, g.governorate_name_ar, z.z
     WHERE sa.supplier_id = {$supplier_id} ORDER BY sa.is_primary DESC, sa.id ASC")->fetchAll();
 $contacts = $db->query("SELECT * FROM supplier_contacts WHERE supplier_id = {$supplier_id} AND is_active = 1 ORDER BY is_primary DESC, id ASC")->fetchAll();
 $bank_accounts = $db->query("SELECT * FROM supplier_bank_accounts WHERE supplier_id = {$supplier_id} AND is_active = 1 ORDER BY is_primary DESC, id ASC")->fetchAll();
-$products = $db->query("SELECT sp.*, p.product_name, p.product_name_en, p.barcode 
+
+// FIXED: Get products with barcodes from product_barcodes table (NOT products.barcode)
+$products = $db->query("
+    SELECT sp.*, p.product_name, p.product_name_en,
+        (SELECT pb.barcode FROM product_barcodes pb 
+         WHERE pb.product_id = p.id AND pb.is_primary = 1 LIMIT 1) as barcode
     FROM supplier_products sp 
     LEFT JOIN products p ON sp.product_id = p.id 
     WHERE sp.supplier_id = {$supplier_id} 
-    ORDER BY sp.last_purchase_date DESC LIMIT 50")->fetchAll();
+    ORDER BY sp.last_purchase_date DESC LIMIT 50
+")->fetchAll();
+
 $due_payments = $db->query("SELECT * FROM supplier_due_payments WHERE supplier_id = {$supplier_id} ORDER BY due_date ASC LIMIT 20")->fetchAll();
 
 // Type labels
