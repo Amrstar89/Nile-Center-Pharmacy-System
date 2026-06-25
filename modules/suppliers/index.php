@@ -162,16 +162,19 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                             <tbody>
                                 <?php foreach ($suppliers as $supplier): ?>
                                 <?php
-                                    $type_info = $type_labels[$supplier['supplier_type']] ?? ['غير معروف', 'bi-question-circle', 'secondary'];
+                                    $supplier_type = $supplier['supplier_type'] ?? 'company';
+                                    $type_info = $type_labels[$supplier_type] ?? ['غير معروف', 'bi-question-circle', 'secondary'];
                                     $balance = floatval($supplier['balance'] ?? 0);
                                     $balance_class = $balance > 0 ? 'balance-positive' : ($balance < 0 ? 'balance-negative' : 'balance-zero');
                                     $balance_text = $balance > 0 ? 'علينا: ' . number_format($balance, 2) : ($balance < 0 ? 'له: ' . number_format(abs($balance), 2) : '0.00');
+                                    $payment_type = $supplier['payment_type'] ?? 'cash';
+                                    $credit_limit = floatval($supplier['credit_limit'] ?? 0);
                                 ?>
                                 <tr>
                                     <td><?= $supplier['id'] ?></td>
                                     <td><span class="supplier-code"><?= htmlspecialchars($supplier['supplier_code'] ?? $supplier['id']) ?></span></td>
                                     <td>
-                                        <strong><?= htmlspecialchars($supplier['supplier_name']) ?></strong>
+                                        <strong><?= htmlspecialchars($supplier['supplier_name'] ?? '') ?></strong>
                                         <?php if (!empty($supplier['supplier_name_en'])): ?>
                                             <br><small class="text-muted"><?= htmlspecialchars($supplier['supplier_name_en']) ?></small>
                                         <?php endif; ?>
@@ -183,26 +186,26 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     </td>
                                     <td><?= htmlspecialchars($supplier['primary_phone'] ?? '-') ?></td>
                                     <td>
-                                        <?php if ($supplier['payment_type'] == 'credit'): ?>
+                                        <?php if ($payment_type == 'credit'): ?>
                                             <span class="badge bg-info">آجل</span>
-                                        <?php elseif ($supplier['payment_type'] == 'cheque'): ?>
+                                        <?php elseif ($payment_type == 'cheque'): ?>
                                             <span class="badge bg-warning text-dark">شيك</span>
                                         <?php else: ?>
                                             <span class="badge bg-success">نقدي</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <?php if ($supplier['payment_type'] != 'cash' && $supplier['credit_limit'] > 0): ?>
-                                            <?= number_format($supplier['credit_limit'], 2) ?> ج
+                                        <?php if ($payment_type != 'cash' && $credit_limit > 0): ?>
+                                            <?= number_format($credit_limit, 2) ?> ج
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
                                     <td class="<?= $balance_class ?>"><?= $balance_text ?> ج</td>
                                     <td>
-                                        <span class="<?= $supplier['is_active'] ? 'status-active' : 'status-inactive' ?>">
+                                        <span class="<?= ($supplier['is_active'] ?? 1) ? 'status-active' : 'status-inactive' ?>">
                                             <i class="bi bi-circle-fill" style="font-size: 8px;"></i>
-                                            <?= $supplier['is_active'] ? 'نشط' : 'موقوف' ?>
+                                            <?= ($supplier['is_active'] ?? 1) ? 'نشط' : 'موقوف' ?>
                                         </span>
                                     </td>
                                     <td>

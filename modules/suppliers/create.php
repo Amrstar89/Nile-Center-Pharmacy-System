@@ -16,7 +16,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $db->beginTransaction();
 
-        // Generate supplier code
+        // Validate supplier name
+        $supplier_name = trim($_POST['supplier_name'] ?? '');
+        if (empty($supplier_name)) {
+            throw new Exception('اسم المورد مطلوب');
+        }
+        $stmt = $db->prepare("SELECT id FROM suppliers WHERE supplier_name = ?");
+        $stmt->execute([$supplier_name]);
+        if ($stmt->fetch()) {
+            throw new Exception('اسم المورد موجود بالفعل');
+        }
+
+        // Validate English name (if provided)
+        $supplier_name_en = trim($_POST['supplier_name_en'] ?? '');
+        if (!empty($supplier_name_en)) {
+            $stmt = $db->prepare("SELECT id FROM suppliers WHERE supplier_name_en = ?");
+            $stmt->execute([$supplier_name_en]);
+            if ($stmt->fetch()) {
+                throw new Exception('الاسم الإنجليزي موجود بالفعل');
+            }
+        }
+
+        // Validate phones
+        if (!empty($_POST['phones'])) {
+            foreach ($_POST['phones'] as $phone) {
+                if (!empty($phone['number'])) {
+                    $stmt = $db->prepare("SELECT sp.*, s.supplier_name FROM supplier_phones sp JOIN suppliers s ON sp.supplier_id = s.id WHERE sp.phone_number = ?");
+                    $stmt->execute([$phone['number']]);
+                    if ($existing = $stmt->fetch()) {
+                        throw new Exception('رقم الهاتف ' . $phone['number'] . ' مسجل لمورد: ' . $existing['supplier_name']);
+                    }
+                }
+            }
+        }
+
+        // Generate sequential supplier code (1, 2, 3... no leading zeros)
         $last_code = $db->query("SELECT MAX(CAST(supplier_code AS UNSIGNED)) as max_code FROM suppliers")->fetch();
         $new_code = ($last_code['max_code'] ?? 0) + 1;
 
@@ -29,8 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
         $stmt->execute([
             $new_code,
-            trim($_POST['supplier_name'] ?? ''),
-            trim($_POST['supplier_name_en'] ?? '') ?: null,
+            $supplier_name,
+            !empty($supplier_name_en) ? $supplier_name_en : null,
             $_POST['supplier_type'] ?? 'company',
             $_POST['payment_type'] ?? 'cash',
             floatval($_POST['credit_limit'] ?? 0),
@@ -85,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Insert contacts (managers, representatives, distributors)
+        // Insert contacts
         if (!empty($_POST['contacts'])) {
             $contact_stmt = $db->prepare("
                 INSERT INTO supplier_contacts (supplier_id, contact_type, contact_name, job_title, phone, email, is_primary)
@@ -132,12 +166,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ->execute([$supplier_id]);
 
         $db->commit();
-        $success = 'تم إضافة المورد بنجاح!';
-
-        // Redirect after success
         header("Location: index.php?success=1");
         exit;
 
+    } catch (Exception $e) {
+        $db->rollBack();
+        $error = $e->getMessage();
     } catch (PDOException $e) {
         $db->rollBack();
         $error = 'حدث خطأ: ' . $e->getMessage();
@@ -179,6 +213,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         .dynamic-row { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
         .remove-btn { color: var(--danger); cursor: pointer; }
         .add-btn { color: var(--success); cursor: pointer; font-weight: 500; }
+        .validation-error { color: var(--danger); font-size: 12px; margin-top: 4px; display: none; }
+        .is-invalid { border-color: var(--danger) !important; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -206,7 +242,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 <div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> <?= $error ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="">
+            <form method="POST" action="" id="supplierForm" novalidate>
                 <!-- Tabs -->
                 <ul class="nav nav-tabs mb-4" id="supplierTabs" role="tablist">
                     <li class="nav-item" role="presentation">
@@ -250,11 +286,14 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">اسم المورد <span class="text-danger">*</span></label>
-                                        <input type="text" name="supplier_name" class="form-control" required>
+                                        <input type="text" name="supplier_name" id="supplierName" class="form-control" required>
+                                        <div class="validation-error" id="nameError">اسم المورد مطلوب</div>
+                                        <div class="validation-error" id="nameDuplicateError">اسم المورد موجود بالفعل</div>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">الاسم بالإنجليزي</label>
-                                        <input type="text" name="supplier_name_en" class="form-control">
+                                        <input type="text" name="supplier_name_en" id="supplierNameEn" class="form-control">
+                                        <div class="validation-error" id="nameEnDuplicateError">الاسم الإنجليزي موجود بالفعل</div>
                                     </div>
                                     <div class="col-md-4 mb-3">
                                         <label class="form-label">تصنيف المورد <span class="text-danger">*</span></label>
@@ -307,7 +346,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                             </select>
                                         </div>
                                         <div class="col-md-3">
-                                            <input type="text" name="phones[0][number]" class="form-control" placeholder="رقم الهاتف">
+                                            <input type="text" name="phones[0][number]" class="form-control phone-number" placeholder="رقم الهاتف" data-index="0">
+                                            <div class="validation-error phone-duplicate-error" data-index="0">رقم الهاتف مسجل لمورد آخر</div>
                                         </div>
                                         <div class="col-md-3">
                                             <select name="phones[0][type]" class="form-select">
@@ -504,7 +544,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 <!-- Submit Buttons -->
                 <div class="card mt-4">
                     <div class="card-body text-center">
-                        <button type="submit" class="btn btn-primary btn-lg">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
                             <i class="bi bi-check-lg"></i> حفظ المورد
                         </button>
                         <a href="index.php" class="btn btn-outline-secondary btn-lg ms-2">
@@ -531,6 +571,132 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             }
         });
 
+        // Validation functions
+        const baseUrl = window.location.protocol + '//' + window.location.host + '/nile-center-system';
+
+        async function validateSupplierName(name) {
+            if (!name.trim()) return false;
+            try {
+                const response = await fetch(`${baseUrl}/api/api_validate_supplier.php?action=check_name&name=${encodeURIComponent(name)}`);
+                const data = await response.json();
+                return data.valid;
+            } catch (e) { return true; }
+        }
+
+        async function validateSupplierNameEn(nameEn) {
+            if (!nameEn.trim()) return true; // Optional
+            try {
+                const response = await fetch(`${baseUrl}/api/api_validate_supplier.php?action=check_name_en&name_en=${encodeURIComponent(nameEn)}`);
+                const data = await response.json();
+                return data.valid;
+            } catch (e) { return true; }
+        }
+
+        async function validatePhone(phone, index) {
+            if (!phone.trim()) return true; // Optional
+            try {
+                const response = await fetch(`${baseUrl}/api/api_validate_supplier.php?action=check_phone&phone=${encodeURIComponent(phone)}`);
+                const data = await response.json();
+                const errorDiv = document.querySelector(`.phone-duplicate-error[data-index="${index}"]`);
+                if (!data.valid && errorDiv) {
+                    errorDiv.textContent = data.message;
+                    errorDiv.style.display = 'block';
+                    return false;
+                } else if (errorDiv) {
+                    errorDiv.style.display = 'none';
+                }
+                return true;
+            } catch (e) { return true; }
+        }
+
+        // Real-time validation
+        document.getElementById('supplierName').addEventListener('blur', async function() {
+            const name = this.value.trim();
+            const errorDiv = document.getElementById('nameError');
+            const duplicateDiv = document.getElementById('nameDuplicateError');
+
+            if (!name) {
+                errorDiv.style.display = 'block';
+                this.classList.add('is-invalid');
+                return;
+            }
+            errorDiv.style.display = 'none';
+
+            const isValid = await validateSupplierName(name);
+            if (!isValid) {
+                duplicateDiv.style.display = 'block';
+                this.classList.add('is-invalid');
+            } else {
+                duplicateDiv.style.display = 'none';
+                this.classList.remove('is-invalid');
+            }
+        });
+
+        document.getElementById('supplierNameEn').addEventListener('blur', async function() {
+            const nameEn = this.value.trim();
+            if (!nameEn) return;
+
+            const isValid = await validateSupplierNameEn(nameEn);
+            const duplicateDiv = document.getElementById('nameEnDuplicateError');
+            if (!isValid) {
+                duplicateDiv.style.display = 'block';
+                this.classList.add('is-invalid');
+            } else {
+                duplicateDiv.style.display = 'none';
+                this.classList.remove('is-invalid');
+            }
+        });
+
+        // Phone validation
+        document.addEventListener('blur', async function(e) {
+            if (e.target.classList.contains('phone-number')) {
+                const phone = e.target.value.trim();
+                const index = e.target.dataset.index;
+                if (phone) {
+                    await validatePhone(phone, index);
+                }
+            }
+        }, true);
+
+        // Form submission validation
+        document.getElementById('supplierForm').addEventListener('submit', async function(e) {
+            const name = document.getElementById('supplierName').value.trim();
+            if (!name) {
+                e.preventDefault();
+                document.getElementById('nameError').style.display = 'block';
+                document.getElementById('supplierName').classList.add('is-invalid');
+                document.getElementById('supplierName').focus();
+                return false;
+            }
+
+            const isNameValid = await validateSupplierName(name);
+            if (!isNameValid) {
+                e.preventDefault();
+                document.getElementById('nameDuplicateError').style.display = 'block';
+                document.getElementById('supplierName').classList.add('is-invalid');
+                document.getElementById('supplierName').focus();
+                return false;
+            }
+
+            // Validate all phones
+            const phoneInputs = document.querySelectorAll('.phone-number');
+            for (let input of phoneInputs) {
+                const phone = input.value.trim();
+                const index = input.dataset.index;
+                if (phone) {
+                    const isValid = await validatePhone(phone, index);
+                    if (!isValid) {
+                        e.preventDefault();
+                        input.classList.add('is-invalid');
+                        input.focus();
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        });
+
         // Dynamic rows
         let phoneCount = 1, addressCount = 1, contactCount = 1, bankCount = 1;
 
@@ -548,7 +714,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <input type="text" name="phones[${phoneCount}][number]" class="form-control" placeholder="رقم الهاتف">
+                        <input type="text" name="phones[${phoneCount}][number]" class="form-control phone-number" placeholder="رقم الهاتف" data-index="${phoneCount}">
+                        <div class="validation-error phone-duplicate-error" data-index="${phoneCount}">رقم الهاتف مسجل لمورد آخر</div>
                     </div>
                     <div class="col-md-3">
                         <select name="phones[${phoneCount}][type]" class="form-select">
