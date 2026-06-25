@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 23, 2026 at 07:02 PM
+-- Generation Time: Jun 25, 2026 at 06:35 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -147,7 +147,12 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (80, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.73.167.118', '2026-06-22 23:49:20'),
 (81, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.73.167.118', '2026-06-23 10:57:43'),
 (82, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.73.167.118', '2026-06-23 16:13:19'),
-(83, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 16:38:54');
+(83, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 16:38:54'),
+(84, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 19:25:11'),
+(85, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 19:25:17'),
+(86, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 23:57:07'),
+(87, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 23:57:15'),
+(88, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 16:29:45');
 
 -- --------------------------------------------------------
 
@@ -307,23 +312,24 @@ CREATE TABLE `customers` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `source` enum('estock','manual') DEFAULT 'manual',
-  `estock_id` decimal(18,0) DEFAULT NULL,
-  `manual_code` varchar(50) DEFAULT NULL
+  `estock_id` decimal(18,0) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `customers`
 --
 
-INSERT INTO `customers` (`id`, `customer_code`, `customer_name`, `customer_name_en`, `customer_type`, `customer_class_id`, `local_margin`, `imported_margin`, `local_discount`, `imported_discount`, `payment_type`, `credit_limit`, `credit_password`, `branch_id`, `phone`, `phone2`, `email`, `address`, `branch_code`, `notes`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`, `manual_code`) VALUES
-(1, '1', 'عمرو حجازي', 'Amr Hegazy', 'individual', 3, 0.00, 0.00, 0.00, 0.00, 'credit', 100000.00, NULL, 1, NULL, NULL, 'Amrstar89@hotmail.com', NULL, NULL, '', 1, '2026-06-22 23:20:33', '2026-06-22 23:20:33', 'manual', NULL, NULL),
-(2, '2', 'عمرو حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-22 23:33:54', '2026-06-22 23:33:54', 'manual', NULL, NULL),
-(3, '3', 'احمد زين', 'Ahmed Zain', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, 3, NULL, NULL, 'Zain@hotmail.com', NULL, NULL, '', 1, '2026-06-23 16:56:20', '2026-06-23 16:56:20', 'manual', NULL, NULL),
-(4, '4', 'احمد حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:57:18', '2026-06-23 16:57:18', 'manual', NULL, NULL),
-(5, '5', 'عميل 4', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:30', '2026-06-23 16:59:30', 'manual', NULL, NULL),
-(6, '6', 'عميل 5', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:36', '2026-06-23 16:59:36', 'manual', NULL, NULL),
-(7, '7', 'عميل 6', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:43', '2026-06-23 16:59:43', 'manual', NULL, NULL),
-(8, '8', 'عمرو حجازي', 'Amr Hegazy', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 17:00:09', '2026-06-23 17:00:09', 'manual', NULL, NULL);
+INSERT INTO `customers` (`id`, `customer_code`, `customer_name`, `customer_name_en`, `customer_type`, `customer_class_id`, `local_margin`, `imported_margin`, `local_discount`, `imported_discount`, `payment_type`, `credit_limit`, `credit_password`, `branch_id`, `phone`, `phone2`, `email`, `address`, `branch_code`, `notes`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`) VALUES
+(1, '1', 'عمرو حجازي', 'Amr Hegazy', 'individual', 3, 0.00, 0.00, 0.00, 0.00, 'credit', 100000.00, NULL, 1, NULL, NULL, 'Amrstar89@hotmail.com', NULL, NULL, '', 1, '2026-06-22 23:20:33', '2026-06-22 23:20:33', 'manual', NULL),
+(2, '2', 'عمرو حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-22 23:33:54', '2026-06-22 23:33:54', 'manual', NULL),
+(3, '3', 'احمد زين', 'Ahmed Zain', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, 3, NULL, NULL, 'Zain@hotmail.com', NULL, NULL, '', 1, '2026-06-23 16:56:20', '2026-06-23 16:56:20', 'manual', NULL),
+(4, '4', 'احمد حجازي', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:57:18', '2026-06-23 16:57:18', 'manual', NULL),
+(5, '5', 'عميل 4', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:30', '2026-06-23 16:59:30', 'manual', NULL),
+(6, '6', 'عميل 5', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:36', '2026-06-23 16:59:36', 'manual', NULL),
+(7, '7', 'عميل 6', NULL, 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 16:59:43', '2026-06-23 16:59:43', 'manual', NULL),
+(8, '8', 'عمرو حجازي', 'Amr Hegazy', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 17:00:09', '2026-06-23 17:00:09', 'manual', NULL),
+(9, '9', 'عمرو حجازي', 'Amr Hegazy', 'company', 2, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', 1, '2026-06-23 20:55:01', '2026-06-23 20:55:01', 'manual', NULL),
+(10, '10', 'محمد سعد', 'mohmed saad', 'individual', NULL, 0.00, 0.00, 0.00, 0.00, 'cash', 0.00, NULL, NULL, NULL, NULL, 'mohamed@hotmail.com', NULL, NULL, '', 1, '2026-06-23 20:55:38', '2026-06-23 20:55:38', 'manual', NULL);
 
 -- --------------------------------------------------------
 
@@ -345,20 +351,19 @@ CREATE TABLE `customers_backup` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `source` enum('estock','manual') DEFAULT 'estock',
-  `estock_id` decimal(18,0) DEFAULT NULL,
-  `manual_code` varchar(50) DEFAULT NULL
+  `estock_id` decimal(18,0) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `customers_backup`
 --
 
-INSERT INTO `customers_backup` (`id`, `customer_code`, `customer_name`, `phone`, `phone2`, `email`, `address`, `branch_code`, `notes`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`, `manual_code`) VALUES
-(1, 'CUST001', 'أحمد محمد', '01001234567', NULL, NULL, NULL, 'BR001', 'عميل دائم', 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
-(2, 'CUST002', 'محمد علي', '01002345678', NULL, NULL, NULL, 'BR001', NULL, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
-(3, 'CUST003', 'فاطمة أحمد', '01003456789', NULL, NULL, NULL, 'BR001', NULL, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL, NULL),
-(5, 'CUST1781640433', 'الة', '01067785', '012645564984', NULL, '21لاالي اللاايس', '3', NULL, 1, '2026-06-16 20:07:13', '2026-06-16 20:07:13', 'estock', NULL, NULL),
-(6, 'CUST1781640799', 'محمد ', '0123456789', '012345678998', NULL, '29 نوال الدقي', '2', NULL, 1, '2026-06-16 20:13:19', '2026-06-16 20:13:19', 'estock', NULL, NULL);
+INSERT INTO `customers_backup` (`id`, `customer_code`, `customer_name`, `phone`, `phone2`, `email`, `address`, `branch_code`, `notes`, `is_active`, `created_at`, `updated_at`, `source`, `estock_id`) VALUES
+(1, 'CUST001', 'أحمد محمد', '01001234567', NULL, NULL, NULL, 'BR001', 'عميل دائم', 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL),
+(2, 'CUST002', 'محمد علي', '01002345678', NULL, NULL, NULL, 'BR001', NULL, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL),
+(3, 'CUST003', 'فاطمة أحمد', '01003456789', NULL, NULL, NULL, 'BR001', NULL, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16', 'estock', NULL),
+(5, 'CUST1781640433', 'الة', '01067785', '012645564984', NULL, '21لاالي اللاايس', '3', NULL, 1, '2026-06-16 20:07:13', '2026-06-16 20:07:13', 'estock', NULL),
+(6, 'CUST1781640799', 'محمد ', '0123456789', '012345678998', NULL, '29 نوال الدقي', '2', NULL, 1, '2026-06-16 20:13:19', '2026-06-16 20:13:19', 'estock', NULL);
 
 -- --------------------------------------------------------
 
@@ -434,7 +439,6 @@ CREATE TABLE `customer_classes` (
 --
 
 INSERT INTO `customer_classes` (`id`, `class_code`, `class_name_ar`, `class_name_en`, `class_type`, `local_margin`, `imported_margin`, `local_discount`, `imported_discount`, `is_active`, `source`, `estock_id`, `created_at`) VALUES
-(0, NULL, 'جملة', 'Wholesale', 'wholesale', 15.00, 20.00, 0.00, 0.00, 1, 'estock', NULL, '2026-06-22 22:09:19'),
 (1, NULL, 'جملة', 'Wholesale', 'wholesale', 15.00, 20.00, 0.00, 0.00, 1, 'estock', NULL, '2026-06-22 22:50:25'),
 (2, NULL, 'تجزئة', 'Retail', 'retail', 0.00, 0.00, 5.00, 10.00, 1, 'estock', NULL, '2026-06-22 22:50:25'),
 (3, NULL, 'تكلفة', 'Cost', 'cost', 0.00, 0.00, 0.00, 0.00, 1, 'estock', NULL, '2026-06-22 22:50:25');
@@ -498,7 +502,8 @@ INSERT INTO `customer_phones` (`id`, `customer_id`, `country_code`, `phone_numbe
 (2, 1, '+20', '01007837873', 'mobile', 0, 0, '2026-06-22 23:20:33'),
 (3, 2, '+20', '01067788553', 'mobile', 1, 0, '2026-06-22 23:33:54'),
 (4, 3, '+20', '01234567891011', 'mobile', 1, 0, '2026-06-23 16:56:20'),
-(5, 3, '+20', '010012013014015', 'mobile', 0, 0, '2026-06-23 16:56:20');
+(5, 3, '+20', '010012013014015', 'mobile', 0, 0, '2026-06-23 16:56:20'),
+(6, 10, '+20', '0123456789', 'mobile', 1, 1, '2026-06-23 20:55:38');
 
 -- --------------------------------------------------------
 
@@ -1123,7 +1128,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-23 18:38:54', '2026-06-15 16:53:16', '2026-06-23 16:38:54'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-25 18:29:45', '2026-06-15 16:53:16', '2026-06-25 16:29:45'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -1404,7 +1409,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=84;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=89;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -1434,7 +1439,7 @@ ALTER TABLE `country_codes`
 -- AUTO_INCREMENT for table `customers`
 --
 ALTER TABLE `customers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `customer_addresses`
@@ -1446,7 +1451,7 @@ ALTER TABLE `customer_addresses`
 -- AUTO_INCREMENT for table `customer_phones`
 --
 ALTER TABLE `customer_phones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `delivery_times`
