@@ -18,13 +18,14 @@ $where = "WHERE c.is_active = 1";
 $params = [];
 
 if (!empty($search)) {
-    $where .= " AND (c.customer_name LIKE ? OR c.customer_code LIKE ? OR cp.phone_number LIKE ?)";
     $search_term = "%{$search}%";
+    // Search by name, code, or phone number (using EXISTS for phone)
+    $where .= " AND (c.customer_name LIKE ? OR c.customer_code LIKE ? OR EXISTS (SELECT 1 FROM customer_phones cp2 WHERE cp2.customer_id = c.id AND cp2.phone_number LIKE ?))";
     $params = [$search_term, $search_term, $search_term];
 }
 
 // Get total count
-$count_sql = "SELECT COUNT(DISTINCT c.id) as total FROM customers c LEFT JOIN customer_phones cp ON c.id = cp.customer_id {$where}";
+$count_sql = "SELECT COUNT(*) as total FROM customers c {$where}";
 $count_stmt = $db->prepare($count_sql);
 $count_stmt->execute($params);
 $total = $count_stmt->fetch()['total'];
@@ -47,7 +48,6 @@ LEFT JOIN branches b ON c.branch_id = b.id
 LEFT JOIN customer_classes cc ON c.customer_class_id = cc.id
 LEFT JOIN customer_balances cb ON c.id = cb.customer_id
 {$where}
-GROUP BY c.id
 ORDER BY c.id DESC
 LIMIT {$per_page} OFFSET {$offset}";
 
@@ -65,7 +65,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
     <title><?= $page_title ?> - <?= APP_NAME ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <style>
         :root { --primary: #667eea; --secondary: #764ba2; --success: #198754; --warning: #ffc107; --danger: #dc3545; }
         body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }

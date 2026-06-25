@@ -870,12 +870,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">باسورد التجاوز</label>
-                                                <input type="password" name="credit_password" class="form-control" placeholder="اتركه فارغاً للإبقاء على القديم">
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
 

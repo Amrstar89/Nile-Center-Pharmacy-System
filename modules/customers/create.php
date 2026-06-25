@@ -164,7 +164,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':customer_class_id' => !empty($_POST['customer_class_id']) ? intval($_POST['customer_class_id']) : null,
             ':payment_type' => $payment_type,
             ':credit_limit' => $payment_type == 'credit' ? $credit_limit : 0,
-            ':credit_password' => ($payment_type == 'credit' && !empty($_POST['credit_password'])) ? password_hash($_POST['credit_password'], PASSWORD_DEFAULT) : null,
             ':branch_id' => !empty($_POST['branch_id']) ? intval($_POST['branch_id']) : null,
             ':phone' => !empty($_POST['phone']) ? $_POST['phone'] : null,
             ':email' => !empty($_POST['email']) ? $_POST['email'] : null,
@@ -681,13 +680,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="form-label">باسورد التجاوز</label>
-                                                <input type="password" name="credit_password" class="form-control" placeholder="لتجاوز الحد عند الطوارئ">
-                                            </div>
-                                        </div>
-                                    </div>
+                                                              </div>
                                 </div>
 
                                 <!-- Wholesale Fields -->
