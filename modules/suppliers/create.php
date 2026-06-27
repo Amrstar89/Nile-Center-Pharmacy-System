@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Generate sequential code (1, 2, 3...)
-        $last_code_result = $db->query("SELECT MAX(CAST(supplier_code AS UNSIGNED)) as max_code FROM suppliers WHERE supplier_code REGEXP '^[0-9]+$")->fetch();
+        $last_code_result = $db->query("SELECT MAX(CAST(supplier_code AS UNSIGNED)) as max_code FROM suppliers WHERE supplier_code NOT REGEXP '[^0-9]'")->fetch();
         $max_code = isset($last_code_result['max_code']) ? intval($last_code_result['max_code']) : 0;
         $new_code = strval($max_code + 1);
 

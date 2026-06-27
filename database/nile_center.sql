@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 27, 2026 at 06:49 PM
+-- Generation Time: Jun 27, 2026 at 07:55 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -149,7 +149,8 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (102, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:28:02'),
 (103, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:31:01'),
 (104, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:45:43'),
-(105, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-27 16:34:00');
+(105, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-27 16:34:00'),
+(106, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-27 17:11:38');
 
 -- --------------------------------------------------------
 
@@ -683,6 +684,104 @@ CREATE TABLE `inventory_batches` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `inventory_items`
+--
+
+CREATE TABLE `inventory_items` (
+  `id` int(11) NOT NULL,
+  `store_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `batch_id` int(11) DEFAULT NULL,
+  `quantity` decimal(12,3) DEFAULT 0.000,
+  `unit_cost` decimal(12,2) DEFAULT 0.00,
+  `sell_price` decimal(12,2) DEFAULT 0.00,
+  `reorder_point` decimal(12,3) DEFAULT 0.000,
+  `max_stock` decimal(12,3) DEFAULT 0.000,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory_transactions`
+--
+
+CREATE TABLE `inventory_transactions` (
+  `id` int(11) NOT NULL,
+  `transaction_type` enum('opening_balance','purchase','sale','transfer_out','transfer_in','adjustment','return_in','return_out','damage','expired') NOT NULL,
+  `reference_type` enum('purchase_invoice','sale_invoice','transfer_order','adjustment','opening_balance','return') DEFAULT NULL,
+  `reference_id` int(11) DEFAULT NULL,
+  `store_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `batch_id` int(11) DEFAULT NULL,
+  `unit_id` int(11) DEFAULT NULL,
+  `unit_conversion` decimal(10,3) DEFAULT 1.000,
+  `quantity` decimal(12,3) NOT NULL,
+  `quantity_base` decimal(12,3) NOT NULL,
+  `unit_cost` decimal(12,2) DEFAULT 0.00,
+  `unit_price` decimal(12,2) DEFAULT 0.00,
+  `total_cost` decimal(12,2) DEFAULT 0.00,
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory_transfers`
+--
+
+CREATE TABLE `inventory_transfers` (
+  `id` int(11) NOT NULL,
+  `transfer_code` varchar(20) NOT NULL,
+  `from_store_id` int(11) NOT NULL,
+  `to_store_id` int(11) NOT NULL,
+  `from_branch_id` int(11) DEFAULT NULL,
+  `to_branch_id` int(11) DEFAULT NULL,
+  `transfer_type` enum('internal','branch_to_branch','central_to_branch','branch_to_central') NOT NULL,
+  `status` enum('draft','pending','approved','shipped','partial_received','received','rejected','cancelled') DEFAULT 'draft',
+  `total_items` int(11) DEFAULT 0,
+  `total_quantity` decimal(12,3) DEFAULT 0.000,
+  `total_cost` decimal(12,2) DEFAULT 0.00,
+  `notes` text DEFAULT NULL,
+  `requested_by` int(11) DEFAULT NULL,
+  `approved_by` int(11) DEFAULT NULL,
+  `shipped_by` int(11) DEFAULT NULL,
+  `received_by` int(11) DEFAULT NULL,
+  `requested_at` datetime DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
+  `shipped_at` datetime DEFAULT NULL,
+  `received_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory_transfer_items`
+--
+
+CREATE TABLE `inventory_transfer_items` (
+  `id` int(11) NOT NULL,
+  `transfer_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `batch_id` int(11) DEFAULT NULL,
+  `requested_qty` decimal(12,3) DEFAULT 0.000,
+  `shipped_qty` decimal(12,3) DEFAULT 0.000,
+  `received_qty` decimal(12,3) DEFAULT 0.000,
+  `unit_id` int(11) DEFAULT NULL,
+  `unit_conversion` decimal(10,3) DEFAULT 1.000,
+  `unit_cost` decimal(12,2) DEFAULT 0.00,
+  `notes` text DEFAULT NULL,
+  `status` enum('pending','shipped','received','rejected') DEFAULT 'pending'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `orders`
 --
 
@@ -1077,6 +1176,69 @@ CREATE TABLE `shift_handovers` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `stock_adjustments`
+--
+
+CREATE TABLE `stock_adjustments` (
+  `id` int(11) NOT NULL,
+  `adjustment_code` varchar(20) NOT NULL,
+  `store_id` int(11) NOT NULL,
+  `adjustment_type` enum('periodic','spot','year_end','damage','expired') DEFAULT 'periodic',
+  `status` enum('draft','counting','completed','cancelled') DEFAULT 'draft',
+  `total_items` int(11) DEFAULT 0,
+  `total_variance_qty` decimal(12,3) DEFAULT 0.000,
+  `total_variance_cost` decimal(12,2) DEFAULT 0.00,
+  `counted_by` int(11) DEFAULT NULL,
+  `approved_by` int(11) DEFAULT NULL,
+  `counted_at` datetime DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stock_adjustment_items`
+--
+
+CREATE TABLE `stock_adjustment_items` (
+  `id` int(11) NOT NULL,
+  `adjustment_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `batch_id` int(11) DEFAULT NULL,
+  `system_qty` decimal(12,3) DEFAULT 0.000,
+  `actual_qty` decimal(12,3) DEFAULT 0.000,
+  `variance_qty` decimal(12,3) DEFAULT 0.000,
+  `unit_cost` decimal(12,2) DEFAULT 0.00,
+  `variance_cost` decimal(12,2) DEFAULT 0.00,
+  `notes` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stores`
+--
+
+CREATE TABLE `stores` (
+  `id` int(11) NOT NULL,
+  `store_code` varchar(20) NOT NULL,
+  `store_name` varchar(100) NOT NULL,
+  `store_type` enum('central_main','branch_main','sub_store','pharmacy','warehouse','damaged','expired','returned') DEFAULT 'sub_store',
+  `branch_id` int(11) DEFAULT NULL,
+  `parent_store_id` int(11) DEFAULT NULL,
+  `is_main` tinyint(1) DEFAULT 0,
+  `is_active` tinyint(1) DEFAULT 1,
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `suppliers`
 --
 
@@ -1113,12 +1275,13 @@ CREATE TABLE `suppliers` (
 --
 
 INSERT INTO `suppliers` (`id`, `supplier_code`, `supplier_name`, `phone`, `email`, `address`, `is_active`, `created_at`, `delivery_time`, `delivery_time_id`, `notes`, `source`, `estock_id`, `manual_code`, `supplier_name_en`, `supplier_type`, `payment_type`, `credit_limit`, `grace_period`, `return_policy`, `instapay_number`, `wallet_number`, `deleted_at`, `created_by`, `updated_at`) VALUES
-(0, '6', 'عمرو حجازي', NULL, NULL, NULL, 1, '2026-06-25 22:46:37', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, 'Amr Hegazy', 'b2b', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, 1, '2026-06-25 22:46:37'),
 (1, '1', 'مورد الأدوية العام', '01234567890', 'supplier1@email.com', NULL, 1, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-25 21:56:41'),
 (2, '2', 'مورد المستلزمات الطبية', '01234567891', 'supplier2@email.com', NULL, 1, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-25 21:56:41'),
-(3, '3', 'مورد مستحضرات التجميل', '01234567892', 'supplier3@email.com', NULL, 1, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-25 21:56:41'),
+(3, '3', 'مورد مستحضرات التجميل', '01234567892', 'supplier3@email.com', NULL, 0, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, '2026-06-27 19:16:08', NULL, '2026-06-27 17:16:08'),
 (4, '4', 'احمد عبد الحميد', '01111111', NULL, NULL, 0, '2026-06-17 00:35:55', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, '2026-06-26 00:03:42', NULL, '2026-06-25 22:30:05'),
-(5, '5', 'عبد الرحمن كانسيداس', '01067788553', NULL, NULL, 0, '2026-06-17 17:00:49', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, '2026-06-26 00:21:21', NULL, '2026-06-25 22:30:09');
+(5, '5', 'عبد الرحمن كانسيداس', '01067788553', NULL, NULL, 0, '2026-06-17 17:00:49', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, '2026-06-26 00:21:21', NULL, '2026-06-25 22:30:09'),
+(6, '6', 'عمرو حجازي', NULL, NULL, NULL, 1, '2026-06-27 17:14:12', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, 'Amr Hegazy', 'b2b', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, 1, '2026-06-27 17:14:12'),
+(7, '7', 'احمد يحيي', NULL, NULL, NULL, 1, '2026-06-27 17:14:34', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, 'ahmed yahia', 'b2b', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, 1, '2026-06-27 17:14:34');
 
 -- --------------------------------------------------------
 
@@ -1170,7 +1333,8 @@ INSERT INTO `supplier_balances` (`id`, `supplier_id`, `balance`, `total_purchase
 (3, 5, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 21:56:41'),
 (4, 2, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 21:56:41'),
 (5, 3, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 21:56:41'),
-(8, 0, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 22:46:37');
+(9, 6, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-27 17:14:12'),
+(10, 7, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-27 17:14:34');
 
 -- --------------------------------------------------------
 
@@ -1261,7 +1425,9 @@ INSERT INTO `supplier_phones` (`id`, `supplier_id`, `country_code`, `phone_numbe
 (3, 3, '+20', '01234567892', 'mobile', 1, '2026-06-25 21:59:37'),
 (4, 4, '+20', '01111111', 'mobile', 1, '2026-06-25 21:59:37'),
 (5, 5, '+20', '01067788553', 'mobile', 1, '2026-06-25 21:59:37'),
-(8, 1, '+20', '01234567890', 'mobile', 1, '2026-06-25 22:20:30');
+(8, 1, '+20', '01234567890', 'mobile', 1, '2026-06-25 22:20:30'),
+(10, 7, '+20', '0101010101010', 'mobile', 1, '2026-06-27 17:14:44'),
+(11, 6, '+20', '01067788553', 'mobile', 1, '2026-06-27 17:15:40');
 
 -- --------------------------------------------------------
 
@@ -1377,7 +1543,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-27 18:34:00', '2026-06-15 16:53:16', '2026-06-27 16:34:00'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-27 19:11:38', '2026-06-15 16:53:16', '2026-06-27 17:11:38'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -1528,6 +1694,35 @@ ALTER TABLE `inventory_batches`
   ADD KEY `idx_batch_supplier` (`supplier_id`);
 
 --
+-- Indexes for table `inventory_items`
+--
+ALTER TABLE `inventory_items`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_store_product_batch` (`store_id`,`product_id`,`batch_id`);
+
+--
+-- Indexes for table `inventory_transactions`
+--
+ALTER TABLE `inventory_transactions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_store_product` (`store_id`,`product_id`),
+  ADD KEY `idx_transaction_type` (`transaction_type`),
+  ADD KEY `idx_created_at` (`created_at`);
+
+--
+-- Indexes for table `inventory_transfers`
+--
+ALTER TABLE `inventory_transfers`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `transfer_code` (`transfer_code`);
+
+--
+-- Indexes for table `inventory_transfer_items`
+--
+ALTER TABLE `inventory_transfer_items`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `orders`
 --
 ALTER TABLE `orders`
@@ -1637,6 +1832,26 @@ ALTER TABLE `shift_handovers`
   ADD PRIMARY KEY (`id`),
   ADD KEY `from_user` (`from_user`),
   ADD KEY `to_user` (`to_user`);
+
+--
+-- Indexes for table `stock_adjustments`
+--
+ALTER TABLE `stock_adjustments`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `adjustment_code` (`adjustment_code`);
+
+--
+-- Indexes for table `stock_adjustment_items`
+--
+ALTER TABLE `stock_adjustment_items`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `stores`
+--
+ALTER TABLE `stores`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `store_code` (`store_code`);
 
 --
 -- Indexes for table `suppliers`
@@ -1749,7 +1964,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=106;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=107;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -1830,6 +2045,30 @@ ALTER TABLE `inventory_batches`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `inventory_items`
+--
+ALTER TABLE `inventory_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `inventory_transactions`
+--
+ALTER TABLE `inventory_transactions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `inventory_transfers`
+--
+ALTER TABLE `inventory_transfers`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `inventory_transfer_items`
+--
+ALTER TABLE `inventory_transfer_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `orders`
 --
 ALTER TABLE `orders`
@@ -1896,6 +2135,30 @@ ALTER TABLE `shift_handovers`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `stock_adjustments`
+--
+ALTER TABLE `stock_adjustments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `stock_adjustment_items`
+--
+ALTER TABLE `stock_adjustment_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `stores`
+--
+ALTER TABLE `stores`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `suppliers`
+--
+ALTER TABLE `suppliers`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
 -- AUTO_INCREMENT for table `supplier_addresses`
 --
 ALTER TABLE `supplier_addresses`
@@ -1905,7 +2168,7 @@ ALTER TABLE `supplier_addresses`
 -- AUTO_INCREMENT for table `supplier_balances`
 --
 ALTER TABLE `supplier_balances`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `supplier_bank_accounts`
@@ -1929,7 +2192,7 @@ ALTER TABLE `supplier_due_payments`
 -- AUTO_INCREMENT for table `supplier_phones`
 --
 ALTER TABLE `supplier_phones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `supplier_prices`
