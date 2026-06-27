@@ -7,7 +7,8 @@ $db = getDB();
 
 $supplier_id = intval($_GET['id'] ?? 0);
 if ($supplier_id <= 0) {
-    redirect('index.php');
+    header("Location: index.php");
+    exit;
 }
 
 // Get supplier details
@@ -21,7 +22,8 @@ $stmt->execute([$supplier_id]);
 $supplier = $stmt->fetch();
 
 if (!$supplier) {
-    redirect('index.php');
+    header("Location: index.php");
+    exit;
 }
 
 // Get transactions

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 25, 2026 at 10:38 PM
+-- Generation Time: Jun 27, 2026 at 06:49 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -20,26 +20,6 @@ SET time_zone = "+00:00";
 --
 -- Database: `nile_center`
 --
-
-DELIMITER $$
---
--- Procedures
---
-CREATE DEFINER=`root`@`localhost` PROCEDURE `AddColumnIfNotExists` (IN `p_table` VARCHAR(64), IN `p_column` VARCHAR(64), IN `p_definition` VARCHAR(255))   BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.COLUMNS 
-        WHERE TABLE_SCHEMA = @dbname 
-        AND TABLE_NAME = p_table 
-        AND COLUMN_NAME = p_column
-    ) THEN
-        SET @sql = CONCAT('ALTER TABLE ', p_table, ' ADD COLUMN ', p_column, ' ', p_definition);
-        PREPARE stmt FROM @sql;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
-    END IF;
-END$$
-
-DELIMITER ;
 
 -- --------------------------------------------------------
 
@@ -153,7 +133,23 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (86, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 23:57:07'),
 (87, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-23 23:57:15'),
 (88, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 16:29:45'),
-(89, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 17:49:43');
+(89, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 17:49:43'),
+(90, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 21:59:50'),
+(91, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 22:01:40'),
+(92, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 22:02:11'),
+(93, 1, 'System', 'delete', 'suppliers', 4, NULL, '{\"deleted_at\":\"2026-06-26 01:03:42\",\"is_active\":0}', NULL, '2026-06-25 22:03:42'),
+(94, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 22:14:48'),
+(95, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 22:20:22'),
+(96, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 22:21:13'),
+(97, 1, 'System', 'delete', 'suppliers', 5, NULL, '{\"deleted_at\":\"2026-06-26 01:21:21\",\"is_active\":0}', NULL, '2026-06-25 22:21:21'),
+(98, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 22:47:41'),
+(99, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:04:06'),
+(100, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:14:05'),
+(101, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:26:42'),
+(102, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:28:02'),
+(103, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:31:01'),
+(104, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:45:43'),
+(105, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-27 16:34:00');
 
 -- --------------------------------------------------------
 
@@ -1098,19 +1094,31 @@ CREATE TABLE `suppliers` (
   `notes` text DEFAULT NULL,
   `source` enum('estock','manual') DEFAULT 'estock',
   `estock_id` decimal(18,0) DEFAULT NULL,
-  `manual_code` varchar(50) DEFAULT NULL
+  `manual_code` varchar(50) DEFAULT NULL,
+  `supplier_name_en` varchar(100) DEFAULT NULL,
+  `supplier_type` varchar(20) DEFAULT 'company',
+  `payment_type` varchar(20) DEFAULT 'cash',
+  `credit_limit` decimal(12,2) DEFAULT 0.00,
+  `grace_period` int(11) DEFAULT 0,
+  `return_policy` text DEFAULT NULL,
+  `instapay_number` varchar(50) DEFAULT NULL,
+  `wallet_number` varchar(50) DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `suppliers`
 --
 
-INSERT INTO `suppliers` (`id`, `supplier_code`, `supplier_name`, `phone`, `email`, `address`, `is_active`, `created_at`, `delivery_time`, `delivery_time_id`, `notes`, `source`, `estock_id`, `manual_code`) VALUES
-(1, 'SUP001', 'مورد الأدوية العام', '01234567890', 'supplier1@email.com', NULL, 1, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL),
-(2, 'SUP002', 'مورد المستلزمات الطبية', '01234567891', 'supplier2@email.com', NULL, 1, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL),
-(3, 'SUP003', 'مورد مستحضرات التجميل', '01234567892', 'supplier3@email.com', NULL, 1, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL),
-(4, 'SUP1781656555', 'احمد عبد الحميد', '01111111', NULL, NULL, 1, '2026-06-17 00:35:55', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL),
-(5, 'SUP1781715649', 'عبد الرحمن كانسيداس', '01067788553', NULL, NULL, 1, '2026-06-17 17:00:49', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL);
+INSERT INTO `suppliers` (`id`, `supplier_code`, `supplier_name`, `phone`, `email`, `address`, `is_active`, `created_at`, `delivery_time`, `delivery_time_id`, `notes`, `source`, `estock_id`, `manual_code`, `supplier_name_en`, `supplier_type`, `payment_type`, `credit_limit`, `grace_period`, `return_policy`, `instapay_number`, `wallet_number`, `deleted_at`, `created_by`, `updated_at`) VALUES
+(0, '6', 'عمرو حجازي', NULL, NULL, NULL, 1, '2026-06-25 22:46:37', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, 'Amr Hegazy', 'b2b', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, 1, '2026-06-25 22:46:37'),
+(1, '1', 'مورد الأدوية العام', '01234567890', 'supplier1@email.com', NULL, 1, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-25 21:56:41'),
+(2, '2', 'مورد المستلزمات الطبية', '01234567891', 'supplier2@email.com', NULL, 1, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-25 21:56:41'),
+(3, '3', 'مورد مستحضرات التجميل', '01234567892', 'supplier3@email.com', NULL, 1, '2026-06-16 19:06:20', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-25 21:56:41'),
+(4, '4', 'احمد عبد الحميد', '01111111', NULL, NULL, 0, '2026-06-17 00:35:55', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, '2026-06-26 00:03:42', NULL, '2026-06-25 22:30:05'),
+(5, '5', 'عبد الرحمن كانسيداس', '01067788553', NULL, NULL, 0, '2026-06-17 17:00:49', 'نفس اليوم', NULL, NULL, 'estock', NULL, NULL, NULL, 'company', 'cash', 0.00, 0, NULL, NULL, NULL, '2026-06-26 00:21:21', NULL, '2026-06-25 22:30:09');
 
 -- --------------------------------------------------------
 
@@ -1151,6 +1159,18 @@ CREATE TABLE `supplier_balances` (
   `last_transaction_date` datetime DEFAULT NULL,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='أرصدة الموردين';
+
+--
+-- Dumping data for table `supplier_balances`
+--
+
+INSERT INTO `supplier_balances` (`id`, `supplier_id`, `balance`, `total_purchases`, `total_payments`, `total_returns`, `last_transaction_date`, `updated_at`) VALUES
+(1, 1, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 21:56:41'),
+(2, 4, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 21:56:41'),
+(3, 5, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 21:56:41'),
+(4, 2, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 21:56:41'),
+(5, 3, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 21:56:41'),
+(8, 0, 0.00, 0.00, 0.00, 0.00, NULL, '2026-06-25 22:46:37');
 
 -- --------------------------------------------------------
 
@@ -1231,6 +1251,17 @@ CREATE TABLE `supplier_phones` (
   `is_primary` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='أرقام هاتف الموردين';
+
+--
+-- Dumping data for table `supplier_phones`
+--
+
+INSERT INTO `supplier_phones` (`id`, `supplier_id`, `country_code`, `phone_number`, `phone_type`, `is_primary`, `created_at`) VALUES
+(2, 2, '+20', '01234567891', 'mobile', 1, '2026-06-25 21:59:37'),
+(3, 3, '+20', '01234567892', 'mobile', 1, '2026-06-25 21:59:37'),
+(4, 4, '+20', '01111111', 'mobile', 1, '2026-06-25 21:59:37'),
+(5, 5, '+20', '01067788553', 'mobile', 1, '2026-06-25 21:59:37'),
+(8, 1, '+20', '01234567890', 'mobile', 1, '2026-06-25 22:20:30');
 
 -- --------------------------------------------------------
 
@@ -1346,7 +1377,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-25 19:49:43', '2026-06-15 16:53:16', '2026-06-25 17:49:43'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-27 18:34:00', '2026-06-15 16:53:16', '2026-06-27 16:34:00'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -1718,7 +1749,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=90;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=106;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -1760,7 +1791,7 @@ ALTER TABLE `customer_addresses`
 -- AUTO_INCREMENT for table `customer_balances`
 --
 ALTER TABLE `customer_balances`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `customer_phones`
@@ -1874,7 +1905,7 @@ ALTER TABLE `supplier_addresses`
 -- AUTO_INCREMENT for table `supplier_balances`
 --
 ALTER TABLE `supplier_balances`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `supplier_bank_accounts`
@@ -1898,7 +1929,7 @@ ALTER TABLE `supplier_due_payments`
 -- AUTO_INCREMENT for table `supplier_phones`
 --
 ALTER TABLE `supplier_phones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `supplier_prices`

@@ -7,7 +7,8 @@ $db = getDB();
 
 $supplier_id = intval($_GET['id'] ?? 0);
 if ($supplier_id <= 0) {
-    redirect('index.php');
+    header("Location: index.php");
+    exit;
 }
 
 // Get supplier with balance
@@ -20,7 +21,8 @@ $stmt = $db->prepare("
 $stmt->execute([$supplier_id]);
 $supplier = $stmt->fetch();
 if (!$supplier) {
-    redirect('index.php');
+    header("Location: index.php");
+    exit;
 }
 
 // Get related data
@@ -33,19 +35,6 @@ $addresses = $db->query("SELECT sa.*, a.area_name_ar, g.governorate_name_ar, z.z
     WHERE sa.supplier_id = {$supplier_id} ORDER BY sa.is_primary DESC, sa.id ASC")->fetchAll();
 $contacts = $db->query("SELECT * FROM supplier_contacts WHERE supplier_id = {$supplier_id} AND is_active = 1 ORDER BY is_primary DESC, id ASC")->fetchAll();
 $bank_accounts = $db->query("SELECT * FROM supplier_bank_accounts WHERE supplier_id = {$supplier_id} AND is_active = 1 ORDER BY is_primary DESC, id ASC")->fetchAll();
-
-// FIXED: Get products with barcodes from product_barcodes table (NOT products.barcode)
-$products = $db->query("
-    SELECT sp.*, p.product_name, p.product_name_en,
-        (SELECT pb.barcode FROM product_barcodes pb 
-         WHERE pb.product_id = p.id AND pb.is_primary = 1 LIMIT 1) as barcode
-    FROM supplier_products sp 
-    LEFT JOIN products p ON sp.product_id = p.id 
-    WHERE sp.supplier_id = {$supplier_id} 
-    ORDER BY sp.last_purchase_date DESC LIMIT 50
-")->fetchAll();
-
-$due_payments = $db->query("SELECT * FROM supplier_due_payments WHERE supplier_id = {$supplier_id} ORDER BY due_date ASC LIMIT 20")->fetchAll();
 
 // Type labels
 $type_labels = [
@@ -94,11 +83,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         .balance-card { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; border-radius: 15px; }
         .balance-amount { font-size: 28px; font-weight: bold; }
         .contact-card { border-left: 3px solid var(--primary); padding: 10px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px; }
-        .product-row { border-bottom: 1px solid #eee; padding: 10px 0; }
-        .product-row:last-child { border-bottom: none; }
-        .due-item { border-left: 3px solid var(--warning); padding: 10px 15px; background: #fff8e1; border-radius: 8px; margin-bottom: 8px; }
-        .due-overdue { border-left-color: var(--danger); background: #ffebee; }
-        .due-paid { border-left-color: var(--success); background: #e8f5e9; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -163,8 +147,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 <li class="nav-item"><button class="nav-link" id="addresses-tab" data-bs-toggle="tab" data-bs-target="#addresses" type="button"><i class="bi bi-geo-alt"></i> العناوين (<?= count($addresses) ?>)</button></li>
                 <li class="nav-item"><button class="nav-link" id="contacts-tab" data-bs-toggle="tab" data-bs-target="#contacts" type="button"><i class="bi bi-people"></i> الموظفين (<?= count($contacts) ?>)</button></li>
                 <li class="nav-item"><button class="nav-link" id="bank-tab" data-bs-toggle="tab" data-bs-target="#bank" type="button"><i class="bi bi-bank"></i> البنوك (<?= count($bank_accounts) ?>)</button></li>
-                <li class="nav-item"><button class="nav-link" id="products-tab" data-bs-toggle="tab" data-bs-target="#products" type="button"><i class="bi bi-box-seam"></i> الأصناف (<?= count($products) ?>)</button></li>
-                <li class="nav-item"><button class="nav-link" id="dues-tab" data-bs-toggle="tab" data-bs-target="#dues" type="button"><i class="bi bi-calendar-check"></i> المستحقات (<?= count($due_payments) ?>)</button></li>
             </ul>
 
             <div class="tab-content" id="viewTabsContent">
@@ -334,92 +316,6 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                                     </tbody>
                                 </table>
                             </div>
-                        <?php endif; ?>
-                    </div></div>
-                </div>
-
-                <!-- Products Tab -->
-                <div class="tab-pane fade" id="products" role="tabpanel">
-                    <div class="card"><div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0"><i class="bi bi-box-seam"></i> أصناف المورد</h5>
-                            <a href="#" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> إضافة صنف</a>
-                        </div>
-                        <?php if (empty($products)): ?>
-                            <div class="text-center text-muted py-4">لا توجد أصناف مسجلة</div>
-                        <?php else: ?>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>الصنف</th>
-                                            <th>كود المورد</th>
-                                            <th>سعر الشراء</th>
-                                            <th>الخصم</th>
-                                            <th>الضريبة</th>
-                                            <th>الصافي</th>
-                                            <th>آخر شراء</th>
-                                            <th>افتراضي</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($products as $prod): ?>
-                                        <tr>
-                                            <td>
-                                                <strong><?= htmlspecialchars($prod['product_name']) ?></strong>
-                                                <?php if ($prod['product_name_en']): ?><br><small class="text-muted"><?= htmlspecialchars($prod['product_name_en']) ?></small><?php endif; ?>
-                                                <?php if ($prod['barcode']): ?><br><small class="text-muted"><?= htmlspecialchars($prod['barcode']) ?></small><?php endif; ?>
-                                            </td>
-                                            <td><?= htmlspecialchars($prod['product_code'] ?? '-') ?></td>
-                                            <td><?= number_format($prod['purchase_price'], 2) ?> ج</td>
-                                            <td><?= $prod['discount_percent'] > 0 ? $prod['discount_percent'] . '%' : '-' ?></td>
-                                            <td><?= $prod['vat_percent'] > 0 ? $prod['vat_percent'] . '%' : '-' ?></td>
-                                            <td><strong><?= number_format($prod['net_price'], 2) ?> ج</strong></td>
-                                            <td><?= $prod['last_purchase_date'] ? date('Y-m-d', strtotime($prod['last_purchase_date'])) : '-' ?></td>
-                                            <td><?= $prod['is_default'] ? '<span class="badge bg-success">✓</span>' : '-' ?></td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php endif; ?>
-                    </div></div>
-                </div>
-
-                <!-- Dues Tab -->
-                <div class="tab-pane fade" id="dues" role="tabpanel">
-                    <div class="card"><div class="card-body">
-                        <h5 class="mb-3"><i class="bi bi-calendar-check"></i> مستحقات المورد</h5>
-                        <?php if (empty($due_payments)): ?>
-                            <div class="text-center text-muted py-4">لا توجد مستحقات مسجلة</div>
-                        <?php else: ?>
-                            <?php foreach ($due_payments as $due): 
-                                $due_class = $due['status'] == 'overdue' ? 'due-overdue' : ($due['status'] == 'paid' ? 'due-paid' : '');
-                                $status_label = ['pending'=>'معلق','partial'=>'جزئي','paid'=>'مدفوع','overdue'=>'متأخر'][$due['status']] ?? $due['status'];
-                            ?>
-                            <div class="due-item <?= $due_class ?>">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <div class="d-flex align-items-center">
-                                            <span class="badge bg-light text-dark border me-2"><?= $due['reference_number'] ?? '#' . $due['id'] ?></span>
-                                            <span class="badge bg-<?= $due['due_type']=='cheque'?'warning text-dark':'info' ?>"><?= $due['due_type']=='cheque'?'شيك':'آجل' ?></span>
-                                            <span class="badge bg-<?= ['pending'=>'secondary','partial'=>'warning','paid'=>'success','overdue'=>'danger'][$due['status']] ?> ms-2"><?= $status_label ?></span>
-                                        </div>
-                                        <div class="mt-2">
-                                            <strong>المبلغ: <?= number_format($due['amount'], 2) ?> ج</strong>
-                                            <?php if ($due['paid_amount'] > 0): ?>
-                                                <span class="text-muted"> | مدفوع: <?= number_format($due['paid_amount'], 2) ?> ج | متبقي: <?= number_format($due['remaining_amount'], 2) ?> ج</span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php if ($due['cheque_number']): ?><div class="text-muted small">شيك: <?= htmlspecialchars($due['cheque_number']) ?> - <?= htmlspecialchars($due['bank_name'] ?? '') ?></div><?php endif; ?>
-                                    </div>
-                                    <div class="text-start">
-                                        <div class="text-muted small">تاريخ الاستحقاق</div>
-                                        <div class="fw-bold <?= $due['status']=='overdue'?'text-danger':'' ?>"><?= date('Y-m-d', strtotime($due['due_date'])) ?></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
                         <?php endif; ?>
                     </div></div>
                 </div>
