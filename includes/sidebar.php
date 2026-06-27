@@ -26,6 +26,7 @@ $is_products = strpos($current_uri, '/products/') !== false;
 $is_suppliers = strpos($current_uri, '/suppliers/') !== false;
 $is_customer_requests = strpos($current_uri, '/customer-requests/') !== false;
 $is_admin = strpos($current_uri, '/admin/') !== false;
+$is_inventory = strpos($current_uri, '/inventory/') !== false;
 ?>
 
 <style>
@@ -228,6 +229,55 @@ $is_admin = strpos($current_uri, '/admin/') !== false;
         </div>
 
         <?php if (isAdmin()): ?>
+        
+        <!-- إدارة المخازن -->
+        <div class="sidebar-heading" onclick="toggleSection(this)">
+            <span><i class="bi bi-box-seam"></i> إدارة المخازن</span>
+            <i class="bi bi-chevron-down toggle-icon"></i>
+        </div>
+        <div class="sidebar-section">
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/stores/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/stores/') !== false && in_array($current_page, ['index.php', 'view.php', 'edit.php']) ? 'active' : '' ?>">
+                    <i class="bi bi-building"></i> المخازن
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/stores/create.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/stores/') !== false && $current_page === 'create.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-lg"></i> إضافة مخزن
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/transfers/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/transfers/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-arrow-left-right"></i> التحويلات
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/transfers/create.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/transfers/') !== false && $current_page === 'create.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-lg"></i> تحويل جديد
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/adjustments/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/adjustments/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-clipboard-check"></i> الجرد
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/adjustments/create.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/adjustments/') !== false && $current_page === 'create.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-lg"></i> جرد جديد
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/opening_balance/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/opening_balance/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-journal-plus"></i> الأرصدة الافتتاحية
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/opening_balance/create.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/opening_balance/') !== false && $current_page === 'create.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-lg"></i> رصيد افتتاحي
+                </a>
+            </div>
+        </div>
+
         <!-- الإدارة -->
         <div class="sidebar-heading" onclick="toggleSection(this)">
             <span><i class="bi bi-gear"></i> الإدارة</span>
