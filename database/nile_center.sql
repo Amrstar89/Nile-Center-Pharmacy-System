@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 27, 2026 at 07:55 PM
+-- Generation Time: Jun 27, 2026 at 09:26 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -150,7 +150,8 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (103, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:31:01'),
 (104, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-25 23:45:43'),
 (105, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-27 16:34:00'),
-(106, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-27 17:11:38');
+(106, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-27 17:11:38'),
+(107, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-06-27 19:00:29');
 
 -- --------------------------------------------------------
 
@@ -663,21 +664,21 @@ INSERT INTO `governorates` (`id`, `governorate_code`, `governorate_name_ar`, `go
 
 CREATE TABLE `inventory_batches` (
   `id` int(11) NOT NULL,
+  `batch_number` varchar(50) DEFAULT NULL,
   `product_id` int(11) NOT NULL,
-  `branch_id` int(11) NOT NULL,
-  `store_id` int(11) DEFAULT 1,
-  `quantity` float DEFAULT 0,
-  `buy_price` decimal(10,2) DEFAULT 0.00,
-  `purchase_price` decimal(10,2) DEFAULT 0.00,
-  `vat_percent` decimal(5,2) DEFAULT 0.00,
+  `store_id` int(11) NOT NULL,
+  `supplier_id` int(11) DEFAULT NULL,
+  `quantity` decimal(12,3) DEFAULT 0.000,
+  `remaining_qty` decimal(12,3) DEFAULT 0.000,
+  `buy_price` decimal(12,2) DEFAULT 0.00,
+  `unit_cost` decimal(12,2) DEFAULT 0.00,
+  `sell_price` decimal(12,2) DEFAULT 0.00,
   `discount_percent` decimal(5,2) DEFAULT 0.00,
+  `vat_percent` decimal(5,2) DEFAULT 0.00,
+  `exp_date` date DEFAULT NULL,
+  `production_date` date DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `sell_price` decimal(10,2) DEFAULT 0.00,
-  `exp_date` date DEFAULT NULL,
-  `batch_number` varchar(50) DEFAULT NULL,
-  `purchase_invoice_id` int(11) DEFAULT NULL,
-  `supplier_id` int(11) DEFAULT NULL,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -695,6 +696,8 @@ CREATE TABLE `inventory_items` (
   `quantity` decimal(12,3) DEFAULT 0.000,
   `unit_cost` decimal(12,2) DEFAULT 0.00,
   `sell_price` decimal(12,2) DEFAULT 0.00,
+  `discount_percent` decimal(5,2) DEFAULT 0.00,
+  `vat_percent` decimal(5,2) DEFAULT 0.00,
   `reorder_point` decimal(12,3) DEFAULT 0.000,
   `max_stock` decimal(12,3) DEFAULT 0.000,
   `is_active` tinyint(1) DEFAULT 1,
@@ -711,7 +714,7 @@ CREATE TABLE `inventory_items` (
 CREATE TABLE `inventory_transactions` (
   `id` int(11) NOT NULL,
   `transaction_type` enum('opening_balance','purchase','sale','transfer_out','transfer_in','adjustment','return_in','return_out','damage','expired') NOT NULL,
-  `reference_type` enum('purchase_invoice','sale_invoice','transfer_order','adjustment','opening_balance','return') DEFAULT NULL,
+  `reference_type` enum('opening_balance','purchase_invoice','sale_invoice','transfer_order','adjustment','return') DEFAULT NULL,
   `reference_id` int(11) DEFAULT NULL,
   `store_id` int(11) NOT NULL,
   `product_id` int(11) NOT NULL,
@@ -722,11 +725,21 @@ CREATE TABLE `inventory_transactions` (
   `quantity_base` decimal(12,3) NOT NULL,
   `unit_cost` decimal(12,2) DEFAULT 0.00,
   `unit_price` decimal(12,2) DEFAULT 0.00,
+  `discount_percent` decimal(5,2) DEFAULT 0.00,
+  `vat_percent` decimal(5,2) DEFAULT 0.00,
   `total_cost` decimal(12,2) DEFAULT 0.00,
+  `total_price` decimal(12,2) DEFAULT 0.00,
   `notes` text DEFAULT NULL,
   `created_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `inventory_transactions`
+--
+
+INSERT INTO `inventory_transactions` (`id`, `transaction_type`, `reference_type`, `reference_id`, `store_id`, `product_id`, `batch_id`, `unit_id`, `unit_conversion`, `quantity`, `quantity_base`, `unit_cost`, `unit_price`, `discount_percent`, `vat_percent`, `total_cost`, `total_price`, `notes`, `created_by`, `created_at`) VALUES
+(1, 'transfer_out', 'transfer_order', 1, 1, 3, NULL, NULL, 1.000, -5.000, -5.000, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'تحويل صادر: TR-00001', 1, '2026-06-27 19:04:44');
 
 -- --------------------------------------------------------
 
@@ -746,6 +759,7 @@ CREATE TABLE `inventory_transfers` (
   `total_items` int(11) DEFAULT 0,
   `total_quantity` decimal(12,3) DEFAULT 0.000,
   `total_cost` decimal(12,2) DEFAULT 0.00,
+  `total_sell` decimal(12,2) DEFAULT 0.00,
   `notes` text DEFAULT NULL,
   `requested_by` int(11) DEFAULT NULL,
   `approved_by` int(11) DEFAULT NULL,
@@ -757,6 +771,13 @@ CREATE TABLE `inventory_transfers` (
   `received_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `inventory_transfers`
+--
+
+INSERT INTO `inventory_transfers` (`id`, `transfer_code`, `from_store_id`, `to_store_id`, `from_branch_id`, `to_branch_id`, `transfer_type`, `status`, `total_items`, `total_quantity`, `total_cost`, `total_sell`, `notes`, `requested_by`, `approved_by`, `shipped_by`, `received_by`, `requested_at`, `approved_at`, `shipped_at`, `received_at`, `created_at`) VALUES
+(1, 'TR-00001', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 1, 5.000, 0.00, 0.00, NULL, 1, 1, 1, 1, '2026-06-27 21:04:12', '2026-06-27 21:04:35', '2026-06-27 21:04:44', '2026-06-27 21:23:33', '2026-06-27 19:04:12');
 
 -- --------------------------------------------------------
 
@@ -775,9 +796,19 @@ CREATE TABLE `inventory_transfer_items` (
   `unit_id` int(11) DEFAULT NULL,
   `unit_conversion` decimal(10,3) DEFAULT 1.000,
   `unit_cost` decimal(12,2) DEFAULT 0.00,
+  `sell_price` decimal(12,2) DEFAULT 0.00,
+  `total_cost` decimal(12,2) DEFAULT 0.00,
+  `total_sell` decimal(12,2) DEFAULT 0.00,
   `notes` text DEFAULT NULL,
   `status` enum('pending','shipped','received','rejected') DEFAULT 'pending'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `inventory_transfer_items`
+--
+
+INSERT INTO `inventory_transfer_items` (`id`, `transfer_id`, `product_id`, `batch_id`, `requested_qty`, `shipped_qty`, `received_qty`, `unit_id`, `unit_conversion`, `unit_cost`, `sell_price`, `total_cost`, `total_sell`, `notes`, `status`) VALUES
+(1, 1, 3, NULL, 5.000, 0.000, 0.000, NULL, 1.000, 0.00, 0.00, 0.00, 0.00, NULL, 'pending');
 
 -- --------------------------------------------------------
 
@@ -1186,6 +1217,7 @@ CREATE TABLE `stock_adjustments` (
   `adjustment_type` enum('periodic','spot','year_end','damage','expired') DEFAULT 'periodic',
   `status` enum('draft','counting','completed','cancelled') DEFAULT 'draft',
   `total_items` int(11) DEFAULT 0,
+  `counted_items` int(11) DEFAULT 0,
   `total_variance_qty` decimal(12,3) DEFAULT 0.000,
   `total_variance_cost` decimal(12,2) DEFAULT 0.00,
   `counted_by` int(11) DEFAULT NULL,
@@ -1195,6 +1227,14 @@ CREATE TABLE `stock_adjustments` (
   `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `stock_adjustments`
+--
+
+INSERT INTO `stock_adjustments` (`id`, `adjustment_code`, `store_id`, `adjustment_type`, `status`, `total_items`, `counted_items`, `total_variance_qty`, `total_variance_cost`, `counted_by`, `approved_by`, `counted_at`, `approved_at`, `notes`, `created_at`) VALUES
+(1, 'ADJ-00001', 6, 'periodic', 'draft', 0, 0, 0.000, 0.00, 1, NULL, '2026-06-27 20:59:57', NULL, NULL, '2026-06-27 18:59:57'),
+(2, 'ADJ-9.2233720368548E', 1, 'periodic', 'draft', 0, 0, 0.000, 0.00, 1, NULL, '2026-06-27 21:00:48', NULL, NULL, '2026-06-27 19:00:48');
 
 -- --------------------------------------------------------
 
@@ -1212,6 +1252,8 @@ CREATE TABLE `stock_adjustment_items` (
   `variance_qty` decimal(12,3) DEFAULT 0.000,
   `unit_cost` decimal(12,2) DEFAULT 0.00,
   `variance_cost` decimal(12,2) DEFAULT 0.00,
+  `is_counted` tinyint(1) DEFAULT 0,
+  `counted_at` datetime DEFAULT NULL,
   `notes` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1235,6 +1277,59 @@ CREATE TABLE `stores` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `stores`
+--
+
+INSERT INTO `stores` (`id`, `store_code`, `store_name`, `store_type`, `branch_id`, `parent_store_id`, `is_main`, `is_active`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 'CENT-01', 'المخزن الرئيسي المركزي', 'central_main', NULL, NULL, 1, 1, 'المخزن الرئيسي للشركة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(2, 'BR01-MAIN', 'مخزن فرع الشركة الرئيسي', 'branch_main', 1, 1, 1, 1, 'المخزن الرئيسي لفرع الشركة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(3, 'BR02-MAIN', 'مخزن فرع نوال الرئيسي', 'branch_main', 2, 1, 1, 1, 'المخزن الرئيسي لفرع نوال', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(4, 'BR03-MAIN', 'مخزن فرع مصدق الرئيسي', 'branch_main', 3, 1, 1, 1, 'المخزن الرئيسي لفرع مصدق', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(5, 'BR04-MAIN', 'مخزن فرع صيد الرئيسي', 'branch_main', 4, 1, 1, 1, 'المخزن الرئيسي لفرع صيد', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(6, 'BR01-PHARM', 'صيدلية فرع الشركة', 'pharmacy', 1, 2, 0, 1, 'صيدلية فرع الشركة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(7, 'BR01-WH', 'مستودع فرع الشركة', 'warehouse', 1, 2, 0, 1, 'مستودع فرع الشركة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(8, 'BR01-DMG', 'مخزن التالف فرع الشركة', 'damaged', 1, 2, 0, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(9, 'BR01-EXP', 'مخزن الهالك فرع الشركة', 'expired', 1, 2, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(10, 'BR02-PHARM', 'صيدلية فرع نوال', 'pharmacy', 2, 3, 0, 1, 'صيدلية فرع نوال', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(11, 'BR02-WH', 'مستودع فرع نوال', 'warehouse', 2, 3, 0, 1, 'مستودع فرع نوال', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(12, 'BR02-DMG', 'مخزن التالف فرع نوال', 'damaged', 2, 3, 0, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(13, 'BR02-EXP', 'مخزن الهالك فرع نوال', 'expired', 2, 3, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(14, 'BR03-PHARM', 'صيدلية فرع مصدق', 'pharmacy', 3, 4, 0, 1, 'صيدلية فرع مصدق', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(15, 'BR03-WH', 'مستودع فرع مصدق', 'warehouse', 3, 4, 0, 1, 'مستودع فرع مصدق', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(16, 'BR03-DMG', 'مخزن التالف فرع مصدق', 'damaged', 3, 4, 0, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(17, 'BR03-EXP', 'مخزن الهالك فرع مصدق', 'expired', 3, 4, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(18, 'BR04-PHARM', 'صيدلية فرع صيد', 'pharmacy', 4, 5, 0, 1, 'صيدلية فرع صيد', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(19, 'BR04-WH', 'مستودع فرع صيد', 'warehouse', 4, 5, 0, 1, 'مستودع فرع صيد', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(20, 'BR04-DMG', 'مخزن التالف فرع صيد', 'damaged', 4, 5, 0, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(21, 'BR04-EXP', 'مخزن الهالك فرع صيد', 'expired', 4, 5, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `store_code_sequences`
+--
+
+CREATE TABLE `store_code_sequences` (
+  `id` int(11) NOT NULL,
+  `store_type` varchar(20) NOT NULL,
+  `branch_id` int(11) DEFAULT NULL,
+  `prefix` varchar(10) NOT NULL,
+  `last_number` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `store_code_sequences`
+--
+
+INSERT INTO `store_code_sequences` (`id`, `store_type`, `branch_id`, `prefix`, `last_number`, `created_at`) VALUES
+(1, 'central_main', NULL, 'CENT', 1, '2026-06-27 18:58:15'),
+(2, 'branch_main', 1, 'BR01', 1, '2026-06-27 18:58:15'),
+(3, 'branch_main', 2, 'BR02', 1, '2026-06-27 18:58:15'),
+(4, 'branch_main', 3, 'BR03', 1, '2026-06-27 18:58:15'),
+(5, 'branch_main', 4, 'BR04', 1, '2026-06-27 18:58:15');
 
 -- --------------------------------------------------------
 
@@ -1543,7 +1638,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-27 19:11:38', '2026-06-15 16:53:16', '2026-06-27 17:11:38'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-27 21:00:29', '2026-06-15 16:53:16', '2026-06-27 19:00:29'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -1685,42 +1780,57 @@ ALTER TABLE `governorates`
 --
 ALTER TABLE `inventory_batches`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_product_branch_store` (`product_id`,`branch_id`,`store_id`),
-  ADD KEY `idx_branch` (`branch_id`),
-  ADD KEY `idx_exp` (`exp_date`),
   ADD KEY `idx_batch_product` (`product_id`),
-  ADD KEY `idx_batch_expiry` (`exp_date`),
-  ADD KEY `idx_batch_active` (`is_active`),
-  ADD KEY `idx_batch_supplier` (`supplier_id`);
+  ADD KEY `idx_batch_store` (`store_id`),
+  ADD KEY `idx_batch_supplier` (`supplier_id`),
+  ADD KEY `idx_batch_exp` (`exp_date`),
+  ADD KEY `idx_batch_active` (`is_active`);
 
 --
 -- Indexes for table `inventory_items`
 --
 ALTER TABLE `inventory_items`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_store_product_batch` (`store_id`,`product_id`,`batch_id`);
+  ADD UNIQUE KEY `uk_store_product_batch` (`store_id`,`product_id`,`batch_id`),
+  ADD KEY `idx_inv_item_store` (`store_id`),
+  ADD KEY `idx_inv_item_product` (`product_id`),
+  ADD KEY `idx_inv_item_batch` (`batch_id`);
 
 --
 -- Indexes for table `inventory_transactions`
 --
 ALTER TABLE `inventory_transactions`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_store_product` (`store_id`,`product_id`),
-  ADD KEY `idx_transaction_type` (`transaction_type`),
-  ADD KEY `idx_created_at` (`created_at`);
+  ADD KEY `idx_inv_tx_store` (`store_id`),
+  ADD KEY `idx_inv_tx_product` (`product_id`),
+  ADD KEY `idx_inv_tx_batch` (`batch_id`),
+  ADD KEY `idx_inv_tx_type` (`transaction_type`),
+  ADD KEY `idx_inv_tx_reference` (`reference_type`,`reference_id`),
+  ADD KEY `idx_inv_tx_date` (`created_at`),
+  ADD KEY `fk_inv_tx_unit` (`unit_id`),
+  ADD KEY `fk_inv_tx_user` (`created_by`);
 
 --
 -- Indexes for table `inventory_transfers`
 --
 ALTER TABLE `inventory_transfers`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `transfer_code` (`transfer_code`);
+  ADD UNIQUE KEY `transfer_code` (`transfer_code`),
+  ADD KEY `idx_transfer_from` (`from_store_id`),
+  ADD KEY `idx_transfer_to` (`to_store_id`),
+  ADD KEY `idx_transfer_status` (`status`),
+  ADD KEY `idx_transfer_date` (`created_at`),
+  ADD KEY `fk_transfer_from_branch` (`from_branch_id`),
+  ADD KEY `fk_transfer_to_branch` (`to_branch_id`);
 
 --
 -- Indexes for table `inventory_transfer_items`
 --
 ALTER TABLE `inventory_transfer_items`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_transfer_item_transfer` (`transfer_id`),
+  ADD KEY `idx_transfer_item_product` (`product_id`),
+  ADD KEY `idx_transfer_item_batch` (`batch_id`);
 
 --
 -- Indexes for table `orders`
@@ -1838,20 +1948,39 @@ ALTER TABLE `shift_handovers`
 --
 ALTER TABLE `stock_adjustments`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `adjustment_code` (`adjustment_code`);
+  ADD UNIQUE KEY `adjustment_code` (`adjustment_code`),
+  ADD KEY `idx_adj_store` (`store_id`),
+  ADD KEY `idx_adj_status` (`status`),
+  ADD KEY `idx_adj_date` (`created_at`);
 
 --
 -- Indexes for table `stock_adjustment_items`
 --
 ALTER TABLE `stock_adjustment_items`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_adj_item_adj` (`adjustment_id`),
+  ADD KEY `idx_adj_item_product` (`product_id`),
+  ADD KEY `idx_adj_item_batch` (`batch_id`),
+  ADD KEY `idx_adj_item_counted` (`is_counted`);
 
 --
 -- Indexes for table `stores`
 --
 ALTER TABLE `stores`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `store_code` (`store_code`);
+  ADD UNIQUE KEY `store_code` (`store_code`),
+  ADD KEY `idx_store_branch` (`branch_id`),
+  ADD KEY `idx_store_parent` (`parent_store_id`),
+  ADD KEY `idx_store_type` (`store_type`),
+  ADD KEY `idx_store_active` (`is_active`),
+  ADD KEY `fk_store_user` (`created_by`);
+
+--
+-- Indexes for table `store_code_sequences`
+--
+ALTER TABLE `store_code_sequences`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_type_branch` (`store_type`,`branch_id`);
 
 --
 -- Indexes for table `suppliers`
@@ -1964,7 +2093,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=107;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=108;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -2054,19 +2183,19 @@ ALTER TABLE `inventory_items`
 -- AUTO_INCREMENT for table `inventory_transactions`
 --
 ALTER TABLE `inventory_transactions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `inventory_transfers`
 --
 ALTER TABLE `inventory_transfers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `inventory_transfer_items`
 --
 ALTER TABLE `inventory_transfer_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `orders`
@@ -2138,7 +2267,7 @@ ALTER TABLE `shift_handovers`
 -- AUTO_INCREMENT for table `stock_adjustments`
 --
 ALTER TABLE `stock_adjustments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `stock_adjustment_items`
@@ -2150,7 +2279,13 @@ ALTER TABLE `stock_adjustment_items`
 -- AUTO_INCREMENT for table `stores`
 --
 ALTER TABLE `stores`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+
+--
+-- AUTO_INCREMENT for table `store_code_sequences`
+--
+ALTER TABLE `store_code_sequences`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `suppliers`
@@ -2276,6 +2411,49 @@ ALTER TABLE `customer_transactions`
   ADD CONSTRAINT `fk_transaction_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
+-- Constraints for table `inventory_batches`
+--
+ALTER TABLE `inventory_batches`
+  ADD CONSTRAINT `fk_batch_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_batch_store` FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_batch_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `inventory_items`
+--
+ALTER TABLE `inventory_items`
+  ADD CONSTRAINT `fk_inv_item_batch` FOREIGN KEY (`batch_id`) REFERENCES `inventory_batches` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_inv_item_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_inv_item_store` FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `inventory_transactions`
+--
+ALTER TABLE `inventory_transactions`
+  ADD CONSTRAINT `fk_inv_tx_batch` FOREIGN KEY (`batch_id`) REFERENCES `inventory_batches` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_inv_tx_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_inv_tx_store` FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_inv_tx_unit` FOREIGN KEY (`unit_id`) REFERENCES `product_units` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_inv_tx_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `inventory_transfers`
+--
+ALTER TABLE `inventory_transfers`
+  ADD CONSTRAINT `fk_transfer_from_branch` FOREIGN KEY (`from_branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_transfer_from_store` FOREIGN KEY (`from_store_id`) REFERENCES `stores` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_transfer_to_branch` FOREIGN KEY (`to_branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_transfer_to_store` FOREIGN KEY (`to_store_id`) REFERENCES `stores` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `inventory_transfer_items`
+--
+ALTER TABLE `inventory_transfer_items`
+  ADD CONSTRAINT `fk_transfer_item_batch` FOREIGN KEY (`batch_id`) REFERENCES `inventory_batches` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_transfer_item_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_transfer_item_transfer` FOREIGN KEY (`transfer_id`) REFERENCES `inventory_transfers` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `orders`
 --
 ALTER TABLE `orders`
@@ -2303,6 +2481,28 @@ ALTER TABLE `purchased_items`
 ALTER TABLE `shift_handovers`
   ADD CONSTRAINT `shift_handovers_ibfk_1` FOREIGN KEY (`from_user`) REFERENCES `users` (`id`),
   ADD CONSTRAINT `shift_handovers_ibfk_2` FOREIGN KEY (`to_user`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `stock_adjustments`
+--
+ALTER TABLE `stock_adjustments`
+  ADD CONSTRAINT `fk_adj_store` FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `stock_adjustment_items`
+--
+ALTER TABLE `stock_adjustment_items`
+  ADD CONSTRAINT `fk_adj_item_adj` FOREIGN KEY (`adjustment_id`) REFERENCES `stock_adjustments` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_adj_item_batch` FOREIGN KEY (`batch_id`) REFERENCES `inventory_batches` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_adj_item_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `stores`
+--
+ALTER TABLE `stores`
+  ADD CONSTRAINT `fk_store_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_store_parent` FOREIGN KEY (`parent_store_id`) REFERENCES `stores` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_store_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `supplier_addresses`
