@@ -656,11 +656,11 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 ON DUPLICATE KEY UPDATE new_value=VALUES(new_value);
 
 -- =====================================================
--- 34. SHIFT HANDOVERS
+-- 34. SHIFT HANDOVERS (FIXED - using existing users only)
 -- =====================================================
 INSERT INTO `shift_handovers` (`id`, `shift_date`, `from_user`, `to_user`, `open_orders_count`, `urgent_orders_count`, `critical_notes`, `general_notes`, `is_acknowledged`, `acknowledged_at`, `created_at`) VALUES
-(1, '2026-06-27', 1, 3, 5, 2, 'طلبات عاجلة تحتاج متابعة', 'التسليمات المعلقة', 1, '2026-06-27 08:00:00', '2026-06-27 07:00:00'),
-(2, '2026-06-27', 3, 4, 3, 1, 'متابعة طلب مستشفى النور', 'الوردية المسائية', 0, NULL, '2026-06-27 15:00:00')
+(1, '2026-06-27', 1, 2, 5, 2, 'طلبات عاجلة تحتاج متابعة', 'التسليمات المعلقة', 1, '2026-06-27 08:00:00', '2026-06-27 07:00:00'),
+(2, '2026-06-27', 2, 1, 3, 1, 'متابعة طلب مستشفى النور', 'الوردية المسائية', 0, NULL, '2026-06-27 15:00:00')
 ON DUPLICATE KEY UPDATE open_orders_count=VALUES(open_orders_count);
 
 SET FOREIGN_KEY_CHECKS = 1;
