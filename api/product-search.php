@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../../core/config.php';
-require_once __DIR__ . '/../../core/auth.php';
+require_once __DIR__ . '/../core/config.php';
+require_once __DIR__ . '/../core/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -73,5 +73,20 @@ LIMIT 50";
 $stmt = $db->prepare($sql);
 $stmt->execute($params);
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// If store_id provided, get batch info for each product
+if ($store_id > 0) {
+    foreach ($products as &$product) {
+        $batch_stmt = $db->prepare("
+            SELECT id, batch_number, exp_date, remaining_qty, unit_cost, sell_price
+            FROM inventory_batches
+            WHERE product_id = ? AND store_id = ? AND remaining_qty > 0 AND exp_date >= CURDATE()
+            ORDER BY exp_date ASC
+            LIMIT 5
+        ");
+        $batch_stmt->execute([$product['id'], $store_id]);
+        $product['batches'] = $batch_stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
 
 echo json_encode($products);

@@ -7,13 +7,16 @@ $db = getDB();
 
 $page_title = 'إنشاء جرد جديد';
 
-// Get active stores
+// Get branches
+$branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
+
+// Get active stores with branch info
 $stores = $db->query("
     SELECT s.*, b.branch_name 
     FROM stores s 
     LEFT JOIN branches b ON s.branch_id = b.id 
     WHERE s.is_active = 1 
-    ORDER BY s.store_name
+    ORDER BY b.branch_name, s.store_name
 ")->fetchAll();
 
 // Handle form submission
@@ -56,9 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Get current stock items and insert them
         $stock_items = $db->prepare("
-            SELECT ii.*, p.product_name, p.product_code, p.manual_code, p.cost_price
+            SELECT ii.*, p.product_name, p.product_code, p.manual_code, p.cost_price, b.exp_date
             FROM inventory_items ii
             JOIN products p ON ii.product_id = p.id
+            LEFT JOIN inventory_batches b ON ii.batch_id = b.id
             WHERE ii.store_id = ? AND ii.is_active = 1
         ");
         $stock_items->execute([$store_id]);
@@ -124,9 +128,9 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
-<body>
+<body style="margin: 0; padding: 0;">
     <?= $sidebar ?? '' ?>
-    <div class="main-content">
+    <div class="main-content" style="margin-right: 260px; padding: 20px; min-height: 100vh;">
         <div class="container-fluid">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="bi bi-plus-lg"></i> <?= $page_title ?></h2>
@@ -144,12 +148,22 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 
                         <div class="row">
                             <div class="col-md-6">
+                                <label class="form-label">الفرع</label>
+                                <select id="branch_filter" class="form-select" onchange="filterStoresByBranch()">
+                                    <option value="">-- اختر الفرع --</option>
+                                    <?php foreach ($branches as $branch): ?>
+                                        <option value="<?= $branch['id'] ?>"><?= htmlspecialchars($branch['branch_name']) ?></option>
+                                    <?php endforeach; ?>
+                                    <option value="0">مركزي (بدون فرع)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
                                 <div class="mb-3">
                                     <label class="form-label">المخزن <span class="text-danger">*</span></label>
-                                    <select name="store_id" class="form-select" required>
+                                    <select name="store_id" id="store_select" class="form-select" required>
                                         <option value="">-- اختر المخزن --</option>
                                         <?php foreach ($stores as $s): ?>
-                                            <option value="<?= $s['id'] ?>">
+                                            <option value="<?= $s['id'] ?>" data-branch="<?= $s['branch_id'] ?? '0' ?>" style="display:none;">
                                                 <?= htmlspecialchars($s['store_name']) ?> <?= $s['branch_name'] ? '(' . htmlspecialchars($s['branch_name']) . ')' : '(مركزي)' ?>
                                             </option>
                                         <?php endforeach; ?>
@@ -208,6 +222,27 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             document.querySelectorAll('.type-card').forEach(card => card.classList.remove('selected'));
             event.currentTarget.classList.add('selected');
             event.currentTarget.querySelector('input[type="radio"]').checked = true;
+        }
+
+        function filterStoresByBranch() {
+            const branchId = document.getElementById('branch_filter').value;
+            const storeSelect = document.getElementById('store_select');
+            const options = storeSelect.querySelectorAll('option[data-branch]');
+
+            options.forEach(opt => {
+                if (!opt.value) {
+                    opt.style.display = '';
+                    return;
+                }
+                const optBranch = opt.getAttribute('data-branch') || '0';
+                if (!branchId || optBranch === branchId) {
+                    opt.style.display = '';
+                } else {
+                    opt.style.display = 'none';
+                }
+            });
+
+            storeSelect.value = '';
         }
     </script>
 </body>

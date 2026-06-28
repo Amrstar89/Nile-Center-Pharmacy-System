@@ -1,12 +1,14 @@
 <?php
-require_once '../../core/config.php';
-require_once '../../core/auth.php';
+require_once __DIR__ . '/../../../core/config.php';
+require_once __DIR__ . '/../../../core/auth.php';
 
 // Check authentication
 if (!isLoggedIn()) {
-    header('Location: ../../index.php');
+    header('Location: ../../../index.php');
     exit;
 }
+
+$db = getDB(); // ← FIXED: Added getDB()
 
 // Get user info
 $currentUser = getCurrentUser();
@@ -21,24 +23,17 @@ if (!$canCreate) {
     exit;
 }
 
-// Get stores for dropdown
-$stmt = $db->query("SELECT s.*, b.branch_name 
-                     FROM stores s 
-                     LEFT JOIN branches b ON s.branch_id = b.id 
-                     WHERE s.is_active = 1 
-                     ORDER BY s.store_type, s.store_name");
-$stores = $stmt->fetchAll();
+// Get branches for dropdown
+$branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
 
-// Get products with stock info for search
-$stmt = $db->query("SELECT p.id, p.product_code, p.product_name, p.product_name_en, 
-                            p.sell_price, p.cost_price, p.unit1_id, u.unit_name_ar,
-                            i.quantity as stock_qty, i.unit_cost, i.store_id
-                     FROM products p
-                     LEFT JOIN product_units u ON p.unit1_id = u.id
-                     LEFT JOIN inventory_items i ON p.id = i.product_id AND i.is_active = 1
-                     WHERE p.is_active = 1
-                     ORDER BY p.product_name");
-$products = $stmt->fetchAll();
+// Get stores with branch info
+$stores = $db->query("
+    SELECT s.*, b.branch_name 
+    FROM stores s 
+    LEFT JOIN branches b ON s.branch_id = b.id 
+    WHERE s.is_active = 1 
+    ORDER BY b.branch_name, s.store_name
+")->fetchAll();
 
 // Get users for dropdown
 $stmt = $db->query("SELECT id, full_name FROM users WHERE is_active = 1 ORDER BY full_name");
@@ -137,17 +132,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception('الصنف غير موجود: ' . $productId);
             }
 
-            // Check stock availability in source store
-            $stmt = $db->prepare("SELECT SUM(quantity) as total_qty, unit_cost 
-                                   FROM inventory_items 
-                                   WHERE store_id = ? AND product_id = ? AND is_active = 1");
-            $stmt->execute([$fromStoreId, $productId]);
-            $stock = $stmt->fetch();
+            // Check batch stock if batch selected
+            if ($batchId) {
+                $stmt = $db->prepare("SELECT remaining_qty FROM inventory_batches WHERE id = ? AND product_id = ? AND store_id = ?");
+                $stmt->execute([$batchId, $productId, $fromStoreId]);
+                $batch = $stmt->fetch();
 
-            $availableQty = floatval($stock['total_qty'] ?? 0);
+                if (!$batch || $batch['remaining_qty'] < $requestedQty) {
+                    throw new Exception('الكمية المطلوبة (' . $requestedQty . ') أكبر من رصيد الدفعة المتاح (' . ($batch['remaining_qty'] ?? 0) . ') للصنف: ' . $product['product_name']);
+                }
+            } else {
+                // Check total stock availability in source store
+                $stmt = $db->prepare("SELECT SUM(quantity) as total_qty, unit_cost 
+                                       FROM inventory_items 
+                                       WHERE store_id = ? AND product_id = ? AND is_active = 1");
+                $stmt->execute([$fromStoreId, $productId]);
+                $stock = $stmt->fetch();
 
-            if ($availableQty < $requestedQty) {
-                throw new Exception('الكمية المطلوبة (' . $requestedQty . ') أكبر من الرصيد المتاح (' . $availableQty . ') للصنف: ' . $product['product_name']);
+                $availableQty = floatval($stock['total_qty'] ?? 0);
+
+                if ($availableQty < $requestedQty) {
+                    throw new Exception('الكمية المطلوبة (' . $requestedQty . ') أكبر من الرصيد المتاح (' . $availableQty . ') للصنف: ' . $product['product_name']);
+                }
             }
 
             // Use stored unit cost if not provided
@@ -210,12 +216,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Cairo', sans-serif; background-color: #f8f9fa; }
-        .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-        .form-label { font-weight: 600; color: #495057; }
+        body { font-family: 'Cairo', sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+        .main-content { 
+            margin-right: 260px; 
+            padding: 20px;
+            min-height: 100vh;
+        }
+        @media (max-width: 768px) { 
+            .main-content { margin-right: 0; padding: 10px; } 
+        }
+        .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .form-label { font-weight: 600; color: #495057; font-size: 0.9rem; }
         .btn-primary { background: #0d6efd; border: none; border-radius: 8px; padding: 10px 24px; }
         .btn-secondary { border-radius: 8px; padding: 10px 24px; }
-        .item-row { background: #f8f9fa; border-radius: 10px; padding: 15px; margin-bottom: 10px; }
+        .item-row { 
+            background: #f8f9fa; 
+            border-radius: 10px; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            border: 1px solid #e9ecef;
+        }
+        .item-row .form-control, .item-row .form-select { font-size: 0.9rem; }
         .stock-info { font-size: 0.85rem; color: #6c757d; }
         .stock-info .badge { font-size: 0.75rem; }
         .search-popup { 
@@ -234,12 +255,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .search-popup .list-group-item:hover { background-color: #e9ecef; }
         .product-search-container { position: relative; }
         .date-display { font-weight: 600; color: #0d6efd; }
+        .batch-info { background: #e7f3ff; border-radius: 5px; padding: 5px 10px; font-size: 0.85rem; margin-top: 5px; }
+        .exp-badge { font-size: 0.75rem; }
+        .summary-card { 
+            background: white; 
+            border-radius: 10px; 
+            padding: 15px; 
+            margin-bottom: 15px;
+            border-right: 4px solid #0d6efd;
+        }
+        .summary-card .label { font-size: 0.85rem; color: #6c757d; }
+        .summary-card .value { font-size: 1.2rem; font-weight: bold; color: #0d6efd; }
     </style>
 </head>
 <body>
-    <?php include '../../includes/sidebar.php'; ?>
+    <?php include '../../../includes/sidebar.php'; ?>
 
-    <div class="main-content">
+    <div class="main-content" style="margin-right: 260px; padding: 20px;">
         <div class="container-fluid py-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
@@ -269,18 +301,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                             <div class="card-body">
                                 <div class="row g-3">
+                                    <!-- From Branch & Store -->
+                                    <div class="col-md-6">
+                                        <label class="form-label">الفرع المصدر</label>
+                                        <select id="fromBranch" class="form-select" onchange="filterStores('from')">
+                                            <option value="">اختر الفرع</option>
+                                            <?php foreach ($branches as $branch): ?>
+                                                <option value="<?php echo $branch['id']; ?>">
+                                                    <?php echo htmlspecialchars($branch['branch_name']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                            <option value="0">مركزي (بدون فرع)</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-6">
                                         <label class="form-label">المخزن المصدر *</label>
                                         <select name="from_store_id" id="fromStore" class="form-select" required onchange="updateProductStock()">
                                             <option value="">اختر المخزن المصدر</option>
                                             <?php foreach ($stores as $store): ?>
                                                 <option value="<?php echo $store['id']; ?>" 
-                                                        data-branch="<?php echo $store['branch_id']; ?>"
-                                                        data-type="<?php echo $store['store_type']; ?>">
+                                                        data-branch="<?php echo $store['branch_id'] ?? '0'; ?>"
+                                                        data-type="<?php echo $store['store_type']; ?>"
+                                                        style="display:none;">
                                                     <?php echo htmlspecialchars($store['store_name']); ?> 
                                                     (<?php echo $store['branch_name'] ?? 'مركزي'; ?>)
                                                 </option>
                                             <?php endforeach; ?>
+                                        </select>
+                                    </div>
+
+                                    <!-- To Branch & Store -->
+                                    <div class="col-md-6">
+                                        <label class="form-label">الفرع الهدف</label>
+                                        <select id="toBranch" class="form-select" onchange="filterStores('to')">
+                                            <option value="">اختر الفرع</option>
+                                            <?php foreach ($branches as $branch): ?>
+                                                <option value="<?php echo $branch['id']; ?>">
+                                                    <?php echo htmlspecialchars($branch['branch_name']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                            <option value="0">مركزي (بدون فرع)</option>
                                         </select>
                                     </div>
                                     <div class="col-md-6">
@@ -289,14 +349,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                             <option value="">اختر المخزن الهدف</option>
                                             <?php foreach ($stores as $store): ?>
                                                 <option value="<?php echo $store['id']; ?>" 
-                                                        data-branch="<?php echo $store['branch_id']; ?>"
-                                                        data-type="<?php echo $store['store_type']; ?>">
+                                                        data-branch="<?php echo $store['branch_id'] ?? '0'; ?>"
+                                                        data-type="<?php echo $store['store_type']; ?>"
+                                                        style="display:none;">
                                                     <?php echo htmlspecialchars($store['store_name']); ?> 
                                                     (<?php echo $store['branch_name'] ?? 'مركزي'; ?>)
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
+
                                     <div class="col-md-6">
                                         <label class="form-label">تاريخ الطلب</label>
                                         <input type="text" class="form-control" value="<?php echo date('Y-m-d H:i'); ?>" readonly>
@@ -372,8 +434,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <div class="card-body">
                                 <ul class="list-unstyled mb-0 small">
                                     <li><i class="bi bi-check2 text-success"></i> اضغط F2 أو انقر على حقل البحث للبحث عن الأصناف</li>
+                                    <li><i class="bi bi-check2 text-success"></i> يتم اختيار أقرب تاريخ صلاحية تلقائياً</li>
                                     <li><i class="bi bi-check2 text-success"></i> التكلفة والسعر يتم استخراجهم تلقائياً من المخزن</li>
-                                    <li><i class="bi bi-check2 text-success"></i> لا يمكن تحويل كمية أكبر من الرصيد المتاح</li>
+                                    <li><i class="bi bi-check2 text-success"></i> لا يمكن تحويل كمية أكبر من الرصيد المتاح للدفعة</li>
                                     <li><i class="bi bi-check2 text-success"></i> التاريخ يظهر تلقائياً</li>
                                 </ul>
                             </div>
@@ -384,25 +447,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 
+    <?php 
+    $api_base_path = '../../../api';
+    include '../../../includes/product-search-popup.php'; 
+    ?>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let itemCounter = 0;
-        let productsData = <?php echo json_encode($products); ?>;
+        let productsData = [];
         let stockData = {};
 
-        // Build stock data by product and store
-        productsData.forEach(p => {
-            if (!stockData[p.id]) {
-                stockData[p.id] = {};
+        // Filter stores by branch
+        function filterStores(direction) {
+            const branchId = document.getElementById(direction + 'Branch').value;
+            const storeSelect = document.getElementById(direction + 'Store');
+            const options = storeSelect.querySelectorAll('option[data-branch]');
+
+            options.forEach(opt => {
+                if (!opt.value) {
+                    opt.style.display = '';
+                    return;
+                }
+                const optBranch = opt.getAttribute('data-branch') || '0';
+                if (!branchId || optBranch === branchId) {
+                    opt.style.display = '';
+                } else {
+                    opt.style.display = 'none';
+                }
+            });
+
+            storeSelect.value = '';
+
+            if (direction === 'from') {
+                updateProductStock();
             }
-            if (p.store_id) {
-                stockData[p.id][p.store_id] = {
-                    qty: parseFloat(p.stock_qty || 0),
-                    cost: parseFloat(p.unit_cost || p.cost_price || 0),
-                    sell: parseFloat(p.sell_price || 0)
-                };
-            }
-        });
+        }
 
         function addItemRow() {
             itemCounter++;
@@ -411,24 +491,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const html = `
                 <div class="item-row" id="itemRow_${itemCounter}">
                     <div class="row g-3">
-                        <div class="col-md-4 product-search-container">
+                        <div class="col-md-3 product-search-container">
                             <label class="form-label">الصنف *</label>
                             <div class="input-group">
                                 <input type="text" 
                                        class="form-control product-search" 
                                        id="productSearch_${itemCounter}"
-                                       placeholder="اضغط F2 للبحث أو ابدأ الكتابة..."
-                                       autocomplete="off"
-                                       onkeydown="handleProductSearch(event, ${itemCounter})"
-                                       onfocus="showProductSearch(${itemCounter})"
-                                       oninput="filterProducts(${itemCounter})">
-                                <button type="button" class="btn btn-outline-secondary" onclick="showProductSearch(${itemCounter})">
+                                       placeholder="اضغط F2 للبحث..."
+                                       readonly
+                                       onclick="openProductSearchModal(${itemCounter})">
+                                <button type="button" class="btn btn-outline-primary" onclick="openProductSearchModal(${itemCounter})">
                                     <i class="bi bi-search"></i> F2
                                 </button>
                             </div>
-                            <div class="search-popup list-group" id="productPopup_${itemCounter}"></div>
                             <input type="hidden" name="items[${itemCounter}][product_id]" id="productId_${itemCounter}">
-                            <div class="stock-info mt-1" id="stockInfo_${itemCounter}"></div>
+                            <div class="batch-info mt-1 d-none" id="batchInfo_${itemCounter}">
+                                <i class="bi bi-calendar-check"></i> 
+                                <span id="expDate_${itemCounter}"></span>
+                                <span class="badge bg-success ms-1" id="batchQty_${itemCounter}"></span>
+                            </div>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">الكمية *</label>
@@ -439,7 +520,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                    step="0.001" 
                                    min="0.001" 
                                    required
-                                   onchange="calculateItemTotal(${itemCounter}); updateTotals();">
+                                   onchange="validateItemQty(${itemCounter}); calculateItemTotal(${itemCounter}); updateTotals();">
+                            <input type="hidden" id="maxQty_${itemCounter}" value="0">
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">التكلفة</label>
@@ -468,6 +550,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 </button>
                             </div>
                         </div>
+                        <div class="col-md-1">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-success w-100" onclick="changeBatch(${itemCounter})">
+                                <i class="bi bi-calendar"></i>
+                            </button>
+                        </div>
                         <div class="col-12">
                             <input type="hidden" name="items[${itemCounter}][batch_id]" id="batchId_${itemCounter}">
                             <input type="hidden" name="items[${itemCounter}][unit_id]" id="unitId_${itemCounter}">
@@ -479,26 +567,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             document.getElementById('itemsContainer').insertAdjacentHTML('beforeend', html);
 
-            // Focus on the new search field
             setTimeout(() => {
-                document.getElementById(`productSearch_${itemCounter}`).focus();
+                openProductSearchModal(itemCounter);
             }, 100);
         }
 
-        function removeItemRow(id) {
-            document.getElementById(`itemRow_${id}`).remove();
-            updateTotals();
-        }
-
-        function handleProductSearch(event, counter) {
-            if (event.key === 'F2') {
-                event.preventDefault();
-                showProductSearch(counter);
-            }
-        }
-
-        function showProductSearch(counter) {
-            const popup = document.getElementById(`productPopup_${counter}`);
+        function openProductSearchModal(rowIndex) {
+            currentRowIndex = rowIndex;
             const fromStoreId = document.getElementById('fromStore').value;
 
             if (!fromStoreId) {
@@ -507,109 +582,178 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 return;
             }
 
-            let html = '';
-            productsData.forEach(p => {
-                const stock = stockData[p.id] && stockData[p.id][fromStoreId] ? stockData[p.id][fromStoreId] : { qty: 0, cost: 0, sell: 0 };
-                const stockBadge = stock.qty > 0 
-                    ? `<span class="badge bg-success">رصيد: ${stock.qty}</span>` 
-                    : `<span class="badge bg-danger">نفذ الرصيد</span>`;
-
-                html += `
-                    <div class="list-group-item" onclick="selectProduct(${counter}, ${p.id}, '${escapeHtml(p.product_name)}', ${stock.qty}, ${stock.cost}, ${stock.sell}, ${p.unit1_id || 'null'})">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <strong>${escapeHtml(p.product_name)}</strong>
-                                <small class="text-muted d-block">${escapeHtml(p.product_name_en || '')} | كود: ${p.product_code}</small>
-                            </div>
-                            <div>
-                                ${stockBadge}
-                                <span class="badge bg-info">تكلفة: ${stock.cost.toFixed(2)}</span>
-                                <span class="badge bg-primary">بيع: ${stock.sell.toFixed(2)}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            popup.innerHTML = html;
-            popup.style.display = 'block';
+            openProductSearch('product_' + rowIndex, fromStoreId);
+            const modal = new bootstrap.Modal(document.getElementById('productSearchModal'));
+            modal.show();
         }
 
-        function filterProducts(counter) {
-            const searchTerm = document.getElementById(`productSearch_${counter}`).value.toLowerCase();
-            const popup = document.getElementById(`productPopup_${counter}`);
+        // Listen for product selection
+        document.addEventListener('productSelected', function(e) {
+            const product = e.detail;
+            fillProductData(currentRowIndex, product);
+        });
+
+        function fillProductData(index, product) {
+            document.getElementById('productId_' + index).value = product.id;
+            document.getElementById('productSearch_' + index).value = product.name;
+
+            if (product.batch) {
+                // Batch selected
+                document.getElementById('batchId_' + index).value = product.batch.id;
+                document.getElementById('cost_' + index).value = product.batch.unit_cost;
+                document.getElementById('sell_' + index).value = product.batch.sell_price;
+                document.getElementById('maxQty_' + index).value = product.batch.remaining_qty;
+
+                // Show batch info
+                document.getElementById('batchInfo_' + index).classList.remove('d-none');
+                document.getElementById('expDate_' + index).textContent = product.batch.exp_date;
+                document.getElementById('batchQty_' + index).textContent = 'رصيد: ' + product.batch.remaining_qty;
+            } else {
+                // No batch - use product defaults
+                document.getElementById('cost_' + index).value = product.cost_price || 0;
+                document.getElementById('sell_' + index).value = product.sell_price || 0;
+                document.getElementById('batchInfo_' + index).classList.add('d-none');
+            }
+
+            document.getElementById('unitId_' + index).value = product.unit_id || '';
+
+            calculateItemTotal(index);
+            document.getElementById('qty_' + index).focus();
+        }
+
+        function changeBatch(index) {
+            const productId = document.getElementById('productId_' + index).value;
             const fromStoreId = document.getElementById('fromStore').value;
 
-            if (searchTerm.length < 2) {
-                popup.style.display = 'none';
+            if (!productId) {
+                alert('اختر صنف أولاً');
                 return;
             }
 
-            let html = '';
-            productsData.forEach(p => {
-                if (p.product_name.toLowerCase().includes(searchTerm) || 
-                    (p.product_name_en && p.product_name_en.toLowerCase().includes(searchTerm)) ||
-                    p.product_code.toLowerCase().includes(searchTerm)) {
+            // Fetch all batches for this product
+            fetch(`../../../api/get-product-batches.php?product_id=${productId}&store_id=${fromStoreId}`)
+                .then(r => r.json())
+                .then(batches => {
+                    if (batches.length === 0) {
+                        alert('لا توجد دفعات متاحة');
+                        return;
+                    }
 
-                    const stock = stockData[p.id] && stockData[p.id][fromStoreId] ? stockData[p.id][fromStoreId] : { qty: 0, cost: 0, sell: 0 };
-                    const stockBadge = stock.qty > 0 
-                        ? `<span class="badge bg-success">رصيد: ${stock.qty}</span>` 
-                        : `<span class="badge bg-danger">نفذ الرصيد</span>`;
-
-                    html += `
-                        <div class="list-group-item" onclick="selectProduct(${counter}, ${p.id}, '${escapeHtml(p.product_name)}', ${stock.qty}, ${stock.cost}, ${stock.sell}, ${p.unit1_id || 'null'})">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>${escapeHtml(p.product_name)}</strong>
-                                    <small class="text-muted d-block">${escapeHtml(p.product_name_en || '')} | كود: ${p.product_code}</small>
+                    // Show batch selection
+                    let html = '<div class="list-group">';
+                    batches.forEach(batch => {
+                        html += `
+                            <button type="button" class="list-group-item list-group-item-action" 
+                                    onclick="selectBatchForRow(${index}, ${batch.id}, '${batch.exp_date}', ${batch.remaining_qty}, ${batch.unit_cost}, ${batch.sell_price})">
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <strong>تاريخ الصلاحية:</strong> ${batch.exp_date}
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-success">رصيد: ${batch.remaining_qty}</span>
+                                        <span class="badge bg-info">تكلفة: ${batch.unit_cost}</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    ${stockBadge}
-                                    <span class="badge bg-info">تكلفة: ${stock.cost.toFixed(2)}</span>
-                                    <span class="badge bg-primary">بيع: ${stock.sell.toFixed(2)}</span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }
-            });
+                            </button>
+                        `;
+                    });
+                    html += '</div>';
 
-            if (html) {
-                popup.innerHTML = html;
-                popup.style.display = 'block';
-            } else {
-                popup.innerHTML = '<div class="list-group-item text-muted">لا توجد نتائج</div>';
-                popup.style.display = 'block';
-            }
+                    // Simple alert for now - can be replaced with a modal
+                    const selected = prompt('اختر تاريخ الصلاحية (أدخل رقم):\n' + 
+                        batches.map((b, i) => `${i+1}. ${b.exp_date} (رصيد: ${b.remaining_qty})`).join('\n'));
+
+                    if (selected && batches[selected-1]) {
+                        const batch = batches[selected-1];
+                        selectBatchForRow(index, batch.id, batch.exp_date, batch.remaining_qty, batch.unit_cost, batch.sell_price);
+                    }
+                });
         }
 
-        function selectProduct(counter, productId, productName, stockQty, cost, sell, unitId) {
-            document.getElementById(`productSearch_${counter}`).value = productName;
-            document.getElementById(`productId_${counter}`).value = productId;
-            document.getElementById(`cost_${counter}`).value = cost.toFixed(2);
-            document.getElementById(`sell_${counter}`).value = sell.toFixed(2);
-            document.getElementById(`unitId_${counter}`).value = unitId || '';
+        function selectBatchForRow(index, batchId, expDate, qty, cost, sell) {
+            document.getElementById('batchId_' + index).value = batchId;
+            document.getElementById('cost_' + index).value = cost;
+            document.getElementById('sell_' + index).value = sell;
+            document.getElementById('maxQty_' + index).value = qty;
 
-            const stockInfo = document.getElementById(`stockInfo_${counter}`);
-            if (stockQty > 0) {
-                stockInfo.innerHTML = `<span class="badge bg-success">الرصيد المتاح: ${stockQty}</span> <span class="badge bg-info">التكلفة: ${cost.toFixed(2)}</span> <span class="badge bg-primary">البيع: ${sell.toFixed(2)}</span>`;
-                document.getElementById(`qty_${counter}`).max = stockQty;
-            } else {
-                stockInfo.innerHTML = `<span class="badge bg-danger">نفذ الرصيد في المخزن المصدر</span>`;
-                document.getElementById(`qty_${counter}`).disabled = true;
-            }
+            document.getElementById('batchInfo_' + index).classList.remove('d-none');
+            document.getElementById('expDate_' + index).textContent = expDate;
+            document.getElementById('batchQty_' + index).textContent = 'رصيد: ' + qty;
 
-            document.getElementById(`productPopup_${counter}`).style.display = 'none';
-
-            // Focus on quantity field
-            document.getElementById(`qty_${counter}`).focus();
+            calculateItemTotal(index);
         }
 
-        function calculateItemTotal(counter) {
-            const qty = parseFloat(document.getElementById(`qty_${counter}`).value) || 0;
-            const cost = parseFloat(document.getElementById(`cost_${counter}`).value) || 0;
+        function validateItemQty(index) {
+            const qty = parseFloat(document.getElementById('qty_' + index).value) || 0;
+            const maxQty = parseFloat(document.getElementById('maxQty_' + index).value) || 0;
+            const productName = document.getElementById('productSearch_' + index).value;
+
+            if (maxQty > 0 && qty > maxQty) {
+                const fromStoreId = document.getElementById('fromStore').value;
+                const productId = document.getElementById('productId_' + index).value;
+
+                // Check if there are other batches
+                fetch(`../../../api/get-product-batches.php?product_id=${productId}&store_id=${fromStoreId}`)
+                    .then(r => r.json())
+                    .then(batches => {
+                        const currentBatchId = document.getElementById('batchId_' + index).value;
+                        const otherBatches = batches.filter(b => b.id != currentBatchId && b.remaining_qty > 0);
+
+                        if (otherBatches.length > 0) {
+                            const nextBatch = otherBatches[0];
+                            const remainingNeeded = qty - maxQty;
+
+                            if (confirm(`الرصيد المتاح من التاريخ المختار هو ${maxQty} فقط.\n\n` +
+                                       `عايز تكمل ${remainingNeeded} من تاريخ ${nextBatch.exp_date} (رصيد: ${nextBatch.remaining_qty})؟`)) {
+                                // Set current row to max qty
+                                document.getElementById('qty_' + index).value = maxQty;
+                                calculateItemTotal(index);
+
+                                // Add new row with remaining qty and next batch
+                                addItemRow();
+                                const newIndex = itemCounter;
+
+                                // Copy product data
+                                document.getElementById('productId_' + newIndex).value = productId;
+                                document.getElementById('productSearch_' + newIndex).value = productName;
+                                document.getElementById('batchId_' + newIndex).value = nextBatch.id;
+                                document.getElementById('cost_' + newIndex).value = nextBatch.unit_cost;
+                                document.getElementById('sell_' + newIndex).value = nextBatch.sell_price;
+                                document.getElementById('maxQty_' + newIndex).value = nextBatch.remaining_qty;
+                                document.getElementById('qty_' + newIndex).value = remainingNeeded;
+
+                                document.getElementById('batchInfo_' + newIndex).classList.remove('d-none');
+                                document.getElementById('expDate_' + newIndex).textContent = nextBatch.exp_date;
+                                document.getElementById('batchQty_' + newIndex).textContent = 'رصيد: ' + nextBatch.remaining_qty;
+
+                                calculateItemTotal(newIndex);
+                                updateTotals();
+                            } else {
+                                document.getElementById('qty_' + index).value = maxQty;
+                                calculateItemTotal(index);
+                            }
+                        } else {
+                            alert(`الرصيد المتاح هو ${maxQty} فقط.\nلا يوجد رصيد آخر متاح.`);
+                            document.getElementById('qty_' + index).value = maxQty;
+                            calculateItemTotal(index);
+                        }
+                    });
+
+                return false;
+            }
+            return true;
+        }
+
+        function removeItemRow(id) {
+            document.getElementById('itemRow_' + id).remove();
+            updateTotals();
+        }
+
+        function calculateItemTotal(index) {
+            const qty = parseFloat(document.getElementById('qty_' + index).value) || 0;
+            const cost = parseFloat(document.getElementById('cost_' + index).value) || 0;
             const total = qty * cost;
-            document.getElementById(`total_${counter}`).value = total.toFixed(2);
+            document.getElementById('total_' + index).value = total.toFixed(2);
         }
 
         function updateTotals() {
@@ -637,25 +781,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             document.getElementById('totalSell').textContent = totalSell.toFixed(2);
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML.replace(/'/g, "\'");
-        }
-
         function updateProductStock() {
             // Clear all items when store changes
             document.getElementById('itemsContainer').innerHTML = '';
             itemCounter = 0;
             updateTotals();
         }
-
-        // Close popup when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.product-search-container')) {
-                document.querySelectorAll('.search-popup').forEach(p => p.style.display = 'none');
-            }
-        });
 
         // Form validation
         document.getElementById('transferForm').addEventListener('submit', function(e) {

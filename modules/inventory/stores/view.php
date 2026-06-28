@@ -32,16 +32,18 @@ $children = $db->prepare("SELECT * FROM stores WHERE parent_store_id = ? AND is_
 $children->execute([$store_id]);
 $children = $children->fetchAll();
 
-// Get inventory items in this store
+// Get inventory items in this store - FIXED: use ii.unit_cost not p.cost_price
 $page = max(1, intval($_GET['page'] ?? 1));
 $per_page = 20;
 $offset = ($page - 1) * $per_page;
 
 $items_sql = "SELECT 
-    ii.*, p.product_name, p.product_code, p.manual_code, p.sell_price, p.cost_price,
-    (ii.quantity * p.cost_price) as stock_value
+    ii.*, p.product_name, p.product_code, p.manual_code, p.sell_price,
+    b.exp_date, b.batch_number,
+    (ii.quantity * ii.unit_cost) as stock_value
 FROM inventory_items ii
 JOIN products p ON ii.product_id = p.id
+LEFT JOIN inventory_batches b ON ii.batch_id = b.id
 WHERE ii.store_id = ? AND ii.is_active = 1
 ORDER BY p.product_name
 LIMIT {$per_page} OFFSET {$offset}";
@@ -56,7 +58,7 @@ $count_stmt->execute([$store_id]);
 $total_items = $count_stmt->fetch()['total'];
 $total_pages = ceil($total_items / $per_page);
 
-// Get stock summary
+// Get stock summary - FIXED: use ii.unit_cost
 $summary = $db->prepare("
     SELECT 
         COUNT(DISTINCT product_id) as products_count,
@@ -109,12 +111,16 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         .nav-tabs .nav-link { border: none; color: #666; font-weight: 500; padding: 12px 20px; }
         .nav-tabs .nav-link.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: transparent; }
         .child-store { border-left: 3px solid var(--primary); padding: 10px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px; }
+        .exp-badge { font-size: 0.75rem; }
+        .exp-soon { background: #fff3cd; color: #856404; }
+        .exp-ok { background: #d4edda; color: #155724; }
+        .exp-danger { background: #f8d7da; color: #721c24; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
-<body>
+<body style="margin: 0; padding: 0;">
     <?= $sidebar ?? '' ?>
-    <div class="main-content">
+    <div class="main-content" style="margin-right: 260px; padding: 20px; min-height: 100vh;">
         <div class="container-fluid">
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -218,11 +224,21 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                             <th>تكلفة الوحدة</th>
                                             <th>سعر البيع</th>
                                             <th>قيمة المخزون</th>
+                                            <th>تاريخ الصلاحية</th>
                                             <th>الحد الأدنى</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($items as $item): ?>
+                                        <?php foreach ($items as $item): 
+                                            $exp_class = 'exp-ok';
+                                            if ($item['exp_date']) {
+                                                $exp_date = strtotime($item['exp_date']);
+                                                $now = time();
+                                                $diff_days = ($exp_date - $now) / 86400;
+                                                if ($diff_days < 0) $exp_class = 'exp-danger';
+                                                elseif ($diff_days < 90) $exp_class = 'exp-soon';
+                                            }
+                                        ?>
                                         <tr>
                                             <td><?= $item['id'] ?></td>
                                             <td><code><?= htmlspecialchars($item['product_code'] ?? $item['manual_code'] ?? 'N/A') ?></code></td>
@@ -231,6 +247,16 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                             <td><?= number_format($item['unit_cost'], 2) ?> ج</td>
                                             <td><?= number_format($item['sell_price'], 2) ?> ج</td>
                                             <td><?= number_format($item['stock_value'], 2) ?> ج</td>
+                                            <td>
+                                                <?php if ($item['exp_date']): ?>
+                                                    <span class="badge <?= $exp_class ?> exp-badge">
+                                                        <?= $item['exp_date'] ?> 
+                                                        <?php if ($item['batch_number']): ?>(<?= $item['batch_number'] ?>)<?php endif; ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-light text-dark">-</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td>
                                                 <?php if ($item['quantity'] <= $item['reorder_point']): ?>
                                                     <span class="badge bg-danger"><?= number_format($item['reorder_point'], 3) ?> ⚠️</span>
@@ -243,7 +269,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 
                                         <?php if (empty($items)): ?>
                                         <tr>
-                                            <td colspan="8" class="text-center py-5">
+                                            <td colspan="9" class="text-center py-5">
                                                 <i class="bi bi-box" style="font-size: 48px; color: #ddd;"></i>
                                                 <h5 class="mt-3 text-muted">لا توجد أصناف في هذا المخزن</h5>
                                             </td>
