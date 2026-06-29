@@ -6,61 +6,48 @@ requireAuth();
 $db = getDB();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header("Location: index.php");
+    header('Location: index.php');
     exit;
 }
 
 try {
     $db->beginTransaction();
+    
     $store_id = intval($_POST['store_id'] ?? 0);
-    $user_id = $_SESSION['user_id'] ?? 1;
-
-    foreach ($_POST['items'] as $item) {
-        $inv_id = intval($item['inv_id'] ?? 0);
-        $product_id = intval($item['product_id'] ?? 0);
-        $batch_id = !empty($item['batch_id']) ? intval($item['batch_id']) : null;
-        
-        $new_cost = floatval($item['new_cost'] ?? 0);
-        $new_sell = floatval($item['new_sell'] ?? 0);
-        $discount = floatval($item['discount'] ?? 0);
-        $vat = floatval($item['vat'] ?? 0);
-
-        // Get old values
-        $old = $db->prepare("SELECT * FROM inventory_items WHERE id = ?");
-        $old->execute([$inv_id]);
-        $old_data = $old->fetch();
-
-        if (!$old_data) continue;
-
-        // Log adjustment
-        $db->prepare("
-            INSERT INTO stock_price_adjustments 
-            (adjustment_code, store_id, product_id, batch_id, old_cost_price, new_cost_price, old_sell_price, new_sell_price, old_discount, new_discount, old_vat, new_vat, created_by, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-        ")->execute([
-            'PRICE-' . time() . '-' . $inv_id,
-            $store_id, $product_id, $batch_id,
-            $old_data['unit_cost'], $new_cost,
-            $old_data['sell_price'], $new_sell,
-            $old_data['discount_percent'] ?? 0, $discount,
-            $old_data['vat_percent'] ?? 0, $vat,
-            $user_id
-        ]);
-
-        // Update inventory
-        $db->prepare("
-            UPDATE inventory_items 
-            SET unit_cost = ?, sell_price = ?, discount_percent = ?, vat_percent = ?, updated_at = NOW()
-            WHERE id = ?
-        ")->execute([$new_cost, $new_sell, $discount, $vat, $inv_id]);
+    $selected = $_POST['selected'] ?? [];
+    $costs = $_POST['cost'] ?? [];
+    $sells = $_POST['sell'] ?? [];
+    $discounts = $_POST['discount'] ?? [];
+    $vats = $_POST['vat'] ?? [];
+    
+    if ($store_id <= 0 || empty($selected)) {
+        throw new Exception('يجب اختيار صنف واحد على الأقل');
     }
-
+    
+    $updated = 0;
+    $stmt = $db->prepare("
+        UPDATE inventory_items 
+        SET unit_cost = ?, sell_price = ?, discount_percent = ?, vat_percent = ?, updated_at = NOW()
+        WHERE id = ? AND store_id = ?
+    ");
+    
+    foreach ($selected as $item_id) {
+        $cost = isset($costs[$item_id]) ? floatval($costs[$item_id]) : null;
+        $sell = isset($sells[$item_id]) ? floatval($sells[$item_id]) : null;
+        $discount = isset($discounts[$item_id]) ? floatval($discounts[$item_id]) : 0;
+        $vat = isset($vats[$item_id]) ? floatval($vats[$item_id]) : 0;
+        
+        $stmt->execute([$cost, $sell, $discount, $vat, $item_id, $store_id]);
+        $updated++;
+    }
+    
     $db->commit();
-    header("Location: index.php?store_id={$store_id}&success=1");
+    
+    header("Location: index.php?branch=" . intval($_POST['branch'] ?? 0) . "&store=$store_id&success=1");
     exit;
-
+    
 } catch (Exception $e) {
     if ($db->inTransaction()) $db->rollBack();
-    header("Location: index.php?store_id={$store_id}&error=" . urlencode($e->getMessage()));
+    header("Location: index.php?error=" . urlencode($e->getMessage()));
     exit;
 }
