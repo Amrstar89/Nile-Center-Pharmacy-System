@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 28, 2026 at 10:09 PM
+-- Generation Time: Jun 30, 2026 at 12:10 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -156,7 +156,11 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (109, 1, 'System Administrator', 'create', 'customers', 31, NULL, '{\"customer_code\":\"31\"}', '26.201.9.238', '2026-06-27 08:00:00'),
 (110, 1, 'System Administrator', 'create', 'suppliers', 17, NULL, '{\"supplier_code\":\"17\"}', '26.201.9.238', '2026-06-27 08:00:00'),
 (111, 1, 'System Administrator', 'create', 'inventory_transfers', 4, NULL, '{\"transfer_code\":\"TR-00004\"}', '26.201.9.238', '2026-06-27 08:00:00'),
-(112, 1, 'System Administrator', 'update', 'stock_adjustments', 3, '{\"status\":\"draft\"}', '{\"status\":\"completed\"}', '26.201.9.238', '2026-06-27 08:00:00');
+(112, 1, 'System Administrator', 'update', 'stock_adjustments', 3, '{\"status\":\"draft\"}', '{\"status\":\"completed\"}', '26.201.9.238', '2026-06-27 08:00:00'),
+(113, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-28 23:58:05'),
+(114, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-29 19:29:48'),
+(115, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-29 19:30:00'),
+(116, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-29 21:44:48');
 
 -- --------------------------------------------------------
 
@@ -917,9 +921,9 @@ CREATE TABLE `inventory_transfers` (
 --
 
 INSERT INTO `inventory_transfers` (`id`, `transfer_code`, `from_store_id`, `to_store_id`, `from_branch_id`, `to_branch_id`, `transfer_type`, `status`, `total_items`, `total_quantity`, `total_cost`, `total_sell`, `notes`, `requested_by`, `approved_by`, `shipped_by`, `received_by`, `requested_at`, `approved_at`, `shipped_at`, `received_at`, `created_at`) VALUES
-(1, 'TR-00001', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 1, 5.000, 0.00, 0.00, NULL, 1, 1, 1, 1, '2026-06-27 21:04:12', '2026-06-27 21:04:35', '2026-06-27 21:04:44', '2026-06-27 21:23:33', '2026-06-27 19:04:12'),
+(1, 'TR-00001', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 1, 5.000, 0.00, 0.00, NULL, 1, 1, 1, 1, '2026-06-27 21:04:12', '2026-06-27 21:04:35', '2026-06-27 21:04:44', '2026-06-29 23:46:43', '2026-06-27 19:04:12'),
 (2, 'TR-00002', 1, 2, NULL, 1, 'central_to_branch', 'received', 2, 350.000, 31200.00, 45500.00, 'تحويل للفرع الرئيسي', 1, 1, 1, 1, '2026-06-23 10:00:00', '2026-06-23 10:30:00', '2026-06-23 11:00:00', '2026-06-23 14:00:00', '2026-06-23 08:00:00'),
-(3, 'TR-00003', 1, 3, NULL, 2, 'central_to_branch', 'shipped', 2, 295.000, 26600.00, 38750.00, 'تحويل لفرع نوال', 1, 1, 1, NULL, '2026-06-24 10:00:00', '2026-06-24 10:30:00', '2026-06-24 11:00:00', NULL, '2026-06-24 08:00:00'),
+(3, 'TR-00003', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 2, 295.000, 26600.00, 38750.00, 'تحويل لفرع نوال', 1, 1, 1, 1, '2026-06-24 10:00:00', '2026-06-24 10:30:00', '2026-06-24 11:00:00', '2026-06-29 23:22:17', '2026-06-24 08:00:00'),
 (4, 'TR-00004', 2, 1, 1, NULL, 'branch_to_central', 'pending', 1, 50.000, 2100.00, 3250.00, 'إرجاع للمخزن الرئيسي', 1, NULL, NULL, NULL, '2026-06-25 10:00:00', NULL, NULL, NULL, '2026-06-25 08:00:00');
 
 -- --------------------------------------------------------
@@ -1726,7 +1730,8 @@ INSERT INTO `stores` (`id`, `store_code`, `store_name`, `store_type`, `branch_id
 (18, 'BR04-PHARM', 'صيدلية فرع صيد', 'pharmacy', 4, 5, 0, 1, 'صيدلية فرع صيد', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
 (19, 'BR04-WH', 'مستودع فرع صيد', 'warehouse', 4, 5, 0, 1, 'مستودع فرع صيد', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
 (20, 'BR04-DMG', 'مخزن التالف فرع صيد', 'damaged', 4, 5, 0, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(21, 'BR04-EXP', 'مخزن الهالك فرع صيد', 'expired', 4, 5, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15');
+(21, 'BR04-EXP', 'مخزن الهالك فرع صيد', 'expired', 4, 5, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
+(22, 'BR02-EXPENSIVE', 'مخزن الغوالي', 'branch_main', 2, 3, 0, 1, NULL, 1, '2026-06-29 21:17:00', '2026-06-29 21:17:00');
 
 -- --------------------------------------------------------
 
@@ -2165,7 +2170,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-28 19:24:44', '2026-06-15 16:53:16', '2026-06-28 17:24:44'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-29 23:44:48', '2026-06-15 16:53:16', '2026-06-29 21:44:48'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -2620,7 +2625,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=113;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=117;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -2716,7 +2721,7 @@ ALTER TABLE `inventory_transactions`
 -- AUTO_INCREMENT for table `inventory_transfers`
 --
 ALTER TABLE `inventory_transfers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `inventory_transfer_items`
@@ -2794,7 +2799,7 @@ ALTER TABLE `shift_handovers`
 -- AUTO_INCREMENT for table `stock_adjustments`
 --
 ALTER TABLE `stock_adjustments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `stock_adjustment_items`
@@ -2806,7 +2811,7 @@ ALTER TABLE `stock_adjustment_items`
 -- AUTO_INCREMENT for table `stores`
 --
 ALTER TABLE `stores`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `store_code_sequences`
