@@ -46,7 +46,7 @@ try {
     if ($query) {
         switch ($type) {
             case 'barcode':
-                $where[] = "(p.barcode = ? OR p.barcode LIKE ?)";
+                $where[] = "(p.manual_code = ? OR p.manual_code LIKE ?)";
                 $params[] = $query;
                 $params[] = "%$query%";
                 break;
@@ -62,16 +62,15 @@ try {
                 $params[] = "%$query%";
                 break;
             case 'company':
-                $where[] = "c.company_name LIKE ?";
+                $where[] = "pco.company_name_ar LIKE ?";
                 $params[] = "%$query%";
                 break;
             case 'name':
             default:
                 // Search in product name (Arabic or English)
-                $where[] = "(p.product_name LIKE ? OR p.product_name_en LIKE ? OR p.barcode = ? OR p.manual_code = ? OR p.product_code = ?)";
+                $where[] = "(p.product_name LIKE ? OR p.product_name_en LIKE ? OR p.manual_code = ? OR p.product_code = ?)";
                 $params[] = "%$query%";
                 $params[] = "%$query%";
-                $params[] = $query;
                 $params[] = $query;
                 $params[] = $query;
                 break;
@@ -103,10 +102,10 @@ try {
     // Build WHERE string
     $where_str = implode(' AND ', $where);
     
-    // Get total count
+    // Get total count (using correct table: product_companies, columns: company_name_ar, category_name_ar)
     $count_sql = "SELECT COUNT(DISTINCT p.id) as total FROM products p 
-        LEFT JOIN companies c ON p.company_id = c.id 
-        LEFT JOIN product_categories pc ON p.category_id = pc.id
+        LEFT JOIN product_companies pco ON p.company_id = pco.id 
+        LEFT JOIN product_categories pca ON p.category_id = pca.id
         WHERE $where_str";
     $count_stmt = $db->prepare($count_sql);
     $count_stmt->execute($params);
@@ -121,23 +120,22 @@ try {
         p.product_name_en,
         p.product_code,
         p.manual_code,
-        p.barcode,
         p.cost_price,
         p.sell_price,
         p.has_expire,
         p.scientific_name,
-        p.unit_id,
+        p.unit1_id,
         u.unit_name_ar,
         p.company_id,
-        c.company_name,
+        pco.company_name_ar,
         p.category_id,
-        pc.category_name,
+        pca.category_name_ar,
         COALESCE(SUM(ii.quantity), 0) as stock_qty,
         MAX(ii.unit_cost) as unit_cost
     FROM products p
-    LEFT JOIN companies c ON p.company_id = c.id
-    LEFT JOIN product_categories pc ON p.category_id = pc.id
-    LEFT JOIN product_units u ON p.unit_id = u.id
+    LEFT JOIN product_companies pco ON p.company_id = pco.id
+    LEFT JOIN product_categories pca ON p.category_id = pca.id
+    LEFT JOIN product_units u ON p.unit1_id = u.id
     LEFT JOIN inventory_items ii ON ii.product_id = p.id AND ii.store_id = ? AND ii.is_active = 1
     WHERE $where_str
     GROUP BY p.id
