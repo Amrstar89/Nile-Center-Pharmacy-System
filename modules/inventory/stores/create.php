@@ -7,51 +7,49 @@ $db = getDB();
 
 $page_title = 'إضافة مخزن جديد';
 
-// Get branches and parent stores for dropdowns
+// Get branches
 $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
 
-$parent_stores = $db->query("
-    SELECT s.id, s.store_name, s.store_type, b.branch_name 
-    FROM stores s 
-    LEFT JOIN branches b ON s.branch_id = b.id 
-    WHERE s.is_active = 1 AND s.store_type IN ('central_main', 'branch_main')
-    ORDER BY s.store_type, s.store_name
-")->fetchAll();
-
-// Store types
-$store_types = [
-    'central_main' => 'مخزن رئيسي مركزي',
-    'branch_main' => 'مخزن رئيسي فرعي',
-    'sub_store' => 'مخزن فرعي',
-    'pharmacy' => 'صيدلية',
-    'warehouse' => 'مستودع',
-    'damaged' => 'مخزن تالف',
-    'expired' => 'مخزن هالك'
-];
+// Generate auto store code
+function generateStoreCode($db, $branch_id, $store_type) {
+    $prefix = $store_type === 'main' ? 'STR' : 'SUB';
+    
+    if ($branch_id) {
+        $branch = $db->prepare("SELECT branch_code FROM branches WHERE id = ?");
+        $branch->execute([$branch_id]);
+        $bc = $branch->fetch();
+        if ($bc && $bc['branch_code']) {
+            $prefix .= '-' . $bc['branch_code'];
+        }
+    }
+    
+    // Get next number for this prefix
+    $check = $db->prepare("SELECT store_code FROM stores WHERE store_code LIKE ? ORDER BY store_code DESC LIMIT 1");
+    $check->execute([$prefix . '-%']);
+    $last = $check->fetch();
+    
+    $nextNum = 1;
+    if ($last) {
+        $parts = explode('-', $last['store_code']);
+        $lastNum = (int) end($parts);
+        $nextNum = $lastNum + 1;
+    }
+    
+    return $prefix . '-' . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
+}
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $errors = [];
 
-        $store_code = trim($_POST['store_code'] ?? '');
         $store_name = trim($_POST['store_name'] ?? '');
         $store_type = $_POST['store_type'] ?? '';
+        $store_category = $_POST['store_category'] ?? '';
         $branch_id = !empty($_POST['branch_id']) ? intval($_POST['branch_id']) : null;
-        $parent_store_id = !empty($_POST['parent_store_id']) ? intval($_POST['parent_store_id']) : null;
-        $is_main = isset($_POST['is_main']) ? 1 : 0;
         $notes = trim($_POST['notes'] ?? '');
 
-        if (empty($store_code)) {
-            $errors[] = 'كود المخزن مطلوب';
-        } else {
-            $stmt = $db->prepare("SELECT id FROM stores WHERE store_code = ?");
-            $stmt->execute([$store_code]);
-            if ($stmt->fetch()) {
-                $errors[] = 'كود المخزن موجود بالفعل';
-            }
-        }
-
+        // Validation
         if (empty($store_name)) {
             $errors[] = 'اسم المخزن مطلوب';
         }
@@ -60,19 +58,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'نوع المخزن مطلوب';
         }
 
-        // Validation: central_main must not have branch_id
-        if ($store_type === 'central_main' && $branch_id) {
-            $errors[] = 'المخزن الرئيسي المركزي لا يتبع لفرع';
+        if (empty($store_category)) {
+            $errors[] = 'تصنيف المخزن مطلوب';
         }
 
-        // Validation: branch_main must have branch_id
-        if ($store_type === 'branch_main' && !$branch_id) {
-            $errors[] = 'المخزن الرئيسي الفرعي يجب أن يتبع لفرع';
-        }
-
-        // Validation: sub stores must have parent
-        if (in_array($store_type, ['sub_store', 'pharmacy', 'warehouse', 'damaged', 'expired']) && !$parent_store_id) {
-            $errors[] = 'المخزن الفرعي يجب أن يكون تابع لمخزن رئيسي';
+        // Auto generate store code
+        $store_code = generateStoreCode($db, $branch_id, $store_type);
+        
+        // Check uniqueness (just in case)
+        $stmt = $db->prepare("SELECT id FROM stores WHERE store_code = ?");
+        $stmt->execute([$store_code]);
+        if ($stmt->fetch()) {
+            // If duplicate, add random suffix and retry once
+            $store_code .= '-' . date('His');
         }
 
         if (!empty($errors)) {
@@ -80,16 +78,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $stmt = $db->prepare("
-            INSERT INTO stores (store_code, store_name, store_type, branch_id, parent_store_id, is_main, is_active, notes, created_by, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, NOW())
+            INSERT INTO stores (store_code, store_name, store_type, store_category, branch_id, is_main_store, is_active, notes, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?, NOW())
         ");
         $stmt->execute([
             $store_code,
             $store_name,
             $store_type,
+            $store_category,
             $branch_id,
-            $parent_store_id,
-            $is_main,
             $notes ?: null,
             $_SESSION['user_id'] ?? 1
         ]);
@@ -101,6 +98,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = $e->getMessage();
     }
 }
+
+// Store categories based on type
+$main_categories = [
+    ['value' => 'main_store', 'label' => 'المخزن الرئيسي', 'icon' => 'bi-building', 'desc' => 'المخزن الأساسي للفرع']
+];
+
+$sub_categories = [
+    ['value' => 'warehouse', 'label' => 'مستودع', 'icon' => 'bi-box-seam', 'desc' => 'مخزن للإمداد والتخزين'],
+    ['value' => 'expired', 'label' => 'منتهي الصلاحية', 'icon' => 'bi-calendar-x', 'desc' => 'مخزن للأصناف منتهية الصلاحية'],
+    ['value' => 'damaged', 'label' => 'بضاعة تالفة', 'icon' => 'bi-trash', 'desc' => 'مخزن للأصناف التالفة'],
+    ['value' => 'surplus', 'label' => 'مخزون فائض', 'icon' => 'bi-stack', 'desc' => 'مخزن للمخزون الزائد'],
+    ['value' => 'cold', 'label' => 'ثلاجة أدوية', 'icon' => 'bi-thermometer-low', 'desc' => 'مخزن مبرد للأدوية الحساسة'],
+    ['value' => 'narcotics', 'label' => 'مخدرات ومؤثرات', 'icon' => 'bi-shield-lock', 'desc' => 'مخزن آمن للمخدرات'],
+    ['value' => 'cosmetics', 'label' => 'مستحضرات تجميل', 'icon' => 'bi-magic', 'desc' => 'مخزن لمستحضرات التجميل'],
+    ['value' => 'medical_supply', 'label' => 'مستلزمات طبية', 'icon' => 'bi-bandaid', 'desc' => 'مخزن للمستلزمات الطبية']
+];
 
 require_once __DIR__ . '/../../../includes/sidebar.php';
 ?>
@@ -119,13 +132,39 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         .main-content { margin-right: 260px; padding: 20px; }
         .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
         .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); border: none; }
-        .section-title { color: var(--primary); font-weight: 700; border-right: 4px solid var(--primary); padding-right: 10px; margin-bottom: 20px; }
+        .section-title { color: var(--primary); font-weight: 700; border-right: 4px solid var(--primary); padding-right: 10px; margin: 25px 0 20px; }
         .form-label { font-weight: 600; color: #555; }
-        .store-type-card { cursor: pointer; transition: all 0.3s; border: 2px solid #e9ecef; border-radius: 10px; padding: 15px; text-align: center; }
-        .store-type-card:hover { border-color: var(--primary); transform: translateY(-2px); }
-        .store-type-card.selected { border-color: var(--primary); background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%); }
-        .store-type-card i { font-size: 24px; margin-bottom: 8px; color: var(--primary); }
-        .store-type-card h6 { font-size: 14px; margin: 0; }
+        
+        /* Store Type Cards */
+        .type-card { cursor: pointer; transition: all 0.3s; border: 2px solid #e9ecef; border-radius: 12px; padding: 25px 15px; text-align: center; height: 100%; }
+        .type-card:hover { border-color: var(--primary); transform: translateY(-3px); box-shadow: 0 5px 15px rgba(102,126,234,0.2); }
+        .type-card.selected { border-color: var(--primary); background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%); }
+        .type-card i { font-size: 32px; margin-bottom: 10px; }
+        .type-card h5 { font-size: 16px; margin: 0 0 5px; }
+        .type-card p { font-size: 12px; color: #888; margin: 0; }
+        .type-card.main-type i { color: var(--primary); }
+        .type-card.sub-type i { color: var(--secondary); }
+        
+        /* Category Cards */
+        .cat-card { cursor: pointer; transition: all 0.3s; border: 2px solid #e9ecef; border-radius: 10px; padding: 18px 12px; text-align: center; height: 100%; }
+        .cat-card:hover { border-color: var(--secondary); transform: translateY(-2px); }
+        .cat-card.selected { border-color: var(--secondary); background: linear-gradient(135deg, rgba(118,75,162,0.1) 0%, rgba(102,126,234,0.1) 100%); }
+        .cat-card i { font-size: 24px; margin-bottom: 8px; color: var(--secondary); }
+        .cat-card h6 { font-size: 13px; margin: 0 0 3px; }
+        .cat-card p { font-size: 11px; color: #999; margin: 0; }
+        .cat-card.disabled { opacity: 0.4; pointer-events: none; }
+        
+        .auto-code-badge { 
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); 
+            color: #2e7d32; 
+            padding: 10px 15px; 
+            border-radius: 10px; 
+            font-size: 14px; 
+            font-weight: 600;
+            border: 1px dashed #81c784;
+        }
+        .auto-code-badge i { margin-left: 5px; }
+        
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -139,108 +178,129 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             </div>
 
             <?php if (isset($error) && $error): ?>
-                <div class="alert alert-danger"><?= $error ?></div>
+                <div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill"></i> <?= $error ?></div>
             <?php endif; ?>
 
             <form method="POST" action="" id="storeForm">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="section-title">معلومات المخزن الأساسية</h5>
-
+                        
+                        <!-- Store Name -->
+                        <h5 class="section-title">اسم المخزن</h5>
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">كود المخزن <span class="text-danger">*</span></label>
-                                    <input type="text" name="store_code" class="form-control" required placeholder="مثال: BR01-PHARM" value="<?= isset($_POST['store_code']) ? htmlspecialchars($_POST['store_code']) : '' ?>">
-                                    <div class="form-text">كود فريد يعرف المخزن (مثال: CENT-01, BR01-MAIN)</div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
+                            <div class="col-md-8">
                                 <div class="mb-3">
                                     <label class="form-label">اسم المخزن <span class="text-danger">*</span></label>
-                                    <input type="text" name="store_name" class="form-control" required placeholder="اسم المخزن" value="<?= isset($_POST['store_name']) ? htmlspecialchars($_POST['store_name']) : '' ?>">
+                                    <input type="text" name="store_name" class="form-control form-control-lg" required 
+                                           placeholder="مثال: مخزن المستورد، مخزن الأدوية الباردة..." 
+                                           value="<?= isset($_POST['store_name']) ? htmlspecialchars($_POST['store_name']) : '' ?>">
+                                    <div class="form-text text-muted">اسم وصفي يعبر عن غرض المخزن</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">كود المخزن</label>
+                                    <div class="auto-code-badge">
+                                        <i class="bi bi-magic"></i> توليد تلقائي
+                                    </div>
+                                    <div class="form-text text-muted">يتم توليد الكود تلقائياً حسب الفرع والنوع</div>
                                 </div>
                             </div>
                         </div>
 
-                        <h5 class="section-title mt-4">نوع المخزن</h5>
-                        <div class="row">
-                            <?php foreach ($store_types as $key => $label): ?>
-                            <?php
-                                $icon = match($key) {
-                                    'central_main' => 'bi-building',
-                                    'branch_main' => 'bi-shop',
-                                    'sub_store' => 'bi-box',
-                                    'pharmacy' => 'bi-capsule',
-                                    'warehouse' => 'bi-box-seam',
-                                    'damaged' => 'bi-trash',
-                                    'expired' => 'bi-exclamation-triangle',
-                                    default => 'bi-building'
-                                };
-                            ?>
-                            <div class="col-md-3 mb-3">
-                                <div class="store-type-card <?= (isset($_POST['store_type']) && $_POST['store_type'] === $key) ? 'selected' : '' ?>" onclick="selectType('<?= $key ?>')">
-                                    <i class="bi <?= $icon ?>"></i>
-                                    <h6><?= $label ?></h6>
-                                    <input type="radio" name="store_type" value="<?= $key ?>" class="d-none" <?= (isset($_POST['store_type']) && $_POST['store_type'] === $key) ? 'checked' : '' ?>>
+                        <!-- Store Type -->
+                        <h5 class="section-title">نوع المخزن</h5>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="type-card main-type <?= (isset($_POST['store_type']) && $_POST['store_type'] === 'main') ? 'selected' : '' ?>" 
+                                     onclick="selectType('main')">
+                                    <input type="radio" name="store_type" value="main" class="d-none" 
+                                           <?= (isset($_POST['store_type']) && $_POST['store_type'] === 'main') ? 'checked' : '' ?>>
+                                    <i class="bi bi-building"></i>
+                                    <h5>مخزن رئيسي</h5>
+                                    <p>المخزن الأساسي للفرع - يتم إنشاؤه أولاً</p>
+                                    <span class="badge bg-primary">أول مخزن في الفرع</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="type-card sub-type <?= (!isset($_POST['store_type']) || $_POST['store_type'] === 'sub') ? 'selected' : '' ?>" 
+                                     onclick="selectType('sub')">
+                                    <input type="radio" name="store_type" value="sub" class="d-none" 
+                                           <?= (!isset($_POST['store_type']) || $_POST['store_type'] === 'sub') ? 'checked' : '' ?>>
+                                    <i class="bi bi-boxes"></i>
+                                    <h5>مخزن فرعي</h5>
+                                    <p>مخزن إضافي تابع للمخزن الرئيسي</p>
+                                    <span class="badge bg-secondary">يمكن إضافة أكثر من واحد</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Store Category -->
+                        <h5 class="section-title">تصنيف المخزن</h5>
+                        <div class="row g-3" id="categoryContainer">
+                            <?php foreach ($sub_categories as $cat): ?>
+                            <div class="col-md-3">
+                                <div class="cat-card <?= (isset($_POST['store_category']) && $_POST['store_category'] === $cat['value']) ? 'selected' : '' ?>" 
+                                     onclick="selectCategory('<?= $cat['value'] ?>')"
+                                     data-main="0">
+                                    <input type="radio" name="store_category" value="<?= $cat['value'] ?>" class="d-none"
+                                           <?= (isset($_POST['store_category']) && $_POST['store_category'] === $cat['value']) ? 'checked' : '' ?>>
+                                    <i class="bi <?= $cat['icon'] ?>"></i>
+                                    <h6><?= $cat['label'] ?></h6>
+                                    <p><?= $cat['desc'] ?></p>
                                 </div>
                             </div>
                             <?php endforeach; ?>
+                            
+                            <!-- Main store category (hidden by default) -->
+                            <div class="col-md-3 d-none" id="mainCatCard">
+                                <div class="cat-card <?= (isset($_POST['store_category']) && $_POST['store_category'] === 'main_store') ? 'selected' : '' ?>"
+                                     onclick="selectCategory('main_store')"
+                                     data-main="1">
+                                    <input type="radio" name="store_category" value="main_store" class="d-none"
+                                           <?= (isset($_POST['store_category']) && $_POST['store_category'] === 'main_store') ? 'checked' : '' ?>>
+                                    <i class="bi bi-building"></i>
+                                    <h6>المخزن الرئيسي</h6>
+                                    <p>المخزن الأساسي للفرع</p>
+                                </div>
+                            </div>
                         </div>
 
-                        <h5 class="section-title mt-4">الهيكل التنظيمي</h5>
+                        <!-- Branch -->
+                        <h5 class="section-title">الفرع التابع</h5>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">الفرع التابع</label>
-                                    <select name="branch_id" id="branch_id" class="form-select" onchange="updateParentStores()">
-                                        <option value="">-- غير تابع لفرع (مركزي) --</option>
+                                    <label class="form-label">الفرع <span class="text-danger">*</span></label>
+                                    <select name="branch_id" id="branch_id" class="form-select form-select-lg" required>
+                                        <option value="">-- اختر الفرع --</option>
                                         <?php foreach ($branches as $branch): ?>
-                                            <option value="<?= $branch['id'] ?>" <?= (isset($_POST['branch_id']) && $_POST['branch_id'] == $branch['id']) ? 'selected' : '' ?>><?= htmlspecialchars($branch['branch_name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <div class="form-text">اتركه فارغاً للمخازن المركزية</div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">المخزن الأب</label>
-                                    <select name="parent_store_id" id="parent_store_id" class="form-select">
-                                        <option value="">-- بدون مخزن أب --</option>
-                                        <?php foreach ($parent_stores as $parent): ?>
-                                            <option value="<?= $parent['id'] ?>" data-branch="<?= $parent['branch_id'] ?? '' ?>" <?= (isset($_POST['parent_store_id']) && $_POST['parent_store_id'] == $parent['id']) ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($parent['store_name']) ?> <?= $parent['branch_name'] ? '(' . htmlspecialchars($parent['branch_name']) . ')' : '' ?>
+                                            <option value="<?= $branch['id'] ?>" <?= (isset($_POST['branch_id']) && $_POST['branch_id'] == $branch['id']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($branch['branch_name']) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <div class="form-text">المخزن الرئيسي الذي يتبع له هذا المخزن</div>
+                                    <div class="form-text text-muted">كل مخزن يتبع لفرع معين</div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-12">
-                                <div class="form-check form-switch mb-3">
-                                    <input type="checkbox" name="is_main" value="1" class="form-check-input" id="is_main" <?= isset($_POST['is_main']) ? 'checked' : '' ?>>
-                                    <label class="form-check-label" for="is_main">هذا هو المخزن الرئيسي للفرع/الشركة</label>
-                                </div>
-                            </div>
-                        </div>
-
+                        <!-- Notes -->
+                        <h5 class="section-title">ملاحظات</h5>
                         <div class="row">
                             <div class="col-md-12">
                                 <div class="mb-3">
-                                    <label class="form-label">ملاحظات</label>
-                                    <textarea name="notes" class="form-control" rows="3" placeholder="ملاحظات عن المخزن..."><?= isset($_POST['notes']) ? htmlspecialchars($_POST['notes']) : '' ?></textarea>
+                                    <textarea name="notes" class="form-control" rows="3" placeholder="ملاحظات إضافية عن المخزن..."><?= isset($_POST['notes']) ? htmlspecialchars($_POST['notes']) : '' ?></textarea>
                                 </div>
                             </div>
                         </div>
+
                     </div>
-                    <div class="card-footer">
+                    <div class="card-footer bg-white d-flex justify-content-between">
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="bi bi-save"></i> حفظ المخزن
                         </button>
-                        <a href="index.php" class="btn btn-secondary btn-lg">
+                        <a href="index.php" class="btn btn-outline-secondary btn-lg">
                             <i class="bi bi-x-lg"></i> إلغاء
                         </a>
                     </div>
@@ -252,35 +312,61 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function selectType(type) {
-            document.querySelectorAll('.store-type-card').forEach(card => card.classList.remove('selected'));
+            document.querySelectorAll('.type-card').forEach(card => card.classList.remove('selected'));
             event.currentTarget.classList.add('selected');
             event.currentTarget.querySelector('input[type="radio"]').checked = true;
-
-            // Auto-set branch requirements
-            const branchSelect = document.getElementById('branch_id');
-            if (type === 'central_main') {
-                branchSelect.value = '';
-                branchSelect.disabled = true;
+            
+            // Toggle categories visibility
+            const isMain = (type === 'main');
+            const subCats = document.querySelectorAll('.cat-card[data-main="0"]');
+            const mainCatCard = document.getElementById('mainCatCard');
+            
+            subCats.forEach(card => {
+                card.closest('.col-md-3').classList.toggle('d-none', isMain);
+                if (isMain) card.classList.remove('selected');
+            });
+            
+            mainCatCard.classList.toggle('d-none', !isMain);
+            if (isMain) {
+                // Auto-select main_store category
+                setTimeout(() => {
+                    const mainCard = mainCatCard.querySelector('.cat-card');
+                    mainCard.click();
+                }, 50);
             } else {
-                branchSelect.disabled = false;
+                document.querySelectorAll('.cat-card').forEach(c => c.classList.remove('selected'));
+                document.querySelectorAll('input[name="store_category"]').forEach(r => r.checked = false);
             }
         }
-
-        function updateParentStores() {
-            const branchId = document.getElementById('branch_id').value;
-            const parentSelect = document.getElementById('parent_store_id');
-            const options = parentSelect.querySelectorAll('option[data-branch]');
-
-            options.forEach(opt => {
-                if (!opt.value) return;
-                const optBranch = opt.getAttribute('data-branch');
-                if (!branchId || optBranch === branchId || optBranch === '') {
-                    opt.style.display = '';
-                } else {
-                    opt.style.display = 'none';
-                }
-            });
+        
+        function selectCategory(value) {
+            document.querySelectorAll('.cat-card').forEach(card => card.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+            event.currentTarget.querySelector('input[type="radio"]').checked = true;
         }
+        
+        // Form validation
+        document.getElementById('storeForm').addEventListener('submit', function(e) {
+            const storeType = document.querySelector('input[name="store_type"]:checked');
+            const storeCategory = document.querySelector('input[name="store_category"]:checked');
+            const branchId = document.getElementById('branch_id').value;
+            
+            if (!storeType) {
+                e.preventDefault();
+                alert('يرجى اختيار نوع المخزن');
+                return false;
+            }
+            if (!branchId) {
+                e.preventDefault();
+                alert('يرجى اختيار الفرع');
+                return false;
+            }
+            if (!storeCategory) {
+                e.preventDefault();
+                alert('يرجى اختيار تصنيف المخزن');
+                return false;
+            }
+        });
     </script>
 </body>
 </html>

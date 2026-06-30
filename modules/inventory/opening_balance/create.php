@@ -10,14 +10,12 @@ $page_title = 'إضافة رصيد افتتاحي';
 $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
 
 $stores = $db->query("
-    SELECT s.*, b.branch_name 
+    SELECT s.*, b.branch_name, b.id as branch_id_real
     FROM stores s 
     LEFT JOIN branches b ON s.branch_id = b.id 
     WHERE s.is_active = 1 
     ORDER BY b.branch_name, s.store_name
 ")->fetchAll();
-
-$units = $db->query("SELECT id, unit_name_ar FROM product_units WHERE is_active = 1")->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -37,44 +35,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($item['product_id']) || empty($item['quantity']) || $item['quantity'] <= 0) continue;
 
             $product_id = intval($item['product_id']);
-            $batch_id = !empty($item['batch_id']) ? intval($item['batch_id']) : null;
             $quantity = floatval($item['quantity']);
             $unit_cost = floatval($item['unit_cost'] ?? 0);
             $sell_price = floatval($item['sell_price'] ?? 0);
             $discount = floatval($item['discount_percent'] ?? 0);
             $vat = floatval($item['vat_percent'] ?? 0);
+            $exp_date = !empty($item['exp_date']) ? $item['exp_date'] : null;
             $total_cost = $quantity * $unit_cost;
 
+            // Insert opening balance transaction
             $db->prepare("
                 INSERT INTO inventory_transactions 
-                (transaction_type, reference_type, store_id, product_id, batch_id, quantity, quantity_base, unit_cost, unit_price, discount_percent, vat_percent, total_cost, notes, created_by, created_at)
-                VALUES ('opening_balance', 'opening_balance', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                (transaction_type, reference_type, store_id, product_id, quantity, quantity_base, 
+                 unit_cost, unit_price, discount_percent, vat_percent, total_cost, notes, created_by, created_at)
+                VALUES ('opening_balance', 'opening_balance', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ")->execute([
-                $store_id, $product_id, $batch_id, $quantity, $quantity,
+                $store_id, $product_id, $quantity, $quantity,
                 $unit_cost, $sell_price, $discount, $vat, $total_cost,
                 'رصيد افتتاحي', $user_id
             ]);
 
-            $existing = $db->prepare("SELECT id FROM inventory_items WHERE store_id = ? AND product_id = ? AND (batch_id = ? OR (batch_id IS NULL AND ? IS NULL))");
-            $existing->execute([$store_id, $product_id, $batch_id, $batch_id]);
+            // Update or insert inventory item
+            $existing = $db->prepare("
+                SELECT id, quantity FROM inventory_items 
+                WHERE store_id = ? AND product_id = ?
+            ");
+            $existing->execute([$store_id, $product_id]);
+            $ex = $existing->fetch();
 
-            if ($existing->fetch()) {
+            if ($ex) {
                 $db->prepare("
                     UPDATE inventory_items 
-                    SET quantity = quantity + ?, unit_cost = ?, sell_price = ?, discount_percent = ?, vat_percent = ?, updated_at = NOW()
-                    WHERE store_id = ? AND product_id = ? AND (batch_id = ? OR (batch_id IS NULL AND ? IS NULL))
-                ")->execute([$quantity, $unit_cost, $sell_price, $discount, $vat, $store_id, $product_id, $batch_id, $batch_id]);
+                    SET quantity = quantity + ?, unit_cost = ?, sell_price = ?, 
+                        discount_percent = ?, vat_percent = ?, updated_at = NOW()
+                    WHERE id = ?
+                ")->execute([$quantity, $unit_cost, $sell_price, $discount, $vat, $ex['id']]);
             } else {
                 $db->prepare("
                     INSERT INTO inventory_items 
-                    (store_id, product_id, batch_id, quantity, unit_cost, sell_price, discount_percent, vat_percent, reorder_point, max_stock, is_active, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 1, NOW())
-                ")->execute([$store_id, $product_id, $batch_id, $quantity, $unit_cost, $sell_price, $discount, $vat]);
+                    (store_id, product_id, quantity, unit_cost, sell_price, 
+                     discount_percent, vat_percent, reorder_point, max_stock, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 1, NOW())
+                ")->execute([$store_id, $product_id, $quantity, $unit_cost, $sell_price, $discount, $vat]);
             }
 
-            if ($batch_id) {
-                $db->prepare("UPDATE inventory_batches SET remaining_qty = remaining_qty + ? WHERE id = ?")
-                    ->execute([$quantity, $batch_id]);
+            // Insert batch if expiry date provided and product needs it
+            if ($exp_date) {
+                $db->prepare("
+                    INSERT INTO inventory_batches 
+                    (product_id, store_id, batch_number, exp_date, initial_qty, remaining_qty, unit_cost, sell_price, created_at)
+                    VALUES (?, ?, 'OB-' . UNIX_TIMESTAMP(), ?, ?, ?, ?, ?, NOW())
+                ")->execute([$product_id, $store_id, $exp_date, $quantity, $quantity, $unit_cost, $sell_price]);
             }
         }
 
@@ -104,12 +115,14 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         .main-content { margin-right: 260px; padding: 20px; }
         .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
         .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); border: none; }
-        .item-row { background: #f8f9fa; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #e9ecef; }
-        .totals-bar { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        .totals-bar .total-value { font-size: 24px; font-weight: bold; }
-        .product-info { background: white; border-radius: 8px; padding: 10px; border: 1px solid #dee2e6; }
+        .item-row { background: white; border-radius: 10px; padding: 12px; margin-bottom: 10px; border: 1px solid #e9ecef; }
+        .product-display { background: #f8f9fa; border-radius: 8px; padding: 10px; min-height: 44px; display: flex; align-items: center; }
+        .barcode-wrap { position: relative; }
+        .barcode-wrap .btn-f2 { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px 0 0 8px; border: 1px solid #dee2e6; background: #f8f9fa; padding: 0 12px; }
+        .barcode-wrap input { padding-left: 50px; }
         .date-field { display: none; }
         .date-field.active { display: block; }
+        .summary-bar { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 15px 20px; border-radius: 12px; position: sticky; bottom: 20px; z-index: 100; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -123,196 +136,219 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             </div>
 
             <?php if (isset($error) && $error): ?>
-                <div class="alert alert-danger"><?= $error ?></div>
+                <div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill"></i> <?= $error ?></div>
             <?php endif; ?>
 
             <form method="POST" id="balanceForm">
                 <div class="card mb-4">
                     <div class="card-body">
                         <div class="row g-3">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label">الفرع</label>
-                                <select id="branch_filter" class="form-select" onchange="filterStoresByBranch()">
+                                <select id="branch_filter" class="form-select" onchange="filterStores()">
                                     <option value="">-- اختر الفرع --</option>
                                     <?php foreach ($branches as $branch): ?>
                                         <option value="<?= $branch['id'] ?>"><?= htmlspecialchars($branch['branch_name']) ?></option>
                                     <?php endforeach; ?>
-                                    <option value="0">مركزي</option>
                                 </select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label">المخزن <span class="text-danger">*</span></label>
-                                <select name="store_id" id="store_select" class="form-select" required onchange="onStoreChange()">
+                                <select name="store_id" id="store_select" class="form-select" required>
                                     <option value="">-- اختر المخزن --</option>
                                     <?php foreach ($stores as $s): ?>
-                                        <option value="<?= $s['id'] ?>" data-branch="<?= $s['branch_id'] ?? '0' ?>" style="display:none;">
-                                            <?= htmlspecialchars($s['store_name']) ?> <?= $s['branch_name'] ? '(' . htmlspecialchars($s['branch_name']) . ')' : '(مركزي)' ?>
+                                        <option value="<?= $s['id'] ?>" data-branch="<?= $s['branch_id'] ?? 0 ?>">
+                                            <?= htmlspecialchars($s['store_name']) ?> (<?= htmlspecialchars($s['branch_name'] ?? 'مركزي') ?>)
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button type="button" class="btn btn-success w-100" onclick="addRow()">
+                                    <i class="bi bi-plus-lg"></i> إضافة صنف
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="bi bi-list-check"></i> الأصناف</h5>
-                        <button type="button" class="btn btn-success" onclick="addItemRow()">
-                            <i class="bi bi-plus-lg"></i> إضافة صنف
-                        </button>
-                    </div>
-                    <div class="card-body" id="itemsContainer"></div>
-                </div>
+                <!-- Items Container -->
+                <div id="itemsContainer"></div>
 
-                <div class="card-footer mt-3">
-                    <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="bi bi-save"></i> حفظ الرصيد الافتتاحي
-                    </button>
+                <!-- Summary Bar -->
+                <div class="summary-bar mt-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <i class="bi bi-boxes"></i> الأصناف: <strong id="sumItems">0</strong>
+                        </div>
+                        <div class="col-md-6 text-start">
+                            <button type="submit" class="btn btn-light fw-bold"><i class="bi bi-save"></i> حفظ الرصيد الافتتاحي</button>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <?php include '../../../includes/product-search-popup.php'; ?>
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let itemCounter = 0;
-        let currentRow = 0;
-
-        function filterStoresByBranch() {
+        
+        function filterStores() {
             const branchId = document.getElementById('branch_filter').value;
-            const storeSelect = document.getElementById('store_select');
-            const options = storeSelect.querySelectorAll('option[data-branch]');
-            options.forEach(opt => {
-                if (!opt.value) { opt.style.display = ''; return; }
-                opt.style.display = (!branchId || opt.getAttribute('data-branch') === branchId) ? '' : 'none';
+            const sel = document.getElementById('store_select');
+            let firstVisible = null;
+            
+            sel.querySelectorAll('option[data-branch]').forEach(opt => {
+                const match = !branchId || opt.dataset.branch === branchId;
+                opt.style.display = match ? '' : 'none';
+                if (match && !firstVisible) firstVisible = opt.value;
             });
-            storeSelect.value = '';
+            
+            if (firstVisible && !sel.value) sel.value = firstVisible;
         }
-
-        function onStoreChange() {
-            document.getElementById('itemsContainer').innerHTML = '';
-            itemCounter = 0;
-            addItemRow();
-        }
-
-        function addItemRow() {
+        
+        function addRow() {
+            if (!document.getElementById('store_select').value) {
+                alert('اختر المخزن أولاً');
+                document.getElementById('store_select').focus();
+                return;
+            }
+            
             itemCounter++;
+            const id = itemCounter;
             const html = `
-                <div class="item-row" id="itemRow_${itemCounter}">
-                    <div class="row g-3">
+                <div class="item-row" id="itemRow_${id}">
+                    <div class="row g-2 align-items-end">
                         <div class="col-md-3">
-                            <label class="form-label">الباركود</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="barcode_${itemCounter}" placeholder="ادخل الباركود..."
-                                       onkeydown="handleBarcode(event, ${itemCounter})" autocomplete="off">
-                                <button type="button" class="btn btn-outline-primary" onclick="openProductSearchModal(${itemCounter})">
-                                    <i class="bi bi-search"></i> F2
+                            <label class="form-label small">الباركود</label>
+                            <div class="barcode-wrap">
+                                <input type="text" class="form-control" id="barcode_${id}" placeholder="ادخل الباركود..."
+                                       onkeydown="handleBarcode(event, ${id})" autocomplete="off">
+                                <button type="button" class="btn-f2" onclick="searchProduct(${id})" title="بحث F2">
+                                    <i class="bi bi-search"></i>
                                 </button>
                             </div>
+                            <input type="hidden" name="items[${id}][product_id]" id="productId_${id}">
                         </div>
-                        <div class="col-md-5">
-                            <label class="form-label">الصنف</label>
-                            <div class="product-info">
-                                <div id="productName_${itemCounter}" class="fw-bold text-muted">اختر الصنف...</div>
-                                <input type="hidden" name="items[${itemCounter}][product_id]" id="productId_${itemCounter}">
-                                <input type="hidden" name="items[${itemCounter}][batch_id]" id="batchId_${itemCounter}">
-                                <div class="row mt-2 small">
-                                    <div class="col-4">تكلفة: <span id="costDisplay_${itemCounter}">-</span></div>
-                                    <div class="col-4">بيع: <span id="sellDisplay_${itemCounter}">-</span></div>
-                                    <div class="col-4">ربح: <span id="profitDisplay_${itemCounter}">-</span></div>
-                                </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">الصنف</label>
+                            <div class="product-display" id="productDisplay_${id}">
+                                <span class="text-muted small">ادخل الباركود أو اضغط F2</span>
                             </div>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label">الكمية <span class="text-danger">*</span></label>
-                            <input type="number" name="items[${itemCounter}][quantity]" class="form-control" step="0.001" min="0.001" required>
+                        <div class="col-md-1">
+                            <label class="form-label small">الكمية *</label>
+                            <input type="number" name="items[${id}][quantity]" class="form-control" step="0.001" min="0.001" value="1" required>
                         </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="button" class="btn btn-outline-danger w-100" onclick="document.getElementById('itemRow_${itemCounter}').remove()">
+                        <div class="col-md-1">
+                            <label class="form-label small">التكلفة</label>
+                            <input type="number" name="items[${id}][unit_cost]" id="cost_${id}" class="form-control" step="0.01" min="0">
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label small">البيع</label>
+                            <input type="number" name="items[${id}][sell_price]" id="sell_${id}" class="form-control" step="0.01" min="0">
+                        </div>
+                        <div class="col-md-1 date-field" id="dateField_${id}">
+                            <label class="form-label small">الصلاحية</label>
+                            <input type="date" name="items[${id}][exp_date]" class="form-control">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="document.getElementById('itemRow_${id}').remove(); updateSummary();">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
-                        <div class="col-md-3 date-field" id="dateField_${itemCounter}">
-                            <label class="form-label">تاريخ الصلاحية</label>
-                            <input type="date" name="items[${itemCounter}][exp_date]" class="form-control">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">تكلفة الوحدة</label>
-                            <input type="number" name="items[${itemCounter}][unit_cost]" id="unitCost_${itemCounter}" class="form-control" step="0.01" min="0">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">سعر البيع</label>
-                            <input type="number" name="items[${itemCounter}][sell_price]" id="sellPrice_${itemCounter}" class="form-control" step="0.01" min="0">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">الخصم %</label>
-                            <input type="number" name="items[${itemCounter}][discount_percent]" class="form-control" step="0.01" min="0" max="100" value="0">
-                        </div>
                     </div>
+                    <!-- Hidden fields for extra data -->
+                    <input type="hidden" name="items[${id}][discount_percent]" value="0">
+                    <input type="hidden" name="items[${id}][vat_percent]" value="0">
                 </div>
             `;
             document.getElementById('itemsContainer').insertAdjacentHTML('beforeend', html);
-            setTimeout(() => document.getElementById('barcode_' + itemCounter).focus(), 100);
+            setTimeout(() => document.getElementById('barcode_' + id).focus(), 100);
         }
-
-        function handleBarcode(event, index) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                const barcode = event.target.value.trim();
+        
+        function handleBarcode(e, rowId) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const barcode = e.target.value.trim();
                 if (!barcode) return;
+                
                 fetch(`../../../api/product-search.php?barcode=${encodeURIComponent(barcode)}`)
-                    .then(r => r.json()).then(data => {
-                        if (data.length > 0) fillProductData(index, data[0]);
-                        else alert('الصنف غير موجود');
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.length > 0) {
+                            fillProduct(rowId, data[0]);
+                        } else {
+                            alert('الصنف غير موجود');
+                        }
                     });
             }
-            if (event.key === 'F2') {
-                event.preventDefault();
-                currentRow = index;
-                const modal = new bootstrap.Modal(document.getElementById('productSearchModal'));
-                modal.show();
+            if (e.key === 'F2') {
+                e.preventDefault();
+                searchProduct(rowId);
             }
         }
-
-        function fillProductData(index, product) {
-            document.getElementById('productId_' + index).value = product.id;
-            document.getElementById('productName_' + index).innerHTML = `<strong>${product.product_name}</strong><small class="d-block text-muted">${product.product_code || product.manual_code || ''}</small>`;
-            document.getElementById('costDisplay_' + index).textContent = product.cost_price || 0;
-            document.getElementById('sellDisplay_' + index).textContent = product.sell_price || 0;
-            const profit = product.sell_price > 0 ? ((product.sell_price - product.cost_price) / product.sell_price * 100).toFixed(1) : 0;
-            document.getElementById('profitDisplay_' + index).textContent = profit + '%';
-            document.getElementById('unitCost_' + index).value = product.cost_price || 0;
-            document.getElementById('sellPrice_' + index).value = product.sell_price || 0;
+        
+        function searchProduct(rowId) {
+            const term = prompt('ابحث باسم الصنف أو الكود:');
+            if (!term) return;
             
-            if (product.has_expire) {
-                document.getElementById('dateField_' + index).classList.add('active');
-            }
-        }
-
-        function openProductSearchModal(index) {
-            currentRow = index;
-            const modal = new bootstrap.Modal(document.getElementById('productSearchModal'));
-            modal.show();
-            loadProducts();
-        }
-
-        function loadProducts() {
-            const tbody = document.getElementById('searchResultsBody');
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>';
-            fetch('../../../api/product-search.php')
-                .then(r => r.json()).then(data => {
-                    tbody.innerHTML = '';
-                    data.forEach(p => {
-                        const row = document.createElement('tr');
-                        row.style.cursor = 'pointer';
-                        row.onclick = () => { fillProductData(currentRow, p); bootstrap.Modal.getInstance(document.getElementById('productSearchModal')).hide(); };
-                        row.innerHTML = `<td><code>${p.product_code || p.manual_code || 'N/A'}</code></td><td><strong>${p.product_name}</strong></td><td>${p.company_name || '-'}</td><td>${p.sell_price || 0}</td><td>${p.cost_price || 0}</td><td><button class="btn btn-sm btn-primary"><i class="bi bi-check"></i></button></td>`;
-                        tbody.appendChild(row);
-                    });
+            fetch(`../../../api/product-search.php?q=${encodeURIComponent(term)}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.length === 0) { alert('لا توجد نتائج'); return; }
+                    if (data.length === 1) {
+                        fillProduct(rowId, data[0]);
+                    } else {
+                        let msg = 'اختر صنف:\n\n';
+                        data.forEach((p, i) => msg += `${i+1}. ${p.product_name}\n`);
+                        const choice = prompt(msg);
+                        if (choice && data[parseInt(choice)-1]) fillProduct(rowId, data[parseInt(choice)-1]);
+                    }
                 });
         }
+        
+        function fillProduct(rowId, product) {
+            document.getElementById('productId_' + rowId).value = product.id;
+            
+            const disp = document.getElementById('productDisplay_' + rowId);
+            disp.innerHTML = `<strong>${product.product_name}</strong>
+                <small class="text-muted ms-2">كود: ${product.product_code || product.manual_code || 'N/A'}</small>
+                ${product.has_expire ? '<span class="badge bg-warning text-dark ms-1">له تاريخ صلاحية</span>' : ''}`;
+            
+            document.getElementById('cost_' + rowId).value = product.cost_price || 0;
+            document.getElementById('sell_' + rowId).value = product.sell_price || 0;
+            
+            // Show date field if product has expiry
+            if (product.has_expire) {
+                document.getElementById('dateField_' + rowId).classList.add('active');
+                document.getElementById('dateField_' + rowId).querySelector('input').required = true;
+            }
+            
+            // Auto add next row
+            setTimeout(() => {
+                const lastRow = document.querySelector('.item-row:last-child');
+                if (lastRow && lastRow.id === 'itemRow_' + rowId) {
+                    addRow();
+                }
+            }, 200);
+            
+            updateSummary();
+        }
+        
+        function updateSummary() {
+            const count = document.querySelectorAll('.item-row').length;
+            document.getElementById('sumItems').textContent = count;
+        }
+        
+        // Validate store selected before submit
+        document.getElementById('balanceForm').addEventListener('submit', function(e) {
+            if (!document.getElementById('store_select').value) {
+                e.preventDefault();
+                alert('اختر المخزن');
+            }
+        });
     </script>
 </body>
 </html>

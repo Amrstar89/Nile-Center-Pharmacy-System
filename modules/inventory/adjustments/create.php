@@ -5,7 +5,7 @@ requireAuth();
 
 $db = getDB();
 
-$page_title = 'إنشاء جرد جديد';
+$page_title = 'إنشاء جرد دوري جديد';
 
 // Get branches
 $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
@@ -25,7 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors = [];
 
         $store_id = intval($_POST['store_id'] ?? 0);
-        $adjustment_type = $_POST['adjustment_type'] ?? 'periodic';
         $notes = trim($_POST['notes'] ?? '');
 
         if ($store_id <= 0) {
@@ -36,21 +35,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception(implode('<br>', $errors));
         }
 
-        // Generate adjustment code
-        $last_code = $db->query("SELECT MAX(CAST(SUBSTRING(adjustment_code, 4) AS UNSIGNED)) as max_code FROM stock_adjustments WHERE adjustment_code LIKE 'ADJ-%'")->fetch();
-        $max_code = intval($last_code['max_code'] ?? 0);
-        $adjustment_code = 'ADJ-' . str_pad($max_code + 1, 5, '0', STR_PAD_LEFT);
+        // Generate adjustment code - fixed to avoid floating point issues
+        $year_month = date('Ym');
+        $stmt = $db->query("SELECT COUNT(*) as cnt FROM stock_adjustments WHERE adjustment_code LIKE 'ADJ-{$year_month}-%'");
+        $count = intval($stmt->fetch()['cnt']) + 1;
+        $adjustment_code = 'ADJ-' . $year_month . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
         // Insert adjustment
         $stmt = $db->prepare("
             INSERT INTO stock_adjustments 
             (adjustment_code, store_id, adjustment_type, status, notes, counted_by, counted_at, created_at)
-            VALUES (?, ?, ?, 'draft', ?, ?, NOW(), NOW())
+            VALUES (?, ?, 'periodic', 'draft', ?, ?, NOW(), NOW())
         ");
         $stmt->execute([
             $adjustment_code,
             $store_id,
-            $adjustment_type,
             $notes ?: null,
             $_SESSION['user_id'] ?? 1
         ]);
@@ -76,15 +75,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $total_items = 0;
         foreach ($items as $item) {
+            $system_qty = floatval($item['quantity']);
+            $unit_cost = floatval($item['unit_cost'] ?? $item['cost_price'] ?? 0);
             $item_stmt->execute([
                 $adjustment_id,
                 $item['product_id'],
                 $item['batch_id'],
-                $item['quantity'],
+                $system_qty,
                 0, // actual_qty starts at 0
-                -$item['quantity'], // variance = actual - system = 0 - quantity
-                $item['unit_cost'] ?? $item['cost_price'] ?? 0,
-                -($item['quantity'] * ($item['unit_cost'] ?? $item['cost_price'] ?? 0))
+                -$system_qty, // variance = actual - system
+                $unit_cost,
+                -($system_qty * $unit_cost)
             ]);
             $total_items++;
         }
@@ -93,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db->prepare("UPDATE stock_adjustments SET total_items = ? WHERE id = ?")
             ->execute([$total_items, $adjustment_id]);
 
-        header("Location: count.php?id={$adjustment_id}");
+        header("Location: view.php?id={$adjustment_id}&success=1");
         exit;
 
     } catch (Exception $e) {
@@ -112,25 +113,20 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        :root { --primary: #667eea; --secondary: #764ba2; --success: #198754; --warning: #ffc107; --danger: #dc3545; }
+        :root { --primary: #667eea; --secondary: #764ba2; }
         body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .sidebar { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; position: fixed; right: 0; top: 0; width: 260px; z-index: 1000; }
         .main-content { margin-right: 260px; padding: 20px; }
         .card { border: none; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
         .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); border: none; }
-        .section-title { color: var(--primary); font-weight: 700; border-right: 4px solid var(--primary); padding-right: 10px; margin-bottom: 20px; }
+        .section-title { color: var(--primary); font-weight: 700; border-right: 4px solid var(--primary); padding-right: 10px; margin: 25px 0 20px; }
         .form-label { font-weight: 600; color: #555; }
-        .type-card { cursor: pointer; transition: all 0.3s; border: 2px solid #e9ecef; border-radius: 10px; padding: 15px; text-align: center; }
-        .type-card:hover { border-color: var(--primary); }
-        .type-card.selected { border-color: var(--primary); background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%); }
-        .type-card i { font-size: 24px; margin-bottom: 8px; color: var(--primary); }
-        .type-card h6 { font-size: 14px; margin: 0; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
-<body style="margin: 0; padding: 0;">
+<body>
     <?= $sidebar ?? '' ?>
-    <div class="main-content" style="margin-right: 260px; padding: 20px; min-height: 100vh;">
+    <div class="main-content">
         <div class="container-fluid">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="bi bi-plus-lg"></i> <?= $page_title ?></h2>
@@ -138,23 +134,27 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             </div>
 
             <?php if (isset($error) && $error): ?>
-                <div class="alert alert-danger"><?= $error ?></div>
+                <div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill"></i> <?= $error ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="" id="adjustmentForm">
+            <form method="POST" action="">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="section-title">معلومات الجرد</h5>
+                        <h5 class="section-title"><i class="bi bi-clipboard-check"></i> بيانات الجرد الدوري</h5>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> 
+                            سيتم إنشاء عملية جرد دوري وجلب جميع الأصناف الموجودة في المخزن. يمكنك بعد ذلك إدخال الكميات الفعلية.
+                        </div>
 
-                        <div class="row">
+                        <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">الفرع</label>
-                                <select id="branch_filter" class="form-select" onchange="filterStoresByBranch()">
+                                <select id="branch_filter" class="form-select" onchange="filterStores()">
                                     <option value="">-- اختر الفرع --</option>
                                     <?php foreach ($branches as $branch): ?>
                                         <option value="<?= $branch['id'] ?>"><?= htmlspecialchars($branch['branch_name']) ?></option>
                                     <?php endforeach; ?>
-                                    <option value="0">مركزي (بدون فرع)</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -172,44 +172,20 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                             </div>
                         </div>
 
-                        <h5 class="section-title mt-4">نوع الجرد</h5>
-                        <div class="row">
-                            <?php 
-                            $types = [
-                                'periodic' => ['جرد دوري', 'bi-calendar-check'],
-                                'spot' => ['جرد مفاجئ', 'bi-lightning'],
-                                'year_end' => ['جرد نهاية سنة', 'bi-calendar-event'],
-                                'damage' => ['جرد تالف', 'bi-trash'],
-                                'expired' => ['جرد هالك', 'bi-exclamation-triangle']
-                            ];
-                            foreach ($types as $key => $label): 
-                            ?>
-                            <div class="col-md-3 mb-3">
-                                <div class="type-card <?= (isset($_POST['adjustment_type']) && $_POST['adjustment_type'] === $key) || (!isset($_POST['adjustment_type']) && $key === 'periodic') ? 'selected' : '' ?>" onclick="selectType('<?= $key ?>')">
-                                    <i class="bi <?= $label[1] ?>"></i>
-                                    <h6><?= $label[0] ?></h6>
-                                    <input type="radio" name="adjustment_type" value="<?= $key ?>" class="d-none" <?= (isset($_POST['adjustment_type']) && $_POST['adjustment_type'] === $key) || (!isset($_POST['adjustment_type']) && $key === 'periodic') ? 'checked' : '' ?>>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-
                         <div class="row mt-3">
                             <div class="col-md-12">
                                 <div class="mb-3">
                                     <label class="form-label">ملاحظات</label>
-                                    <textarea name="notes" class="form-control" rows="3" placeholder="ملاحظات عن الجرد..."></textarea>
+                                    <textarea name="notes" class="form-control" rows="2" placeholder="ملاحظات عن الجرد..."></textarea>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="card-footer">
+                    <div class="card-footer bg-white d-flex justify-content-between">
                         <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="bi bi-play-circle"></i> بدء الجرد
+                            <i class="bi bi-play-circle"></i> بدء الجرد وجلب الأصناف
                         </button>
-                        <a href="index.php" class="btn btn-secondary btn-lg">
-                            <i class="bi bi-x-lg"></i> إلغاء
-                        </a>
+                        <a href="index.php" class="btn btn-outline-secondary btn-lg">إلغاء</a>
                     </div>
                 </div>
             </form>
@@ -218,30 +194,14 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function selectType(type) {
-            document.querySelectorAll('.type-card').forEach(card => card.classList.remove('selected'));
-            event.currentTarget.classList.add('selected');
-            event.currentTarget.querySelector('input[type="radio"]').checked = true;
-        }
-
-        function filterStoresByBranch() {
+        function filterStores() {
             const branchId = document.getElementById('branch_filter').value;
             const storeSelect = document.getElementById('store_select');
             const options = storeSelect.querySelectorAll('option[data-branch]');
-
             options.forEach(opt => {
-                if (!opt.value) {
-                    opt.style.display = '';
-                    return;
-                }
-                const optBranch = opt.getAttribute('data-branch') || '0';
-                if (!branchId || optBranch === branchId) {
-                    opt.style.display = '';
-                } else {
-                    opt.style.display = 'none';
-                }
+                if (!opt.value) { opt.style.display = ''; return; }
+                opt.style.display = (!branchId || opt.getAttribute('data-branch') === branchId) ? '' : 'none';
             });
-
             storeSelect.value = '';
         }
     </script>
