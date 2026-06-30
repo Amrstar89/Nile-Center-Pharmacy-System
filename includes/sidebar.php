@@ -258,22 +258,22 @@ $is_inventory = strpos($current_uri, '/inventory/') !== false;
             </div>
             <div class="nav-item">
                 <a href="<?= $base_url ?>/modules/inventory/adjustments/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/adjustments/') !== false ? 'active' : '' ?>">
-                    <i class="bi bi-clipboard-check"></i> الجرد
+                    <i class="bi bi-clipboard-check"></i> الجرد والتسويات
                 </a>
             </div>
             <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/inventory/adjustments/create.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/adjustments/') !== false && $current_page === 'create.php' ? 'active' : '' ?>">
-                    <i class="bi bi-plus-lg"></i> جرد جديد
+                <a href="<?= $base_url ?>/modules/inventory/opening_balance/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/adjustments/') !== false && $current_page === 'create.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-lg"></i> الرصيد الافتتاحي
                 </a>
             </div>
             <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/inventory/opening_balance/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/opening_balance/') !== false ? 'active' : '' ?>">
-                    <i class="bi bi-journal-plus"></i> الأرصدة الافتتاحية
+                <a href="<?= $base_url ?>/modules/inventory/product_movement/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/opening_balance/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-journal-plus"></i> حركة الأصناف
                 </a>
             </div>
             <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/inventory/opening_balance/create.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/opening_balance/') !== false && $current_page === 'create.php' ? 'active' : '' ?>">
-                    <i class="bi bi-plus-lg"></i> رصيد افتتاحي
+                <a href="<?= $base_url ?>/modules/inventory/price_adjustment/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/opening_balance/') !== false && $current_page === 'create.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-lg"></i> تعديل الأسعار
                 </a>
             </div>
         </div>
