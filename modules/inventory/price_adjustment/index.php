@@ -6,6 +6,13 @@ requireAuth();
 $db = getDB();
 $page_title = 'تعديل الأرصدة والأسعار';
 
+// Check which columns exist in stores table
+$cols = $db->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stores'")->fetchAll(PDO::FETCH_COLUMN);
+$has_store_category = in_array('store_category', $cols);
+$has_is_main_store = in_array('is_main_store', $cols);
+
+$order_by = $has_is_main_store ? "is_main_store DESC, store_name" : "store_name";
+
 // Get branches
 $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
 
@@ -44,7 +51,7 @@ if ($selected_store > 0) {
 // Get stores for selected branch
 $stores = [];
 if ($selected_branch > 0) {
-    $stmt = $db->prepare("SELECT id, store_name, store_code, store_type, store_category FROM stores WHERE branch_id = ? AND is_active = 1 ORDER BY is_main_store DESC, store_name");
+    $stmt = $db->prepare("SELECT id, store_name, store_code, store_type, store_category FROM stores WHERE branch_id = ? AND is_active = 1 ORDER BY {$order_by}");
     $stmt->execute([$selected_branch]);
     $stores = $stmt->fetchAll();
 }
@@ -87,7 +94,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             <h2 class="mb-4"><i class="bi bi-pencil-square"></i> <?= $page_title ?></h2>
             
             <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> اختر الفرع ثم المخزن لتعديل أسعار التكلفة وأسعار البيع ونسب الربح للأصناف. يمكنك التعديل على مجموعة من الأصناف دفعة واحدة.
+                <i class="bi bi-info-circle"></i> اختر الفرع ثم المخزن لتعديل أسعار التكلفة وأسعار البيع ونسب الربح للأصناف.
             </div>
 
             <!-- Filters -->
@@ -107,7 +114,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                 <option value="0">اختر المخزن</option>
                                 <?php foreach ($stores as $s): ?>
                                     <option value="<?= $s['id'] ?>" <?= $selected_store == $s['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($s['store_name']) ?> (<?= $category_labels[$s['store_category']] ?? 'مخزن' ?>)
+                                        <?= htmlspecialchars($s['store_name']) ?> <?= $has_store_category ? '(' . ($category_labels[$s['store_category']] ?? 'مخزن') . ')' : '' ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -123,16 +130,14 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             </div>
 
             <?php if ($selected_store > 0): ?>
-            <!-- Bulk Edit Form -->
             <form method="POST" action="save.php">
                 <input type="hidden" name="store_id" value="<?= $selected_store ?>">
-                
                 <div class="card">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="bi bi-list-check"></i> أصناف المخزن</h5>
                         <div>
                             <span class="badge bg-primary"><?= count($items) ?> صنف</span>
-                            <button type="submit" class="btn btn-success btn-sm ms-2"><i class="bi bi-save"></i> حفظ التعديلات</button>
+                            <button type="submit" class="btn btn-success btn-sm ms-2"><i class="bi bi-save"></i> حفظ</button>
                         </div>
                     </div>
                     <div class="card-body p-0">
@@ -175,9 +180,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                                    onchange="calcProfit(this, <?= $item['id'] ?>)">
                                         </td>
                                         <td>
-                                            <span id="profit_<?= $item['id'] ?>" class="profit-display <?= $profit >= 10 ? 'profit-good' : 'profit-bad' ?>">
-                                                <?= number_format($profit, 1) ?>%
-                                            </span>
+                                            <span id="profit_<?= $item['id'] ?>" class="profit-display <?= $profit >= 10 ? 'profit-good' : 'profit-bad' ?>"><?= number_format($profit, 1) ?>%</span>
                                         </td>
                                         <td>
                                             <input type="number" name="discount[<?= $item['id'] ?>]" class="form-control" 
@@ -208,26 +211,17 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             <?php endif; ?>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function toggleAll() {
-            const checked = document.getElementById('selectAll').checked;
-            document.querySelectorAll('.row-check').forEach(cb => cb.checked = checked);
-        }
-        
+        function toggleAll() { document.querySelectorAll('.row-check').forEach(cb => cb.checked = document.getElementById('selectAll').checked); }
         function calcProfit(el, id) {
-            // Find the row
             const row = el.closest('tr');
             const cost = parseFloat(row.querySelector('input[name^="cost["]').value) || 0;
             const sell = parseFloat(row.querySelector('input[name^="sell["]').value) || 0;
             const profit = sell > 0 ? ((sell - cost) / sell * 100) : 0;
-            
             const badge = document.getElementById('profit_' + id);
             badge.textContent = profit.toFixed(1) + '%';
             badge.className = 'profit-display ' + (profit >= 10 ? 'profit-good' : 'profit-bad');
-            
-            // Auto-check the row
             row.querySelector('.row-check').checked = true;
         }
     </script>
