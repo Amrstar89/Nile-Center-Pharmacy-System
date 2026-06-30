@@ -1,0 +1,43 @@
+[Tue 06/30/2026 20:27:34.28] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   0d67ca0..123d8b3  main       -> origin/main
+[Tue 06/30/2026 20:27:41.05] Found 8 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'database/nile_center.sql', LF will be replaced by CRLF the next time Git touches it
+Auto-merging modules/inventory/price_adjustment/index.php
+CONFLICT (content): Merge conflict in modules/inventory/price_adjustment/index.php
+Auto-merging modules/inventory/stores/index.php
+CONFLICT (content): Merge conflict in modules/inventory/stores/index.php
+Auto-merging modules/inventory/transfers/create.php
+CONFLICT (content): Merge conflict in modules/inventory/transfers/create.php
+Automatic merge failed; fix conflicts and then commit the result.
+[Tue 06/30/2026 20:27:42.69] ERROR: Git pull failed! 
+[Tue 06/30/2026 20:27:55.05] Starting auto-pull... 
+fatal: unable to access 'https://github.com/Amrstar89/Nile-Center-Pharmacy-System.git/': Recv failure: Connection was reset
+[Tue 06/30/2026 20:32:26.61] ERROR: Git fetch failed! 
+[Tue 06/30/2026 20:32:48.96] Starting auto-pull... 
+fatal: unable to access 'https://github.com/Amrstar89/Nile-Center-Pharmacy-System.git/': Recv failure: Connection was reset
+[Tue 06/30/2026 20:37:19.51] ERROR: Git fetch failed! 
+[Tue 06/30/2026 21:21:56.71] Starting auto-pull... 
+fatal: unable to access 'https://github.com/Amrstar89/Nile-Center-Pharmacy-System.git/': Connection timed out after 300053 milliseconds
+[Tue 06/30/2026 21:26:57.03] ERROR: Git fetch failed! 
+[Tue 06/30/2026 21:32:26.65] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Tue 06/30/2026 21:32:27.76] Found 8 new commit(s). Pulling... 
+error: Pulling is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[Tue 06/30/2026 21:32:27.81] ERROR: Git pull failed! 
+[Tue 06/30/2026 22:04:22.19] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Tue 06/30/2026 22:04:23.20] Found 8 new commit(s). Pulling... 
+error: Pulling is not possible because you have unmerged files.
+hint: Fix them up in the work tree, and then use 'git add/rm <file>'
+hint: as appropriate to mark resolution and make a commit.
+fatal: Exiting because of an unresolved conflict.
+[Tue 06/30/2026 22:04:23.25] ERROR: Git pull failed! 

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 30, 2026 at 02:14 AM
+-- Generation Time: Jul 01, 2026 at 12:09 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -160,7 +160,10 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (113, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-28 23:58:05'),
 (114, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-29 19:29:48'),
 (115, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-29 19:30:00'),
-(116, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-29 21:44:48');
+(116, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-29 21:44:48'),
+(117, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 17:22:05'),
+(118, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 19:38:28'),
+(119, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 20:43:54');
 
 -- --------------------------------------------------------
 
@@ -834,8 +837,8 @@ INSERT INTO `inventory_items` (`id`, `store_id`, `product_id`, `batch_id`, `quan
 (8, 1, 29, 8, 1400.000, 11.00, 18.00, 0.00, 14.00, 150.000, 3000.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (9, 1, 36, 9, 480.000, 62.00, 95.00, 0.00, 14.00, 50.000, 1000.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (10, 1, 40, 10, 380.000, 35.00, 65.00, 0.00, 14.00, 40.000, 800.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
-(11, 2, 10, 11, 180.000, 30.00, 45.00, 0.00, 14.00, 20.000, 500.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
-(12, 2, 16, 12, 140.000, 42.00, 65.00, 0.00, 14.00, 15.000, 400.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
+(11, 2, 10, 11, 179.000, 30.00, 45.00, 0.00, 14.00, 20.000, 500.000, 1, '2026-06-20 08:00:00', '2026-06-30 01:00:50'),
+(12, 2, 16, 12, 139.000, 42.00, 65.00, 0.00, 14.00, 15.000, 400.000, 1, '2026-06-20 08:00:00', '2026-06-30 01:00:50'),
 (13, 3, 28, 13, 95.000, 16.00, 25.00, 0.00, 14.00, 10.000, 300.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (14, 3, 29, 14, 190.000, 11.00, 18.00, 0.00, 14.00, 20.000, 500.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (15, 4, 17, 15, 110.000, 48.00, 75.00, 0.00, 14.00, 12.000, 350.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00');
@@ -883,7 +886,9 @@ INSERT INTO `inventory_transactions` (`id`, `transaction_type`, `reference_type`
 (7, 'purchase', 'purchase_invoice', 1, 1, 10, 2, 1, 1.000, 300.000, 300.000, 28.00, 45.00, 0.00, 14.00, 8400.00, 13500.00, 'شراء من مورد', 1, '2026-06-21 08:00:00'),
 (8, 'purchase', 'purchase_invoice', 2, 1, 11, 3, 1, 1.000, 400.000, 400.000, 55.00, 85.00, 0.00, 14.00, 22000.00, 34000.00, 'شراء من مورد', 1, '2026-06-22 08:00:00'),
 (9, 'transfer_out', 'transfer_order', 2, 1, 10, 1, 1, 1.000, -200.000, -200.000, 30.00, 45.00, 0.00, 14.00, -6000.00, -9000.00, 'تحويل لفرع نوال', 1, '2026-06-23 08:00:00'),
-(10, 'transfer_in', 'transfer_order', 2, 2, 10, 11, 1, 1.000, 200.000, 200.000, 30.00, 45.00, 0.00, 14.00, 6000.00, 9000.00, 'استلام من المخزن الرئيسي', 1, '2026-06-23 08:00:00');
+(10, 'transfer_in', 'transfer_order', 2, 2, 10, 11, 1, 1.000, 200.000, 200.000, 30.00, 45.00, 0.00, 14.00, 6000.00, 9000.00, 'استلام من المخزن الرئيسي', 1, '2026-06-23 08:00:00'),
+(11, 'damage', 'adjustment', 14, 2, 10, NULL, NULL, 1.000, -1.000, -1.000, 30.00, 0.00, 0.00, 0.00, -30.00, 0.00, 'جرد: ADJ-202606-0001', 1, '2026-06-30 01:00:50'),
+(12, 'damage', 'adjustment', 14, 2, 16, NULL, NULL, 1.000, -1.000, -1.000, 42.00, 0.00, 0.00, 0.00, -42.00, 0.00, 'جرد: ADJ-202606-0001', 1, '2026-06-30 01:00:50');
 
 -- --------------------------------------------------------
 
@@ -922,7 +927,7 @@ CREATE TABLE `inventory_transfers` (
 --
 
 INSERT INTO `inventory_transfers` (`id`, `transfer_code`, `from_store_id`, `to_store_id`, `from_branch_id`, `to_branch_id`, `transfer_type`, `status`, `total_items`, `total_quantity`, `total_cost`, `total_sell`, `notes`, `requested_by`, `approved_by`, `shipped_by`, `received_by`, `requested_at`, `approved_at`, `shipped_at`, `received_at`, `transfer_date`, `created_at`) VALUES
-(1, 'TR-00001', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 1, 5.000, 0.00, 0.00, NULL, 1, 1, 1, 1, '2026-06-27 21:04:12', '2026-06-27 21:04:35', '2026-06-27 21:04:44', '2026-06-29 23:46:43', NULL, '2026-06-27 19:04:12'),
+(1, 'TR-00001', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 1, 5.000, 0.00, 0.00, NULL, 1, 1, 1, 1, '2026-06-27 21:04:12', '2026-06-27 21:04:35', '2026-06-27 21:04:44', '2026-06-30 02:59:56', NULL, '2026-06-27 19:04:12'),
 (2, 'TR-00002', 1, 2, NULL, 1, 'central_to_branch', 'received', 2, 350.000, 31200.00, 45500.00, 'تحويل للفرع الرئيسي', 1, 1, 1, 1, '2026-06-23 10:00:00', '2026-06-23 10:30:00', '2026-06-23 11:00:00', '2026-06-23 14:00:00', NULL, '2026-06-23 08:00:00'),
 (3, 'TR-00003', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 2, 295.000, 26600.00, 38750.00, 'تحويل لفرع نوال', 1, 1, 1, 1, '2026-06-24 10:00:00', '2026-06-24 10:30:00', '2026-06-24 11:00:00', '2026-06-29 23:22:17', NULL, '2026-06-24 08:00:00'),
 (4, 'TR-00004', 2, 1, 1, NULL, 'branch_to_central', 'pending', 1, 50.000, 2100.00, 3250.00, 'إرجاع للمخزن الرئيسي', 1, NULL, NULL, NULL, '2026-06-25 10:00:00', NULL, NULL, NULL, NULL, '2026-06-25 08:00:00');
@@ -1685,7 +1690,8 @@ INSERT INTO `stock_adjustments` (`id`, `adjustment_code`, `store_id`, `adjustmen
 (2, 'ADJ-00002', 1, 'periodic', 'draft', 0, 0, 0.000, 0.00, 1, NULL, '2026-06-27 21:00:48', NULL, NULL, '2026-06-27 19:00:48'),
 (3, 'ADJ-00003', 1, 'periodic', 'completed', 5, 5, 10.000, 350.00, 1, 1, '2026-06-26 10:00:00', '2026-06-26 12:00:00', 'جرد دوري', '2026-06-26 08:00:00'),
 (4, 'ADJ-00004', 2, '', 'draft', 0, 0, 0.000, 0.00, 1, NULL, '2026-06-27 10:00:00', NULL, 'جرد مفاجئ', '2026-06-27 08:00:00'),
-(5, 'ADJ-9.2233720368548E', 1, 'periodic', 'completed', 10, 0, 0.000, 0.00, 1, NULL, '2026-06-28 20:02:17', NULL, NULL, '2026-06-28 18:02:17');
+(5, 'ADJ-9.2233720368548E', 1, 'periodic', 'completed', 10, 0, 0.000, 0.00, 1, NULL, '2026-06-28 20:02:17', NULL, NULL, '2026-06-28 18:02:17'),
+(14, 'ADJ-202606-0001', 2, 'periodic', 'completed', 2, 0, -2.000, -72.00, 1, NULL, '2026-06-30 03:00:20', NULL, NULL, '2026-06-30 01:00:20');
 
 -- --------------------------------------------------------
 
@@ -1727,7 +1733,9 @@ INSERT INTO `stock_adjustment_items` (`id`, `adjustment_id`, `product_id`, `batc
 (12, 5, 28, 7, 950.000, 950.000, 0.000, 16.00, 0.00, 0, NULL, NULL),
 (13, 5, 29, 8, 1400.000, 1400.000, 0.000, 11.00, 0.00, 0, NULL, NULL),
 (14, 5, 36, 9, 480.000, 480.000, 0.000, 62.00, 0.00, 0, NULL, NULL),
-(15, 5, 40, 10, 380.000, 380.000, 0.000, 35.00, 0.00, 0, NULL, NULL);
+(15, 5, 40, 10, 380.000, 380.000, 0.000, 35.00, 0.00, 0, NULL, NULL),
+(16, 14, 10, 11, 180.000, 179.000, -1.000, 30.00, -30.00, 0, NULL, NULL),
+(17, 14, 16, 12, 140.000, 139.000, -1.000, 42.00, -42.00, 0, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -2215,7 +2223,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-29 23:44:48', '2026-06-15 16:53:16', '2026-06-29 21:44:48'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-30 22:43:54', '2026-06-15 16:53:16', '2026-06-30 20:43:54'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -2686,7 +2694,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=117;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=120;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -2776,7 +2784,7 @@ ALTER TABLE `inventory_items`
 -- AUTO_INCREMENT for table `inventory_transactions`
 --
 ALTER TABLE `inventory_transactions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `inventory_transfers`
@@ -2872,13 +2880,13 @@ ALTER TABLE `shift_handovers`
 -- AUTO_INCREMENT for table `stock_adjustments`
 --
 ALTER TABLE `stock_adjustments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `stock_adjustment_items`
 --
 ALTER TABLE `stock_adjustment_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT for table `stores`
