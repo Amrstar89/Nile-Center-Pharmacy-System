@@ -9,33 +9,51 @@ $page_title = 'تعديل الأرصدة والأسعار';
 // Get branches
 $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
 
+// Get categories for filter (using correct column: category_name_ar)
+$categories = $db->query("SELECT id, category_name_ar FROM product_categories WHERE is_active = 1 ORDER BY category_name_ar")->fetchAll();
+
+// Get companies for filter (using correct table: product_companies, column: company_name_ar)
+$companies = $db->query("SELECT id, company_name_ar FROM product_companies WHERE is_active = 1 ORDER BY company_name_ar")->fetchAll();
+
 $selected_store = intval($_GET['store'] ?? 0);
 $selected_branch = intval($_GET['branch'] ?? 0);
 $search = trim($_GET['search'] ?? '');
+$filter_category = intval($_GET['category'] ?? 0);
+$filter_company = intval($_GET['company'] ?? 0);
 
 $items = [];
 if ($selected_store > 0) {
     $sql = "
-        SELECT ii.*, p.product_name, p.product_code, p.manual_code, p.barcode,
-               p.has_expire, p.company_id, c.company_name, p.scientific_name,
-               u.unit_name_ar
+        SELECT ii.*, p.product_name, p.product_code, p.manual_code, p.scientific_name,
+               p.has_expire, p.company_id, pc.company_name_ar, 
+               u.unit_name_ar, p.category_id, cat.category_name_ar
         FROM inventory_items ii
         JOIN products p ON ii.product_id = p.id
-        LEFT JOIN companies c ON p.company_id = c.id
-        LEFT JOIN product_units u ON p.unit_id = u.id
+        LEFT JOIN product_companies pc ON p.company_id = pc.id
+        LEFT JOIN product_units u ON p.unit1_id = u.id
+        LEFT JOIN product_categories cat ON p.category_id = cat.id
         WHERE ii.store_id = ? AND ii.is_active = 1
     ";
     $params = [$selected_store];
     
     if ($search) {
-        $sql .= " AND (p.product_name LIKE ? OR p.product_code LIKE ? OR p.manual_code LIKE ? OR p.barcode = ?)";
+        $sql .= " AND (p.product_name LIKE ? OR p.product_code LIKE ? OR p.manual_code LIKE ?)";
         $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
-        $params[] = $search;
     }
     
-    $sql .= " ORDER BY p.product_name LIMIT 200";
+    if ($filter_category > 0) {
+        $sql .= " AND p.category_id = ?";
+        $params[] = $filter_category;
+    }
+    
+    if ($filter_company > 0) {
+        $sql .= " AND p.company_id = ?";
+        $params[] = $filter_company;
+    }
+    
+    $sql .= " ORDER BY p.product_name LIMIT 500";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $items = $stmt->fetchAll();
@@ -44,17 +62,12 @@ if ($selected_store > 0) {
 // Get stores for selected branch
 $stores = [];
 if ($selected_branch > 0) {
-    $stmt = $db->prepare("SELECT id, store_name, store_code, store_type, store_category FROM stores WHERE branch_id = ? AND is_active = 1 ORDER BY is_main_store DESC, store_name");
+    $stmt = $db->prepare("SELECT id, store_name, store_code, store_type, store_category FROM stores WHERE branch_id = ? AND is_active = 1 ORDER BY store_name");
     $stmt->execute([$selected_branch]);
     $stores = $stmt->fetchAll();
 }
 
-$category_labels = [
-    'main_store' => 'رئيسي', 'warehouse' => 'مستودع', 'cold' => 'ثلاجة',
-    'narcotics' => 'مخدرات', 'cosmetics' => 'تجميل', 'medical_supply' => 'مستلزمات',
-    'surplus' => 'فائض', 'damaged' => 'تالف', 'expired' => 'منتهي'
-];
-
+$page_title = 'تعديل الأرصدة والأسعار';
 require_once __DIR__ . '/../../../includes/sidebar.php';
 ?>
 <!DOCTYPE html>
@@ -77,6 +90,8 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         .profit-display { font-size: 11px; padding: 2px 8px; border-radius: 6px; }
         .profit-good { background: #d4edda; color: #155724; }
         .profit-bad { background: #f8d7da; color: #721c24; }
+        .filter-bar { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+        .action-bar { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; border: 1px solid #e9ecef; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -87,53 +102,60 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             <h2 class="mb-4"><i class="bi bi-pencil-square"></i> <?= $page_title ?></h2>
             
             <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> اختر الفرع ثم المخزن لتعديل أسعار التكلفة وأسعار البيع ونسب الربح للأصناف. يمكنك التعديل على مجموعة من الأصناف دفعة واحدة.
+                <i class="bi bi-info-circle"></i> اختر الفرع ثم المخزن لتعديل أسعار التكلفة وأسعار البيع ونسب الربح للأصناف.
             </div>
 
             <!-- Filters -->
-            <div class="card mb-4">
-                <div class="card-body">
-                    <form method="GET" class="row g-3">
-                        <div class="col-md-3">
-                            <select name="branch" class="form-select" onchange="this.form.submit()">
-                                <option value="0">اختر الفرع</option>
-                                <?php foreach ($branches as $b): ?>
-                                    <option value="<?= $b['id'] ?>" <?= $selected_branch == $b['id'] ? 'selected' : '' ?>><?= htmlspecialchars($b['branch_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <select name="store" class="form-select" onchange="this.form.submit()">
-                                <option value="0">اختر المخزن</option>
-                                <?php foreach ($stores as $s): ?>
-                                    <option value="<?= $s['id'] ?>" <?= $selected_store == $s['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($s['store_name']) ?> (<?= $category_labels[$s['store_category']] ?? 'مخزن' ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <input type="text" name="search" class="form-control" placeholder="بحث باسم الصنف أو الباركود..." value="<?= htmlspecialchars($search) ?>">
-                        </div>
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> بحث</button>
-                        </div>
-                    </form>
-                </div>
+            <div class="filter-bar">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-2">
+                        <select name="branch" class="form-select" onchange="this.form.submit()">
+                            <option value="0">اختر الفرع</option>
+                            <?php foreach ($branches as $b): ?>
+                                <option value="<?= $b['id'] ?>" <?= $selected_branch == $b['id'] ? 'selected' : '' ?>><?= htmlspecialchars($b['branch_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select name="store" class="form-select" onchange="this.form.submit()">
+                            <option value="0">اختر المخزن</option>
+                            <?php foreach ($stores as $s): ?>
+                                <option value="<?= $s['id'] ?>" <?= $selected_store == $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['store_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select name="category" class="form-select" onchange="this.form.submit()">
+                            <option value="0">كل التصنيفات</option>
+                            <?php foreach ($categories as $c): ?>
+                                <option value="<?= $c['id'] ?>" <?= $filter_category == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['category_name_ar']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select name="company" class="form-select" onchange="this.form.submit()">
+                            <option value="0">كل الشركات</option>
+                            <?php foreach ($companies as $c): ?>
+                                <option value="<?= $c['id'] ?>" <?= $filter_company == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['company_name_ar']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" name="search" class="form-control" placeholder="بحث باسم أو كود..." value="<?= htmlspecialchars($search) ?>">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> بحث</button>
+                    </div>
+                </form>
             </div>
 
             <?php if ($selected_store > 0): ?>
-            <!-- Bulk Edit Form -->
             <form method="POST" action="save.php">
                 <input type="hidden" name="store_id" value="<?= $selected_store ?>">
-                
                 <div class="card">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="bi bi-list-check"></i> أصناف المخزن</h5>
-                        <div>
-                            <span class="badge bg-primary"><?= count($items) ?> صنف</span>
-                            <button type="submit" class="btn btn-success btn-sm ms-2"><i class="bi bi-save"></i> حفظ التعديلات</button>
-                        </div>
+                        <span class="badge bg-primary"><?= count($items) ?> صنف</span>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -142,6 +164,8 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                     <tr>
                                         <th><input type="checkbox" id="selectAll" onclick="toggleAll()"></th>
                                         <th>الصنف</th>
+                                        <th>التصنيف</th>
+                                        <th>الشركة</th>
                                         <th>الكمية</th>
                                         <th>تكلفة الوحدة</th>
                                         <th>سعر البيع</th>
@@ -163,6 +187,8 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                             <br><small class="text-muted"><?= htmlspecialchars($item['product_code'] ?? $item['manual_code'] ?? '') ?></small>
                                             <?php if ($item['has_expire']): ?><span class="badge bg-warning text-dark">له تاريخ صلاحية</span><?php endif; ?>
                                         </td>
+                                        <td><small class="text-muted"><?= htmlspecialchars($item['category_name_ar'] ?? '-') ?></small></td>
+                                        <td><small class="text-muted"><?= htmlspecialchars($item['company_name_ar'] ?? '-') ?></small></td>
                                         <td><?= number_format(floatval($item['quantity']), 3) ?></td>
                                         <td>
                                             <input type="number" name="cost[<?= $item['id'] ?>]" class="form-control" 
@@ -175,9 +201,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                                    onchange="calcProfit(this, <?= $item['id'] ?>)">
                                         </td>
                                         <td>
-                                            <span id="profit_<?= $item['id'] ?>" class="profit-display <?= $profit >= 10 ? 'profit-good' : 'profit-bad' ?>">
-                                                <?= number_format($profit, 1) ?>%
-                                            </span>
+                                            <span id="profit_<?= $item['id'] ?>" class="profit-display <?= $profit >= 10 ? 'profit-good' : 'profit-bad' ?>"><?= number_format($profit, 1) ?>%</span>
                                         </td>
                                         <td>
                                             <input type="number" name="discount[<?= $item['id'] ?>]" class="form-control" 
@@ -190,7 +214,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                     </tr>
                                     <?php endforeach; ?>
                                     <?php if (empty($items)): ?>
-                                        <tr><td colspan="8" class="text-center py-4 text-muted">لا توجد أصناف في المخزن</td></tr>
+                                        <tr><td colspan="10" class="text-center py-4 text-muted">لا توجد أصناف في المخزن</td></tr>
                                     <?php endif; ?>
                                 </tbody>
                             </table>
@@ -208,26 +232,20 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             <?php endif; ?>
         </div>
     </div>
-
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function toggleAll() {
-            const checked = document.getElementById('selectAll').checked;
-            document.querySelectorAll('.row-check').forEach(cb => cb.checked = checked);
+        function toggleAll() { 
+            document.querySelectorAll('.row-check').forEach(cb => cb.checked = document.getElementById('selectAll').checked); 
         }
-        
         function calcProfit(el, id) {
-            // Find the row
             const row = el.closest('tr');
             const cost = parseFloat(row.querySelector('input[name^="cost["]').value) || 0;
             const sell = parseFloat(row.querySelector('input[name^="sell["]').value) || 0;
             const profit = sell > 0 ? ((sell - cost) / sell * 100) : 0;
-            
             const badge = document.getElementById('profit_' + id);
             badge.textContent = profit.toFixed(1) + '%';
             badge.className = 'profit-display ' + (profit >= 10 ? 'profit-good' : 'profit-bad');
-            
-            // Auto-check the row
             row.querySelector('.row-check').checked = true;
         }
     </script>
