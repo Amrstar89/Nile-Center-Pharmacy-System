@@ -6,19 +6,14 @@ requireAuth();
 $db = getDB();
 $page_title = 'تعديل الأرصدة والأسعار';
 
-// Check which columns exist in stores table
-$cols = $db->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stores'")->fetchAll(PDO::FETCH_COLUMN);
-$has_store_category = in_array('store_category', $cols);
-$has_is_main_store = in_array('is_main_store', $cols);
-
-$order_by = $has_is_main_store ? "is_main_store DESC, store_name" : "store_name";
-
 // Get branches
 $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
 
-// Get categories for filter
-$categories = $db->query("SELECT id, category_name FROM product_categories WHERE is_active = 1 ORDER BY category_name")->fetchAll();
-$companies = $db->query("SELECT id, company_name FROM companies WHERE is_active = 1 ORDER BY company_name")->fetchAll();
+// Get categories for filter (using correct column: category_name_ar)
+$categories = $db->query("SELECT id, category_name_ar FROM product_categories WHERE is_active = 1 ORDER BY category_name_ar")->fetchAll();
+
+// Get companies for filter (using correct table: product_companies, column: company_name_ar)
+$companies = $db->query("SELECT id, company_name_ar FROM product_companies WHERE is_active = 1 ORDER BY company_name_ar")->fetchAll();
 
 $selected_store = intval($_GET['store'] ?? 0);
 $selected_branch = intval($_GET['branch'] ?? 0);
@@ -29,24 +24,23 @@ $filter_company = intval($_GET['company'] ?? 0);
 $items = [];
 if ($selected_store > 0) {
     $sql = "
-        SELECT ii.*, p.product_name, p.product_code, p.manual_code, p.barcode,
-               p.has_expire, p.company_id, c.company_name, p.scientific_name,
-               u.unit_name_ar, p.category_id, pc.category_name
+        SELECT ii.*, p.product_name, p.product_code, p.manual_code, p.scientific_name,
+               p.has_expire, p.company_id, pc.company_name_ar, 
+               u.unit_name_ar, p.category_id, cat.category_name_ar
         FROM inventory_items ii
         JOIN products p ON ii.product_id = p.id
-        LEFT JOIN companies c ON p.company_id = c.id
-        LEFT JOIN product_units u ON p.unit_id = u.id
-        LEFT JOIN product_categories pc ON p.category_id = pc.id
+        LEFT JOIN product_companies pc ON p.company_id = pc.id
+        LEFT JOIN product_units u ON p.unit1_id = u.id
+        LEFT JOIN product_categories cat ON p.category_id = cat.id
         WHERE ii.store_id = ? AND ii.is_active = 1
     ";
     $params = [$selected_store];
     
     if ($search) {
-        $sql .= " AND (p.product_name LIKE ? OR p.product_code LIKE ? OR p.manual_code LIKE ? OR p.barcode = ?)";
+        $sql .= " AND (p.product_name LIKE ? OR p.product_code LIKE ? OR p.manual_code LIKE ?)";
         $params[] = "%$search%";
         $params[] = "%$search%";
         $params[] = "%$search%";
-        $params[] = $search;
     }
     
     if ($filter_category > 0) {
@@ -68,17 +62,12 @@ if ($selected_store > 0) {
 // Get stores for selected branch
 $stores = [];
 if ($selected_branch > 0) {
-    $stmt = $db->prepare("SELECT id, store_name, store_code, store_type, store_category FROM stores WHERE branch_id = ? AND is_active = 1 ORDER BY {$order_by}");
+    $stmt = $db->prepare("SELECT id, store_name, store_code, store_type, store_category FROM stores WHERE branch_id = ? AND is_active = 1 ORDER BY store_name");
     $stmt->execute([$selected_branch]);
     $stores = $stmt->fetchAll();
 }
 
-$category_labels = [
-    'main_store' => 'رئيسي', 'warehouse' => 'مستودع', 'cold' => 'ثلاجة',
-    'narcotics' => 'مخدرات', 'cosmetics' => 'تجميل', 'medical_supply' => 'مستلزمات',
-    'surplus' => 'فائض', 'damaged' => 'تالف', 'expired' => 'منتهي'
-];
-
+$page_title = 'تعديل الأرصدة والأسعار';
 require_once __DIR__ . '/../../../includes/sidebar.php';
 ?>
 <!DOCTYPE html>
@@ -103,7 +92,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         .profit-bad { background: #f8d7da; color: #721c24; }
         .filter-bar { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
         .action-bar { background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px; border: 1px solid #e9ecef; }
-        .summary-bar { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 15px 20px; border-radius: 12px; position: sticky; bottom: 20px; z-index: 100; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -114,7 +102,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             <h2 class="mb-4"><i class="bi bi-pencil-square"></i> <?= $page_title ?></h2>
             
             <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> اختر الفرع ثم المخزن لتعديل أسعار التكلفة وأسعار البيع ونسب الربح للأصناف. يمكنك أيضاً إضافة أصناف جديدة للمخزن.
+                <i class="bi bi-info-circle"></i> اختر الفرع ثم المخزن لتعديل أسعار التكلفة وأسعار البيع ونسب الربح للأصناف.
             </div>
 
             <!-- Filters -->
@@ -132,9 +120,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                         <select name="store" class="form-select" onchange="this.form.submit()">
                             <option value="0">اختر المخزن</option>
                             <?php foreach ($stores as $s): ?>
-                                <option value="<?= $s['id'] ?>" <?= $selected_store == $s['id'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($s['store_name']) ?> <?= $has_store_category ? '(' . ($category_labels[$s['store_category']] ?? 'مخزن') . ')' : '' ?>
-                                </option>
+                                <option value="<?= $s['id'] ?>" <?= $selected_store == $s['id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['store_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -142,7 +128,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                         <select name="category" class="form-select" onchange="this.form.submit()">
                             <option value="0">كل التصنيفات</option>
                             <?php foreach ($categories as $c): ?>
-                                <option value="<?= $c['id'] ?>" <?= $filter_category == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['category_name']) ?></option>
+                                <option value="<?= $c['id'] ?>" <?= $filter_category == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['category_name_ar']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -150,12 +136,12 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                         <select name="company" class="form-select" onchange="this.form.submit()">
                             <option value="0">كل الشركات</option>
                             <?php foreach ($companies as $c): ?>
-                                <option value="<?= $c['id'] ?>" <?= $filter_company == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['company_name']) ?></option>
+                                <option value="<?= $c['id'] ?>" <?= $filter_company == $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['company_name_ar']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <input type="text" name="search" class="form-control" placeholder="بحث باسم أو باركود..." value="<?= htmlspecialchars($search) ?>">
+                        <input type="text" name="search" class="form-control" placeholder="بحث باسم أو كود..." value="<?= htmlspecialchars($search) ?>">
                     </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> بحث</button>
@@ -164,22 +150,13 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             </div>
 
             <?php if ($selected_store > 0): ?>
-            <!-- Action Bar -->
-            <div class="action-bar d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-0"><i class="bi bi-list-check"></i> أصناف المخزن</h5>
-                    <small class="text-muted"><?= count($items) ?> صنف</small>
-                </div>
-                <div>
-                    <button type="button" class="btn btn-success" onclick="openAddProduct()">
-                        <i class="bi bi-plus-lg"></i> إضافة صنف للمخزن
-                    </button>
-                </div>
-            </div>
-
             <form method="POST" action="save.php">
                 <input type="hidden" name="store_id" value="<?= $selected_store ?>">
                 <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-list-check"></i> أصناف المخزن</h5>
+                        <span class="badge bg-primary"><?= count($items) ?> صنف</span>
+                    </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
@@ -210,8 +187,8 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                             <br><small class="text-muted"><?= htmlspecialchars($item['product_code'] ?? $item['manual_code'] ?? '') ?></small>
                                             <?php if ($item['has_expire']): ?><span class="badge bg-warning text-dark">له تاريخ صلاحية</span><?php endif; ?>
                                         </td>
-                                        <td><small class="text-muted"><?= htmlspecialchars($item['category_name'] ?? '-') ?></small></td>
-                                        <td><small class="text-muted"><?= htmlspecialchars($item['company_name'] ?? '-') ?></small></td>
+                                        <td><small class="text-muted"><?= htmlspecialchars($item['category_name_ar'] ?? '-') ?></small></td>
+                                        <td><small class="text-muted"><?= htmlspecialchars($item['company_name_ar'] ?? '-') ?></small></td>
                                         <td><?= number_format(floatval($item['quantity']), 3) ?></td>
                                         <td>
                                             <input type="number" name="cost[<?= $item['id'] ?>]" class="form-control" 
@@ -257,7 +234,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../../../js/product-search.js"></script>
     <script>
         function toggleAll() { 
             document.querySelectorAll('.row-check').forEach(cb => cb.checked = document.getElementById('selectAll').checked); 
@@ -271,29 +247,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             badge.textContent = profit.toFixed(1) + '%';
             badge.className = 'profit-display ' + (profit >= 10 ? 'profit-good' : 'profit-bad');
             row.querySelector('.row-check').checked = true;
-        }
-        
-        // Open ProductSearch to add a product to this store
-        function openAddProduct() {
-            const storeId = <?= $selected_store ?>;
-            if (!storeId) { alert('اختر المخزن أولاً'); return; }
-            
-            ProductSearch.open({
-                storeId: storeId,
-                onSelect: function(product) {
-                    // Navigate to add product to store page with product info
-                    const params = new URLSearchParams({
-                        store_id: storeId,
-                        product_id: product.id,
-                        product_name: product.product_name,
-                        cost_price: product.cost_price || product.unit_cost || 0,
-                        sell_price: product.sell_price || 0
-                    });
-                    if (confirm('إضافة "' + product.product_name + '" إلى المخزن؟')) {
-                        window.location.href = 'add_product.php?' + params.toString();
-                    }
-                }
-            });
         }
     </script>
 </body>
