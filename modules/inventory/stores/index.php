@@ -44,7 +44,7 @@ if (!empty($search)) {
 // Build SELECT based on available columns
 $total_cost_select = $has_total_cost 
     ? "(SELECT COALESCE(SUM(total_cost), 0) FROM inventory_items WHERE store_id = s.id) as total_value"
-    : "0 as total_value";
+    : "(SELECT COALESCE(SUM(quantity * unit_cost), 0) FROM inventory_items WHERE store_id = s.id) as total_value";
 
 $order_by = $has_is_main_store
     ? "CASE WHEN s.is_main_store = 1 THEN 0 ELSE 1 END, b.branch_name, s.store_name"
@@ -86,13 +86,11 @@ foreach ($all_stores as $store) {
 $category_labels = [
     'main_store' => ['المخزن الرئيسي', 'bi-building', 'primary', 'border-primary'],
     'warehouse' => ['مستودع', 'bi-box-seam', 'info', 'border-info'],
-    'cold' => ['ثلاجة أدوية', 'bi-thermometer-low', 'success', 'border-success'],
-    'narcotics' => ['مخدرات ومؤثرات', 'bi-shield-lock', 'danger', 'border-danger'],
-    'cosmetics' => ['مستحضرات تجميل', 'bi-magic', 'warning', 'border-warning'],
-    'medical_supply' => ['مستلزمات طبية', 'bi-bandaid', 'secondary', 'border-secondary'],
-    'surplus' => ['مخزون فائض', 'bi-stack', 'dark', 'border-dark'],
-    'damaged' => ['بضاعة تالفة', 'bi-trash', 'danger', 'border-danger'],
-    'expired' => ['منتهي الصلاحية', 'bi-calendar-x', 'dark', 'border-dark']
+    'pharmacy' => ['صيدلية', 'bi-capsule', 'success', 'border-success'],
+    'expired' => ['منتهي الصلاحية', 'bi-calendar-x', 'danger', 'border-danger'],
+    'damaged' => ['بضاعة تالفة', 'bi-trash', 'warning', 'border-warning'],
+    'surplus' => ['مخزون فائض', 'bi-stack', 'secondary', 'border-secondary'],
+    'general' => ['مخزن عام', 'bi-box', 'secondary', 'border-secondary']
 ];
 
 // Summary stats
@@ -150,13 +148,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                 <h2><i class="bi bi-building"></i> <?= $page_title ?></h2>
                 <a href="create.php" class="btn btn-primary"><i class="bi bi-plus-lg"></i> مخزن جديد</a>
             </div>
-
-            <?php if (!$has_store_category || !$has_is_main_store): ?>
-                <div class="alert alert-warning">
-                    <i class="bi bi-exclamation-triangle-fill"></i> 
-                    <strong>تنبيه:</strong> الداتابيز محتاجة تحديث. افتح phpMyAdmin → اختار داتابيز nile_center → تبويب SQL → شغل الكود اللي في ملف <code>database/fix_missing_columns.sql</code>
-                </div>
-            <?php endif; ?>
 
             <?php if (isset($_GET['success'])): ?>
                 <div class="alert alert-success alert-dismissible fade show">
@@ -268,13 +259,8 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                                     <div class="stats-row">
                                         <div class="stat"><div class="val"><?= number_format($products_count) ?></div><div class="lbl">صنف</div></div>
                                         <div class="stat"><div class="val"><?= number_format($total_stock, 0) ?></div><div class="lbl">كمية</div></div>
-                                        <?php if ($has_total_cost): ?>
                                         <div class="stat"><div class="val"><?= number_format($total_value, 0) ?></div><div class="lbl">قيمة</div></div>
-                                        <?php endif; ?>
                                     </div>
-                                    <?php if (!empty($store['notes'])): ?>
-                                        <div class="mt-2 text-muted small"><i class="bi bi-info-circle"></i> <?= htmlspecialchars(mb_substr($store['notes'], 0, 60)) ?><?= mb_strlen($store['notes']) > 60 ? '...' : '' ?></div>
-                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
