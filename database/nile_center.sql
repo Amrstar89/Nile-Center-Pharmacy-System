@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 30, 2026 at 12:10 AM
+-- Generation Time: Jun 30, 2026 at 02:14 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -913,6 +913,7 @@ CREATE TABLE `inventory_transfers` (
   `approved_at` datetime DEFAULT NULL,
   `shipped_at` datetime DEFAULT NULL,
   `received_at` datetime DEFAULT NULL,
+  `transfer_date` date DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -920,11 +921,11 @@ CREATE TABLE `inventory_transfers` (
 -- Dumping data for table `inventory_transfers`
 --
 
-INSERT INTO `inventory_transfers` (`id`, `transfer_code`, `from_store_id`, `to_store_id`, `from_branch_id`, `to_branch_id`, `transfer_type`, `status`, `total_items`, `total_quantity`, `total_cost`, `total_sell`, `notes`, `requested_by`, `approved_by`, `shipped_by`, `received_by`, `requested_at`, `approved_at`, `shipped_at`, `received_at`, `created_at`) VALUES
-(1, 'TR-00001', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 1, 5.000, 0.00, 0.00, NULL, 1, 1, 1, 1, '2026-06-27 21:04:12', '2026-06-27 21:04:35', '2026-06-27 21:04:44', '2026-06-29 23:46:43', '2026-06-27 19:04:12'),
-(2, 'TR-00002', 1, 2, NULL, 1, 'central_to_branch', 'received', 2, 350.000, 31200.00, 45500.00, 'تحويل للفرع الرئيسي', 1, 1, 1, 1, '2026-06-23 10:00:00', '2026-06-23 10:30:00', '2026-06-23 11:00:00', '2026-06-23 14:00:00', '2026-06-23 08:00:00'),
-(3, 'TR-00003', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 2, 295.000, 26600.00, 38750.00, 'تحويل لفرع نوال', 1, 1, 1, 1, '2026-06-24 10:00:00', '2026-06-24 10:30:00', '2026-06-24 11:00:00', '2026-06-29 23:22:17', '2026-06-24 08:00:00'),
-(4, 'TR-00004', 2, 1, 1, NULL, 'branch_to_central', 'pending', 1, 50.000, 2100.00, 3250.00, 'إرجاع للمخزن الرئيسي', 1, NULL, NULL, NULL, '2026-06-25 10:00:00', NULL, NULL, NULL, '2026-06-25 08:00:00');
+INSERT INTO `inventory_transfers` (`id`, `transfer_code`, `from_store_id`, `to_store_id`, `from_branch_id`, `to_branch_id`, `transfer_type`, `status`, `total_items`, `total_quantity`, `total_cost`, `total_sell`, `notes`, `requested_by`, `approved_by`, `shipped_by`, `received_by`, `requested_at`, `approved_at`, `shipped_at`, `received_at`, `transfer_date`, `created_at`) VALUES
+(1, 'TR-00001', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 1, 5.000, 0.00, 0.00, NULL, 1, 1, 1, 1, '2026-06-27 21:04:12', '2026-06-27 21:04:35', '2026-06-27 21:04:44', '2026-06-29 23:46:43', NULL, '2026-06-27 19:04:12'),
+(2, 'TR-00002', 1, 2, NULL, 1, 'central_to_branch', 'received', 2, 350.000, 31200.00, 45500.00, 'تحويل للفرع الرئيسي', 1, 1, 1, 1, '2026-06-23 10:00:00', '2026-06-23 10:30:00', '2026-06-23 11:00:00', '2026-06-23 14:00:00', NULL, '2026-06-23 08:00:00'),
+(3, 'TR-00003', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 2, 295.000, 26600.00, 38750.00, 'تحويل لفرع نوال', 1, 1, 1, 1, '2026-06-24 10:00:00', '2026-06-24 10:30:00', '2026-06-24 11:00:00', '2026-06-29 23:22:17', NULL, '2026-06-24 08:00:00'),
+(4, 'TR-00004', 2, 1, 1, NULL, 'branch_to_central', 'pending', 1, 50.000, 2100.00, 3250.00, 'إرجاع للمخزن الرئيسي', 1, NULL, NULL, NULL, '2026-06-25 10:00:00', NULL, NULL, NULL, NULL, '2026-06-25 08:00:00');
 
 -- --------------------------------------------------------
 
@@ -1096,6 +1097,28 @@ INSERT INTO `order_statuses` (`id`, `status_name`, `status_color`, `sort_order`,
 (2, 'جاهز', '#198754', 2, 0, 0, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16'),
 (3, 'تم التسليم', '#0d6efd', 3, 0, 1, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16'),
 (4, 'إلغي', '#dc3545', 4, 0, 1, 1, '2026-06-15 16:53:16', '2026-06-15 16:53:16');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `price_adjustments`
+--
+
+CREATE TABLE `price_adjustments` (
+  `id` int(11) NOT NULL,
+  `store_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `old_cost_price` decimal(12,2) DEFAULT 0.00,
+  `new_cost_price` decimal(12,2) DEFAULT 0.00,
+  `old_sell_price` decimal(12,2) DEFAULT 0.00,
+  `new_sell_price` decimal(12,2) DEFAULT 0.00,
+  `old_profit_margin` decimal(5,2) DEFAULT 0.00,
+  `new_profit_margin` decimal(5,2) DEFAULT 0.00,
+  `adjustment_date` date NOT NULL,
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -1450,6 +1473,28 @@ CREATE TABLE `product_locations` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `product_movements`
+--
+
+CREATE TABLE `product_movements` (
+  `id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `store_id` int(11) NOT NULL,
+  `movement_type` enum('opening_balance','purchase','sale','transfer_in','transfer_out','adjustment','return','damage') NOT NULL,
+  `reference_type` varchar(50) DEFAULT NULL,
+  `reference_id` int(11) DEFAULT NULL,
+  `quantity` decimal(12,3) NOT NULL DEFAULT 0.000,
+  `unit_cost` decimal(12,2) DEFAULT 0.00,
+  `unit_price` decimal(12,2) DEFAULT 0.00,
+  `batch_id` int(11) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `product_price_history`
 --
 
@@ -1617,7 +1662,7 @@ CREATE TABLE `stock_adjustments` (
   `id` int(11) NOT NULL,
   `adjustment_code` varchar(20) NOT NULL,
   `store_id` int(11) NOT NULL,
-  `adjustment_type` enum('periodic','spot','year_end','damage','expired') DEFAULT 'periodic',
+  `adjustment_type` enum('periodic') DEFAULT 'periodic',
   `status` enum('draft','counting','completed','cancelled') DEFAULT 'draft',
   `total_items` int(11) DEFAULT 0,
   `counted_items` int(11) DEFAULT 0,
@@ -1639,7 +1684,7 @@ INSERT INTO `stock_adjustments` (`id`, `adjustment_code`, `store_id`, `adjustmen
 (1, 'ADJ-00001', 6, 'periodic', 'draft', 0, 0, 0.000, 0.00, 1, NULL, '2026-06-27 20:59:57', NULL, NULL, '2026-06-27 18:59:57'),
 (2, 'ADJ-00002', 1, 'periodic', 'draft', 0, 0, 0.000, 0.00, 1, NULL, '2026-06-27 21:00:48', NULL, NULL, '2026-06-27 19:00:48'),
 (3, 'ADJ-00003', 1, 'periodic', 'completed', 5, 5, 10.000, 350.00, 1, 1, '2026-06-26 10:00:00', '2026-06-26 12:00:00', 'جرد دوري', '2026-06-26 08:00:00'),
-(4, 'ADJ-00004', 2, 'spot', 'draft', 0, 0, 0.000, 0.00, 1, NULL, '2026-06-27 10:00:00', NULL, 'جرد مفاجئ', '2026-06-27 08:00:00'),
+(4, 'ADJ-00004', 2, '', 'draft', 0, 0, 0.000, 0.00, 1, NULL, '2026-06-27 10:00:00', NULL, 'جرد مفاجئ', '2026-06-27 08:00:00'),
 (5, 'ADJ-9.2233720368548E', 1, 'periodic', 'completed', 10, 0, 0.000, 0.00, 1, NULL, '2026-06-28 20:02:17', NULL, NULL, '2026-06-28 18:02:17');
 
 -- --------------------------------------------------------
@@ -1694,10 +1739,10 @@ CREATE TABLE `stores` (
   `id` int(11) NOT NULL,
   `store_code` varchar(20) NOT NULL,
   `store_name` varchar(100) NOT NULL,
-  `store_type` enum('central_main','branch_main','sub_store','pharmacy','warehouse','damaged','expired','returned') DEFAULT 'sub_store',
+  `store_type` enum('main','sub') NOT NULL DEFAULT 'sub',
+  `store_category` enum('warehouse','pharmacy','expired','damaged','surplus','general') NOT NULL DEFAULT 'general',
   `branch_id` int(11) DEFAULT NULL,
   `parent_store_id` int(11) DEFAULT NULL,
-  `is_main` tinyint(1) DEFAULT 0,
   `is_active` tinyint(1) DEFAULT 1,
   `notes` text DEFAULT NULL,
   `created_by` int(11) DEFAULT NULL,
@@ -1709,29 +1754,29 @@ CREATE TABLE `stores` (
 -- Dumping data for table `stores`
 --
 
-INSERT INTO `stores` (`id`, `store_code`, `store_name`, `store_type`, `branch_id`, `parent_store_id`, `is_main`, `is_active`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'CENT-01', 'المخزن الرئيسي المركزي', 'central_main', NULL, NULL, 1, 1, 'المخزن الرئيسي للشركة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(2, 'BR01-MAIN', 'مخزن فرع الشركة الرئيسي', 'branch_main', 1, 1, 1, 1, 'المخزن الرئيسي لفرع الشركة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(3, 'BR02-MAIN', 'مخزن فرع نوال الرئيسي', 'branch_main', 2, 1, 1, 1, 'المخزن الرئيسي لفرع نوال', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(4, 'BR03-MAIN', 'مخزن فرع مصدق الرئيسي', 'branch_main', 3, 1, 1, 1, 'المخزن الرئيسي لفرع مصدق', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(5, 'BR04-MAIN', 'مخزن فرع صيد الرئيسي', 'branch_main', 4, 1, 1, 1, 'المخزن الرئيسي لفرع صيد', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(6, 'BR01-PHARM', 'صيدلية فرع الشركة', 'pharmacy', 1, 2, 0, 1, 'صيدلية فرع الشركة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(7, 'BR01-WH', 'مستودع فرع الشركة', 'warehouse', 1, 2, 0, 1, 'مستودع فرع الشركة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(8, 'BR01-DMG', 'مخزن التالف فرع الشركة', 'damaged', 1, 2, 0, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(9, 'BR01-EXP', 'مخزن الهالك فرع الشركة', 'expired', 1, 2, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(10, 'BR02-PHARM', 'صيدلية فرع نوال', 'pharmacy', 2, 3, 0, 1, 'صيدلية فرع نوال', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(11, 'BR02-WH', 'مستودع فرع نوال', 'warehouse', 2, 3, 0, 1, 'مستودع فرع نوال', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(12, 'BR02-DMG', 'مخزن التالف فرع نوال', 'damaged', 2, 3, 0, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(13, 'BR02-EXP', 'مخزن الهالك فرع نوال', 'expired', 2, 3, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(14, 'BR03-PHARM', 'صيدلية فرع مصدق', 'pharmacy', 3, 4, 0, 1, 'صيدلية فرع مصدق', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(15, 'BR03-WH', 'مستودع فرع مصدق', 'warehouse', 3, 4, 0, 1, 'مستودع فرع مصدق', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(16, 'BR03-DMG', 'مخزن التالف فرع مصدق', 'damaged', 3, 4, 0, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(17, 'BR03-EXP', 'مخزن الهالك فرع مصدق', 'expired', 3, 4, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(18, 'BR04-PHARM', 'صيدلية فرع صيد', 'pharmacy', 4, 5, 0, 1, 'صيدلية فرع صيد', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(19, 'BR04-WH', 'مستودع فرع صيد', 'warehouse', 4, 5, 0, 1, 'مستودع فرع صيد', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(20, 'BR04-DMG', 'مخزن التالف فرع صيد', 'damaged', 4, 5, 0, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(21, 'BR04-EXP', 'مخزن الهالك فرع صيد', 'expired', 4, 5, 0, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-27 18:58:15'),
-(22, 'BR02-EXPENSIVE', 'مخزن الغوالي', 'branch_main', 2, 3, 0, 1, NULL, 1, '2026-06-29 21:17:00', '2026-06-29 21:17:00');
+INSERT INTO `stores` (`id`, `store_code`, `store_name`, `store_type`, `store_category`, `branch_id`, `parent_store_id`, `is_active`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 'CENT-01', 'المخزن الرئيسي المركزي', 'sub', 'general', NULL, NULL, 1, 'المخزن الرئيسي للشركة', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(2, 'BR01-MAIN', 'مخزن فرع الشركة الرئيسي', 'sub', 'general', 1, 1, 1, 'المخزن الرئيسي لفرع الشركة', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(3, 'BR02-MAIN', 'مخزن فرع نوال الرئيسي', 'sub', 'general', 2, 1, 1, 'المخزن الرئيسي لفرع نوال', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(4, 'BR03-MAIN', 'مخزن فرع مصدق الرئيسي', 'sub', 'general', 3, 1, 1, 'المخزن الرئيسي لفرع مصدق', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(5, 'BR04-MAIN', 'مخزن فرع صيد الرئيسي', 'sub', 'general', 4, 1, 1, 'المخزن الرئيسي لفرع صيد', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(6, 'BR01-PHARM', 'صيدلية فرع الشركة', 'sub', 'pharmacy', 1, 2, 1, 'صيدلية فرع الشركة', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(7, 'BR01-WH', 'مستودع فرع الشركة', 'sub', 'warehouse', 1, 2, 1, 'مستودع فرع الشركة', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(8, 'BR01-DMG', 'مخزن التالف فرع الشركة', 'sub', 'damaged', 1, 2, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(9, 'BR01-EXP', 'مخزن الهالك فرع الشركة', 'sub', 'expired', 1, 2, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(10, 'BR02-PHARM', 'صيدلية فرع نوال', 'sub', 'pharmacy', 2, 3, 1, 'صيدلية فرع نوال', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(11, 'BR02-WH', 'مستودع فرع نوال', 'sub', 'warehouse', 2, 3, 1, 'مستودع فرع نوال', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(12, 'BR02-DMG', 'مخزن التالف فرع نوال', 'sub', 'damaged', 2, 3, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(13, 'BR02-EXP', 'مخزن الهالك فرع نوال', 'sub', 'expired', 2, 3, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(14, 'BR03-PHARM', 'صيدلية فرع مصدق', 'sub', 'pharmacy', 3, 4, 1, 'صيدلية فرع مصدق', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(15, 'BR03-WH', 'مستودع فرع مصدق', 'sub', 'warehouse', 3, 4, 1, 'مستودع فرع مصدق', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(16, 'BR03-DMG', 'مخزن التالف فرع مصدق', 'sub', 'damaged', 3, 4, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(17, 'BR03-EXP', 'مخزن الهالك فرع مصدق', 'sub', 'expired', 3, 4, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(18, 'BR04-PHARM', 'صيدلية فرع صيد', 'sub', 'pharmacy', 4, 5, 1, 'صيدلية فرع صيد', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(19, 'BR04-WH', 'مستودع فرع صيد', 'sub', 'warehouse', 4, 5, 1, 'مستودع فرع صيد', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(20, 'BR04-DMG', 'مخزن التالف فرع صيد', 'sub', 'damaged', 4, 5, 1, 'مخزن الأصناف التالفة', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(21, 'BR04-EXP', 'مخزن الهالك فرع صيد', 'sub', 'expired', 4, 5, 1, 'مخزن الأصناف منتهية الصلاحية', 1, '2026-06-27 18:58:15', '2026-06-30 00:10:11'),
+(22, 'BR02-EXPENSIVE', 'مخزن الغوالي', 'sub', 'general', 2, 3, 1, NULL, 1, '2026-06-29 21:17:00', '2026-06-30 00:10:11');
 
 -- --------------------------------------------------------
 
@@ -2392,6 +2437,14 @@ ALTER TABLE `order_statuses`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `price_adjustments`
+--
+ALTER TABLE `price_adjustments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_store_product` (`store_id`,`product_id`),
+  ADD KEY `idx_date` (`adjustment_date`);
+
+--
 -- Indexes for table `products`
 --
 ALTER TABLE `products`
@@ -2437,6 +2490,14 @@ ALTER TABLE `product_locations`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uk_product_location` (`product_id`,`location_code`),
   ADD KEY `idx_product` (`product_id`);
+
+--
+-- Indexes for table `product_movements`
+--
+ALTER TABLE `product_movements`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_product_store` (`product_id`,`store_id`),
+  ADD KEY `idx_created_at` (`created_at`);
 
 --
 -- Indexes for table `product_price_history`
@@ -2748,6 +2809,12 @@ ALTER TABLE `order_statuses`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
+-- AUTO_INCREMENT for table `price_adjustments`
+--
+ALTER TABLE `price_adjustments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `products`
 --
 ALTER TABLE `products`
@@ -2769,6 +2836,12 @@ ALTER TABLE `product_barcodes`
 -- AUTO_INCREMENT for table `product_locations`
 --
 ALTER TABLE `product_locations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `product_movements`
+--
+ALTER TABLE `product_movements`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
