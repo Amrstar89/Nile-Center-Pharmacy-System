@@ -84,9 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $batch_code = 'OB-' . time() . '-' . rand(100, 999);
                 $db->prepare("
                     INSERT INTO inventory_batches 
-                    (product_id, store_id, batch_number, exp_date, initial_qty, remaining_qty, unit_cost, sell_price, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
-                ")->execute([$product_id, $store_id, $batch_code, $exp_date, $quantity, $quantity, $unit_cost, $sell_price]);
+                    (product_id, store_id, batch_number, exp_date, remaining_qty, unit_cost, sell_price, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                ")->execute([$product_id, $store_id, $batch_code, $exp_date, $quantity, $unit_cost, $sell_price]);
             }
         }
 
