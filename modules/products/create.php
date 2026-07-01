@@ -118,9 +118,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $unit3_sell_price = $sell_price / $unit1_to_unit3;
         }
 
-        // Insert product WITHOUT product_code (will be set to id after insert)
+        // Insert product with temporary product_code (will be updated to id after insert)
         $sql = "INSERT INTO products SET
-            product_code = NULL,
+            product_code = 'TMP',
             product_name = :product_name,
             product_name_en = :product_name_en,
             scientific_name = :scientific_name,
@@ -206,8 +206,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Set product_code = id (sequential number: 1, 2, 3...)
-        $update_stmt = $db->prepare("UPDATE products SET product_code = ? WHERE id = ?");
-        $update_stmt->execute([$product_id, $product_id]);
+        $update_stmt = $db->prepare("UPDATE products SET product_code = CAST(? AS CHAR) WHERE id = ?");
+        $update_stmt->execute([(string)$product_id, $product_id]);
 
         // Insert barcodes
         if (!empty($_POST['barcodes'])) {
