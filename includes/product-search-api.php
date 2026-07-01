@@ -4,7 +4,6 @@
  */
 header('Content-Type: application/json; charset=utf-8');
 
-// Disable error display - return JSON only
 ini_set('display_errors', 0);
 error_reporting(0);
 
@@ -106,7 +105,7 @@ try {
         $pu_col = "p.unit_id";
     }
 
-    // Get products
+    // Get products with LIMIT/OFFSET inline (not as placeholders for MariaDB)
     $sql = "SELECT 
         p.id, p.product_name, p.product_name_en, p.product_code, p.manual_code,
         p.cost_price, p.sell_price, p.has_expire, p.scientific_name,
@@ -132,23 +131,34 @@ try {
         $sql .= "\nHAVING stock_qty > 0";
     }
     
-    $sql .= "\nORDER BY p.product_name\nLIMIT ? OFFSET ?";
+    // MariaDB fix: inline LIMIT/OFFSET as integers, not placeholders
+    $sql .= "\nORDER BY p.product_name\nLIMIT " . intval($limit) . " OFFSET " . intval($offset);
 
     $stmt = $db->prepare($sql);
-    $all_params = array_merge([$store_id], $params, [$limit, $offset]);
-    $stmt->execute($all_params);
+    
+    // Bind store_id as first param
+    $stmt->bindValue(1, intval($store_id), PDO::PARAM_INT);
+    
+    // Bind remaining params
+    $paramIdx = 2;
+    foreach ($params as $p) {
+        $stmt->bindValue($paramIdx, $p, is_int($p) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        $paramIdx++;
+    }
+    
+    $stmt->execute();
     $products = $stmt->fetchAll();
 
     // Get total count
-    $total = count($products); // Simple count for now
-    
-    // Get total from a separate count query
     $count_sql = "SELECT COUNT(DISTINCT p.id) as total FROM products p 
         LEFT JOIN product_companies pco ON p.company_id = pco.id 
         LEFT JOIN product_categories pca ON p.category_id = pca.id
         WHERE {$where_str}";
     $count_stmt = $db->prepare($count_sql);
-    $count_stmt->execute($params);
+    foreach ($params as $i => $p) {
+        $count_stmt->bindValue($i + 1, $p, is_int($p) ? PDO::PARAM_INT : PDO::PARAM_STR);
+    }
+    $count_stmt->execute();
     $total = intval($count_stmt->fetch()['total'] ?? 0);
 
     // Get batches for each product
