@@ -166,13 +166,19 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         .product-display .prod-name { font-weight: 600; color: #333; }
         .product-display .prod-code { font-size: 11px; color: #888; font-family: monospace; }
         
-        .barcode-wrap { position: relative; }
+        /* FIX: Search button z-index and positioning */
+        .barcode-wrap { position: relative; z-index: 1; }
         .barcode-wrap .btn-f2 { 
             position: absolute; left: 0; top: 0; bottom: 0;
             border-radius: 8px 0 0 8px; border: 1px solid #dee2e6;
             background: #f8f9fa; padding: 0 12px; cursor: pointer;
+            z-index: 5; /* Above sidebar */
+            width: 40px;
+            display: flex; align-items: center; justify-content: center;
         }
-        .barcode-wrap input { padding-left: 50px; }
+        .barcode-wrap .btn-f2:hover { background: #e9ecef; border-color: var(--primary); }
+        .barcode-wrap .btn-f2 i { pointer-events: none; } /* Prevent icon from stealing click */
+        .barcode-wrap input { padding-left: 45px; }
         
         .stock-badge { font-size: 11px; padding: 4px 10px; border-radius: 6px; }
         
