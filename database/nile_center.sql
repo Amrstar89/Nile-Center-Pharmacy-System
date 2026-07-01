@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 01, 2026 at 12:09 AM
+-- Generation Time: Jul 02, 2026 at 12:15 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -163,7 +163,8 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (116, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-29 21:44:48'),
 (117, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 17:22:05'),
 (118, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 19:38:28'),
-(119, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 20:43:54');
+(119, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 20:43:54'),
+(120, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-01 20:02:18');
 
 -- --------------------------------------------------------
 
@@ -797,7 +798,8 @@ INSERT INTO `inventory_batches` (`id`, `batch_number`, `product_id`, `store_id`,
 (12, 'BATCH-012', 16, 2, 2, 150.000, 140.000, 42.00, 42.00, 65.00, 0.00, 14.00, '2027-09-30', '2026-04-01', 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (13, 'BATCH-013', 28, 3, 2, 100.000, 95.000, 16.00, 16.00, 25.00, 0.00, 14.00, '2027-06-30', '2026-07-01', 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (14, 'BATCH-014', 29, 3, 2, 200.000, 190.000, 11.00, 11.00, 18.00, 0.00, 14.00, '2027-05-31', '2026-08-01', 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
-(15, 'BATCH-015', 17, 4, 2, 120.000, 110.000, 48.00, 48.00, 75.00, 0.00, 14.00, '2027-08-31', '2026-05-01', 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00');
+(15, 'BATCH-015', 17, 4, 2, 120.000, 110.000, 48.00, 48.00, 75.00, 0.00, 14.00, '2027-08-31', '2026-05-01', 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
+(16, 'OB-1782943764-428', 101, 2, NULL, 0.000, 5.000, 0.00, 67.50, 90.00, 0.00, 0.00, '2028-05-10', NULL, 1, '2026-07-01 22:09:24', '2026-07-01 22:09:24');
 
 -- --------------------------------------------------------
 
@@ -837,11 +839,12 @@ INSERT INTO `inventory_items` (`id`, `store_id`, `product_id`, `batch_id`, `quan
 (8, 1, 29, 8, 1400.000, 11.00, 18.00, 0.00, 14.00, 150.000, 3000.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (9, 1, 36, 9, 480.000, 62.00, 95.00, 0.00, 14.00, 50.000, 1000.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (10, 1, 40, 10, 380.000, 35.00, 65.00, 0.00, 14.00, 40.000, 800.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
-(11, 2, 10, 11, 179.000, 30.00, 45.00, 0.00, 14.00, 20.000, 500.000, 1, '2026-06-20 08:00:00', '2026-06-30 01:00:50'),
-(12, 2, 16, 12, 139.000, 42.00, 65.00, 0.00, 14.00, 15.000, 400.000, 1, '2026-06-20 08:00:00', '2026-06-30 01:00:50'),
+(11, 2, 10, 11, 0.000, 30.00, 45.00, 0.00, 14.00, 20.000, 500.000, 1, '2026-06-20 08:00:00', '2026-06-30 23:22:11'),
+(12, 2, 16, 12, 0.000, 45.00, 65.00, 0.00, 14.00, 15.000, 400.000, 1, '2026-06-20 08:00:00', '2026-06-30 23:48:06'),
 (13, 3, 28, 13, 95.000, 16.00, 25.00, 0.00, 14.00, 10.000, 300.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (14, 3, 29, 14, 190.000, 11.00, 18.00, 0.00, 14.00, 20.000, 500.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
-(15, 4, 17, 15, 110.000, 48.00, 75.00, 0.00, 14.00, 12.000, 350.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00');
+(15, 4, 17, 15, 110.000, 48.00, 75.00, 0.00, 14.00, 12.000, 350.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
+(17, 2, 101, NULL, 5.000, 67.50, 90.00, 25.00, 0.00, 0.000, 0.000, 1, '2026-07-01 22:09:24', '2026-07-01 22:09:24');
 
 -- --------------------------------------------------------
 
@@ -888,7 +891,10 @@ INSERT INTO `inventory_transactions` (`id`, `transaction_type`, `reference_type`
 (9, 'transfer_out', 'transfer_order', 2, 1, 10, 1, 1, 1.000, -200.000, -200.000, 30.00, 45.00, 0.00, 14.00, -6000.00, -9000.00, 'تحويل لفرع نوال', 1, '2026-06-23 08:00:00'),
 (10, 'transfer_in', 'transfer_order', 2, 2, 10, 11, 1, 1.000, 200.000, 200.000, 30.00, 45.00, 0.00, 14.00, 6000.00, 9000.00, 'استلام من المخزن الرئيسي', 1, '2026-06-23 08:00:00'),
 (11, 'damage', 'adjustment', 14, 2, 10, NULL, NULL, 1.000, -1.000, -1.000, 30.00, 0.00, 0.00, 0.00, -30.00, 0.00, 'جرد: ADJ-202606-0001', 1, '2026-06-30 01:00:50'),
-(12, 'damage', 'adjustment', 14, 2, 16, NULL, NULL, 1.000, -1.000, -1.000, 42.00, 0.00, 0.00, 0.00, -42.00, 0.00, 'جرد: ADJ-202606-0001', 1, '2026-06-30 01:00:50');
+(12, 'damage', 'adjustment', 14, 2, 16, NULL, NULL, 1.000, -1.000, -1.000, 42.00, 0.00, 0.00, 0.00, -42.00, 0.00, 'جرد: ADJ-202606-0001', 1, '2026-06-30 01:00:50'),
+(13, 'damage', 'adjustment', 15, 2, 10, NULL, NULL, 1.000, -179.000, -179.000, 30.00, 0.00, 0.00, 0.00, -5370.00, 0.00, 'جرد: ADJ-202607-0001', 1, '2026-06-30 23:22:11'),
+(14, 'damage', 'adjustment', 15, 2, 16, NULL, NULL, 1.000, -139.000, -139.000, 42.00, 0.00, 0.00, 0.00, -5838.00, 0.00, 'جرد: ADJ-202607-0001', 1, '2026-06-30 23:22:11'),
+(16, 'opening_balance', 'opening_balance', NULL, 2, 101, NULL, NULL, 1.000, 5.000, 5.000, 67.50, 90.00, 25.00, 0.00, 337.50, 0.00, 'رصيد افتتاحي', 1, '2026-07-01 22:09:24');
 
 -- --------------------------------------------------------
 
@@ -927,7 +933,7 @@ CREATE TABLE `inventory_transfers` (
 --
 
 INSERT INTO `inventory_transfers` (`id`, `transfer_code`, `from_store_id`, `to_store_id`, `from_branch_id`, `to_branch_id`, `transfer_type`, `status`, `total_items`, `total_quantity`, `total_cost`, `total_sell`, `notes`, `requested_by`, `approved_by`, `shipped_by`, `received_by`, `requested_at`, `approved_at`, `shipped_at`, `received_at`, `transfer_date`, `created_at`) VALUES
-(1, 'TR-00001', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 1, 5.000, 0.00, 0.00, NULL, 1, 1, 1, 1, '2026-06-27 21:04:12', '2026-06-27 21:04:35', '2026-06-27 21:04:44', '2026-06-30 02:59:56', NULL, '2026-06-27 19:04:12'),
+(1, 'TR-00001', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 1, 5.000, 0.00, 0.00, NULL, 1, 1, 1, 1, '2026-06-27 21:04:12', '2026-06-27 21:04:35', '2026-06-27 21:04:44', '2026-07-01 01:01:07', NULL, '2026-06-27 19:04:12'),
 (2, 'TR-00002', 1, 2, NULL, 1, 'central_to_branch', 'received', 2, 350.000, 31200.00, 45500.00, 'تحويل للفرع الرئيسي', 1, 1, 1, 1, '2026-06-23 10:00:00', '2026-06-23 10:30:00', '2026-06-23 11:00:00', '2026-06-23 14:00:00', NULL, '2026-06-23 08:00:00'),
 (3, 'TR-00003', 1, 3, NULL, 2, 'central_to_branch', 'partial_received', 2, 295.000, 26600.00, 38750.00, 'تحويل لفرع نوال', 1, 1, 1, 1, '2026-06-24 10:00:00', '2026-06-24 10:30:00', '2026-06-24 11:00:00', '2026-06-29 23:22:17', NULL, '2026-06-24 08:00:00'),
 (4, 'TR-00004', 2, 1, 1, NULL, 'branch_to_central', 'pending', 1, 50.000, 2100.00, 3250.00, 'إرجاع للمخزن الرئيسي', 1, NULL, NULL, NULL, '2026-06-25 10:00:00', NULL, NULL, NULL, NULL, '2026-06-25 08:00:00');
@@ -1282,7 +1288,8 @@ INSERT INTO `products` (`id`, `product_code`, `product_name`, `product_name_en`,
 (97, '97', 'كريم حفاضات 50 جم', 'Diaper Cream 50g', NULL, 2, 0, 0, 0, 150, 15, 30, 'منتجات الأم والطفل', 'Johnson', 27, 11, 45.00, 0.00, 0.00, 1, 0, 0, 0, 1, 'EAN13', NULL, 32.00, 0, '', 0, 1, 20.00, 6, 0, 0, 0, 0, 6, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00', 'manual', NULL, 'M-00097'),
 (98, '98', 'منظف جراحي 500 مل', 'Surgical Cleaner 500ml', NULL, 4, 0, 0, 0, 200, 20, 40, 'مواد تعقيم', 'Eva Pharma', 30, 30, 65.00, 0.00, 0.00, 1, 0, 0, 0, 1, 'EAN13', NULL, 45.00, 0, '', 0, 1, 15.00, 5, 0, 0, 0, 0, 5, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00', 'manual', NULL, 'M-00098'),
 (99, '99', 'كحول إيثيلي 70% 500 مل', 'Ethanol 70% 500ml', NULL, 4, 0, 0, 0, 300, 30, 60, 'مواد تعقيم', 'Eva Pharma', 30, 30, 35.00, 0.00, 0.00, 1, 0, 0, 0, 1, 'EAN13', NULL, 24.00, 0, '', 0, 1, 20.00, 5, 0, 0, 0, 0, 5, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00', 'manual', NULL, 'M-00099'),
-(100, '100', 'مطهر بيتادين 100 مل', 'Betadine 100ml', NULL, 4, 0, 0, 0, 400, 40, 80, 'مواد تعقيم', 'Meda', 30, 15, 55.00, 0.00, 0.00, 1, 0, 0, 0, 1, 'EAN13', NULL, 38.00, 0, '', 0, 1, 15.00, 5, 0, 0, 0, 0, 5, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00', 'manual', NULL, 'M-00100');
+(100, '100', 'مطهر بيتادين 100 مل', 'Betadine 100ml', NULL, 4, 0, 0, 0, 400, 40, 80, 'مواد تعقيم', 'Meda', 30, 15, 55.00, 0.00, 0.00, 1, 0, 0, 0, 1, 'EAN13', NULL, 38.00, 0, '', 0, 1, 15.00, 5, 0, 0, 0, 0, 5, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00', 'manual', NULL, 'M-00100'),
+(101, '101', 'تيبونيا فورت 40مجم', 'TEBONINA FORTE 40MG', 'GINKGO BILOBA DRY EXTRACT', 1, 0, 0, 0, 100, 2, 10, NULL, NULL, 6, 25, 90.00, 45.00, 45.00, 1, 0, 0, 0, 0, NULL, NULL, 67.50, 0, '', 0, 1, 50.00, 7, 8, 8, 2, 2, 1, 1, '2026-07-01 21:59:00', '2026-07-01 21:59:00', 'manual', NULL, 't');
 
 -- --------------------------------------------------------
 
@@ -1691,7 +1698,11 @@ INSERT INTO `stock_adjustments` (`id`, `adjustment_code`, `store_id`, `adjustmen
 (3, 'ADJ-00003', 1, 'periodic', 'completed', 5, 5, 10.000, 350.00, 1, 1, '2026-06-26 10:00:00', '2026-06-26 12:00:00', 'جرد دوري', '2026-06-26 08:00:00'),
 (4, 'ADJ-00004', 2, '', 'draft', 0, 0, 0.000, 0.00, 1, NULL, '2026-06-27 10:00:00', NULL, 'جرد مفاجئ', '2026-06-27 08:00:00'),
 (5, 'ADJ-9.2233720368548E', 1, 'periodic', 'completed', 10, 0, 0.000, 0.00, 1, NULL, '2026-06-28 20:02:17', NULL, NULL, '2026-06-28 18:02:17'),
-(14, 'ADJ-202606-0001', 2, 'periodic', 'completed', 2, 0, -2.000, -72.00, 1, NULL, '2026-06-30 03:00:20', NULL, NULL, '2026-06-30 01:00:20');
+(14, 'ADJ-202606-0001', 2, 'periodic', 'completed', 2, 0, -2.000, -72.00, 1, NULL, '2026-06-30 03:00:20', NULL, NULL, '2026-06-30 01:00:20'),
+(15, 'ADJ-202607-0001', 2, 'periodic', 'completed', 2, 0, -318.000, -11208.00, 1, NULL, '2026-07-01 01:21:59', NULL, NULL, '2026-06-30 23:21:59'),
+(16, 'ADJ-202607-0002', 2, 'periodic', 'draft', 2, 0, 0.000, 0.00, 1, NULL, '2026-07-01 01:22:23', NULL, NULL, '2026-06-30 23:22:23'),
+(17, 'ADJ-202607-0003', 2, 'periodic', 'draft', 2, 0, 0.000, 0.00, 1, NULL, '2026-07-01 01:46:14', NULL, NULL, '2026-06-30 23:46:14'),
+(18, 'ADJ-202607-0004', 2, 'periodic', 'draft', 2, 0, 0.000, 0.00, 1, NULL, '2026-07-01 02:00:05', NULL, NULL, '2026-07-01 00:00:05');
 
 -- --------------------------------------------------------
 
@@ -1735,7 +1746,15 @@ INSERT INTO `stock_adjustment_items` (`id`, `adjustment_id`, `product_id`, `batc
 (14, 5, 36, 9, 480.000, 480.000, 0.000, 62.00, 0.00, 0, NULL, NULL),
 (15, 5, 40, 10, 380.000, 380.000, 0.000, 35.00, 0.00, 0, NULL, NULL),
 (16, 14, 10, 11, 180.000, 179.000, -1.000, 30.00, -30.00, 0, NULL, NULL),
-(17, 14, 16, 12, 140.000, 139.000, -1.000, 42.00, -42.00, 0, NULL, NULL);
+(17, 14, 16, 12, 140.000, 139.000, -1.000, 42.00, -42.00, 0, NULL, NULL),
+(18, 15, 10, 11, 179.000, 0.000, -179.000, 30.00, -5370.00, 0, NULL, NULL),
+(19, 15, 16, 12, 139.000, 0.000, -139.000, 42.00, -5838.00, 0, NULL, NULL),
+(20, 16, 10, 11, 0.000, 0.000, 0.000, 30.00, 0.00, 0, NULL, NULL),
+(21, 16, 16, 12, 0.000, 0.000, 0.000, 42.00, 0.00, 0, NULL, NULL),
+(22, 17, 10, 11, 0.000, 0.000, 0.000, 30.00, 0.00, 0, NULL, NULL),
+(23, 17, 16, 12, 0.000, 0.000, 0.000, 42.00, 0.00, 0, NULL, NULL),
+(24, 18, 10, 11, 0.000, 0.000, 0.000, 30.00, 0.00, 0, NULL, NULL),
+(25, 18, 16, 12, 0.000, 0.000, 0.000, 45.00, 0.00, 0, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -2223,7 +2242,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-06-30 22:43:54', '2026-06-15 16:53:16', '2026-06-30 20:43:54'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-07-01 22:02:18', '2026-06-15 16:53:16', '2026-07-01 20:02:18'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -2694,7 +2713,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=120;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=121;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -2772,19 +2791,19 @@ ALTER TABLE `governorates`
 -- AUTO_INCREMENT for table `inventory_batches`
 --
 ALTER TABLE `inventory_batches`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `inventory_items`
 --
 ALTER TABLE `inventory_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT for table `inventory_transactions`
 --
 ALTER TABLE `inventory_transactions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `inventory_transfers`
@@ -2826,7 +2845,7 @@ ALTER TABLE `price_adjustments`
 -- AUTO_INCREMENT for table `products`
 --
 ALTER TABLE `products`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=101;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=102;
 
 --
 -- AUTO_INCREMENT for table `product_alerts`
@@ -2880,13 +2899,13 @@ ALTER TABLE `shift_handovers`
 -- AUTO_INCREMENT for table `stock_adjustments`
 --
 ALTER TABLE `stock_adjustments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `stock_adjustment_items`
 --
 ALTER TABLE `stock_adjustment_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `stores`

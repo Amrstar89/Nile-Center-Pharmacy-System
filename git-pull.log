@@ -41,3 +41,66 @@ hint: Fix them up in the work tree, and then use 'git add/rm <file>'
 hint: as appropriate to mark resolution and make a commit.
 fatal: Exiting because of an unresolved conflict.
 [Tue 06/30/2026 22:04:23.25] ERROR: Git pull failed! 
+[Wed 07/01/2026  2:03:30.79] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   1128f3a..c588bf9  main       -> origin/main
+[Wed 07/01/2026  2:03:32.15] Found 4 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'git-pull.log', LF will be replaced by CRLF the next time Git touches it
+Merge made by the 'ort' strategy.
+ includes/product-search-api.php | 234 +++++++++++++++++++++++++---------------
+ 1 file changed, 150 insertions(+), 84 deletions(-)
+[Wed 07/01/2026  2:03:33.12] Pull completed successfully! 
+[Wed 07/01/2026  2:05:50.82] Starting auto-pull... 
+^C[Wed 07/01/2026  2:06:13.71] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   c588bf9..8a0e9d1  main       -> origin/main
+[Wed 07/01/2026  2:06:15.17] Found 5 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'git-pull.log', LF will be replaced by CRLF the next time Git touches it
+Merge made by the 'ort' strategy.
+ includes/product-search-api.php | 28 +++++++++++++++++++---------
+ 1 file changed, 19 insertions(+), 9 deletions(-)
+[Wed 07/01/2026  2:06:16.14] Pull completed successfully! 
+[Wed 07/01/2026 22:45:51.66] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   8a0e9d1..b295d65  main       -> origin/main
+[Wed 07/01/2026 22:45:53.47] Found 8 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'git-pull.log', LF will be replaced by CRLF the next time Git touches it
+Merge made by the 'ort' strategy.
+ modules/inventory/adjustments/create.php     | 24 ++++++++++++++++++------
+ modules/inventory/opening_balance/create.php | 16 +++++++++++++---
+ modules/inventory/transfers/create.php       | 10 ++++++++--
+ 3 files changed, 39 insertions(+), 11 deletions(-)
+[Wed 07/01/2026 22:45:54.49] Pull completed successfully! 
+[Wed 07/01/2026 23:58:30.87] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   b295d65..873de34  main       -> origin/main
+[Wed 07/01/2026 23:58:32.17] Found 7 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'git-pull.log', LF will be replaced by CRLF the next time Git touches it
+Merge made by the 'ort' strategy.
+ modules/products/create.php | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+[Wed 07/01/2026 23:58:33.15] Pull completed successfully! 
+[Thu 07/02/2026  0:08:34.73] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   873de34..6828ee0  main       -> origin/main
+[Thu 07/02/2026  0:08:35.99] Found 8 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'git-pull.log', LF will be replaced by CRLF the next time Git touches it
+Merge made by the 'ort' strategy.
+ modules/inventory/opening_balance/create.php | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+[Thu 07/02/2026  0:08:36.95] Pull completed successfully! 
