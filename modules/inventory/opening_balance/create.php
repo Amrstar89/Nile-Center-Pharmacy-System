@@ -120,9 +120,19 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         .item-row:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(102,126,234,0.1); }
         .product-display { background: #f8f9fa; border-radius: 8px; padding: 10px; min-height: 44px; display: flex; align-items: center; }
         .product-selected { background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%) !important; }
-        .barcode-wrap { position: relative; }
-        .barcode-wrap .btn-f2 { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px 0 0 8px; border: 1px solid #dee2e6; background: #f8f9fa; padding: 0 12px; cursor: pointer; }
-        .barcode-wrap input { padding-left: 50px; }
+        /* FIX: Search button z-index and positioning */
+        .barcode-wrap { position: relative; z-index: 1; }
+        .barcode-wrap .btn-f2 { 
+            position: absolute; left: 0; top: 0; bottom: 0; 
+            border-radius: 8px 0 0 8px; border: 1px solid #dee2e6; 
+            background: #f8f9fa; padding: 0 12px; cursor: pointer; 
+            z-index: 5; /* Above sidebar */
+            width: 40px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .barcode-wrap .btn-f2:hover { background: #e9ecef; border-color: var(--primary); }
+        .barcode-wrap .btn-f2 i { pointer-events: none; } /* Prevent icon from stealing click */
+        .barcode-wrap input { padding-left: 45px; }
         .date-field { display: none; }
         .date-field.active { display: block; }
         .summary-bar { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 15px 20px; border-radius: 12px; position: sticky; bottom: 20px; z-index: 100; }

@@ -134,6 +134,20 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         .feature-card i { font-size: 2.5rem; color: var(--primary); margin-bottom: 15px; }
         .feature-card h5 { color: #333; margin-bottom: 8px; }
         .feature-card p { color: #888; font-size: 13px; margin: 0; }
+        /* FIX: Search button z-index and positioning */
+        .barcode-wrap { position: relative; z-index: 1; }
+        .barcode-wrap .btn-f2 { 
+            position: absolute; left: 0; top: 0; bottom: 0; 
+            border-radius: 8px 0 0 8px; border: 1px solid #dee2e6; 
+            background: #f8f9fa; padding: 0 12px; cursor: pointer; 
+            z-index: 5; /* Above sidebar */
+            width: 40px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .barcode-wrap .btn-f2:hover { background: #e9ecef; border-color: var(--primary); }
+        .barcode-wrap .btn-f2 i { pointer-events: none; } /* Prevent icon from stealing click */
+        .barcode-wrap input { padding-left: 45px; }
+        .product-display { background: #f8f9fa; border-radius: 8px; padding: 8px 12px; min-height: 38px; }
         @media (max-width: 768px) { .sidebar { width: 100%; position: relative; } .main-content { margin-right: 0; } }
     </style>
 </head>
@@ -265,7 +279,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                     <input type="hidden" name="store_id" id="manual_store_id">
                     <div id="manualItemsContainer"></div>
                     
-                    <div class="summary-bar" style="display:none;" id="manualSummary">
+                    <div class="summary-bar" style="display:none; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 15px 20px; border-radius: 12px; position: sticky; bottom: 20px; z-index: 100;" id="manualSummary">
                         <div class="row align-items-center">
                             <div class="col-md-6">
                                 <i class="bi bi-boxes"></i> الأصناف: <strong id="manualItemCount">0</strong>
@@ -347,13 +361,11 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                         <div class="row g-2 align-items-end">
                             <div class="col-md-3">
                                 <label class="form-label small">الباركود / F2</label>
-                                <div class="barcode-wrap" style="position:relative;">
+                                <div class="barcode-wrap">
                                     <input type="text" class="form-control" id="mbarcode_${id}" 
-                                           style="padding-left:45px;"
                                            placeholder="ادخل الباركود أو اضغط F2..."
                                            onkeydown="handleManualBarcode(event, ${id})" autocomplete="off">
-                                    <button type="button" onclick="openManualSearch(${id})" 
-                                            style="position:absolute;left:0;top:0;bottom:0;width:40px;border:1px solid #dee2e6;border-radius:4px 0 0 4px;background:#f8f9fa;cursor:pointer;">
+                                    <button type="button" class="btn-f2" onclick="openManualSearch(${id})" title="بحث متقدم (F2)">
                                         <i class="bi bi-search"></i>
                                     </button>
                                 </div>
@@ -361,7 +373,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small">الصنف</label>
-                                <div class="product-display" id="mproductDisplay_${id}" style="background:#f8f9fa;border-radius:8px;padding:8px 12px;min-height:38px;">
+                                <div class="product-display" id="mproductDisplay_${id}">
                                     <span class="text-muted small">ادخل الباركود أو اضغط F2</span>
                                 </div>
                             </div>
