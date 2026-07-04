@@ -31,6 +31,13 @@ $is_purchases = strpos($current_uri, '/purchases/') !== false;
 $is_shifts = strpos($current_uri, '/shifts/') !== false;
 $is_admin = strpos($current_uri, '/admin/') !== false;
 $is_inventory = strpos($current_uri, '/inventory/') !== false;
+
+// Purchase sub-sections
+$is_purchase_dashboard = $is_purchases && (basename(dirname($script_name)) === 'purchases' && $current_page === 'index.php');
+$is_purchase_orders = strpos($current_uri, '/purchases/orders/') !== false;
+$is_purchase_invoices = strpos($current_uri, '/purchases/invoices/') !== false;
+$is_purchase_returns = strpos($current_uri, '/purchases/returns/') !== false;
+$is_purchase_reports = strpos($current_uri, '/purchases/reports/') !== false;
 ?>
 
 <style>
@@ -163,15 +170,45 @@ $is_inventory = strpos($current_uri, '/inventory/') !== false;
             </div>
         </div>
 
-        <!-- المشتريات -->
+        <!-- المشتريات - NEW FULL MODULE -->
         <div class="sidebar-heading" onclick="toggleSection(this)">
             <span><i class="bi bi-cart-plus"></i> المشتريات</span>
             <i class="bi bi-chevron-down toggle-icon"></i>
         </div>
         <div class="sidebar-section">
             <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/purchases/" class="nav-link <?= $is_purchases ? 'active' : '' ?>">
-                    <i class="bi bi-shop"></i> شاشة المشتريات
+                <a href="<?= $base_url ?>/modules/purchases/" class="nav-link <?= $is_purchases && basename(dirname($script_name)) === 'purchases' && $current_page === 'index.php' ? 'active' : '' ?>">
+                    <i class="bi bi-speedometer2"></i> Dashboard المشتريات
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/purchases/orders/" class="nav-link <?= $is_purchase_orders ? 'active' : '' ?>">
+                    <i class="bi bi-file-earmark-text"></i> أوامر الشراء
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/purchases/orders/create.php" class="nav-link <?= $is_purchase_orders && $current_page === 'create.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-circle"></i> أمر شراء جديد
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/purchases/invoices/" class="nav-link <?= $is_purchase_invoices ? 'active' : '' ?>">
+                    <i class="bi bi-receipt"></i> فواتير الشراء
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/purchases/invoices/create.php" class="nav-link <?= $is_purchase_invoices && $current_page === 'create.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-circle"></i> فاتورة شراء جديدة
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/purchases/returns/create.php" class="nav-link <?= $is_purchase_returns ? 'active' : '' ?>">
+                    <i class="bi bi-arrow-return-left"></i> مرتجعات المشتريات
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/purchases/reports/" class="nav-link <?= $is_purchase_reports ? 'active' : '' ?>">
+                    <i class="bi bi-graph-up"></i> تقارير المشتريات
                 </a>
             </div>
         </div>
