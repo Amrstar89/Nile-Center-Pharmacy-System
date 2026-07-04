@@ -19,7 +19,7 @@ $poStats = $db->query("
         SUM(CASE WHEN status='partial' THEN 1 ELSE 0 END) as partial,
         SUM(CASE WHEN status='received' THEN 1 ELSE 0 END) as received,
         SUM(CASE WHEN status='cancelled' THEN 1 ELSE 0 END) as cancelled,
-        SUM(CASE WHEN status!='cancelled' AND status!='received' THEN grand_total ELSE 0 END) as pending_value
+        COALESCE(SUM(CASE WHEN status!='cancelled' AND status!='received' THEN grand_total ELSE 0 END), 0) as pending_value
     FROM purchase_orders
 ")->fetch();
 
@@ -30,8 +30,8 @@ $invStats = $db->query("
         SUM(CASE WHEN status='open' THEN 1 ELSE 0 END) as open,
         SUM(CASE WHEN status='partial' THEN 1 ELSE 0 END) as partial,
         SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END) as paid,
-        SUM(CASE WHEN status IN ('open','partial') THEN remaining_amount ELSE 0 END) as total_dues,
-        SUM(CASE WHEN invoice_date='$today' THEN grand_total ELSE 0 END) as today_total
+        COALESCE(SUM(CASE WHEN status IN ('open','partial') THEN remaining_amount ELSE 0 END), 0) as total_dues,
+        COALESCE(SUM(CASE WHEN invoice_date='$today' THEN grand_total ELSE 0 END), 0) as today_total
     FROM purchase_invoices
 ")->fetch();
 
@@ -65,7 +65,7 @@ $recentInvs = $db->query("
 $supplierDues = $db->query("
     SELECT s.id, s.supplier_name, s.supplier_code, s.phone,
            COUNT(pi.id) as inv_count,
-           SUM(pi.remaining_amount) as total_due
+           COALESCE(SUM(pi.remaining_amount), 0) as total_due
     FROM suppliers s
     JOIN purchase_invoices pi ON s.id = pi.supplier_id
     WHERE pi.status IN ('open','partial')
@@ -156,20 +156,20 @@ require_once __DIR__ . '/../../includes/sidebar.php';
 
     <!-- Stats Row 1: Orders -->
     <div class="row g-3 mb-4">
-        <div class="col-md-2"><div class="card1 primary"><div class="d-flex justify-content-between"><div><h3><?= $poStats['total'] ?></h3><p>إجمالي أوامر الشراء</p></div><div class="icon-box"><i class="bi bi-file-earmark-text"></i></div></div></div></div>
-        <div class="col-md-2"><div class="card1 warning"><div class="d-flex justify-content-between"><div><h3><?= $poStats['draft'] ?></h3><p>مسودات</p></div><div class="icon-box"><i class="bi bi-pencil-square"></i></div></div></div></div>
-        <div class="col-md-2"><div class="card1 info"><div class="d-flex justify-content-between"><div><h3><?= $poStats['sent'] ?></h3><p>مرسلة</p></div><div class="icon-box"><i class="bi bi-send"></i></div></div></div></div>
-        <div class="col-md-2"><div class="card1 success"><div class="d-flex justify-content-between"><div><h3><?= $poStats['partial'] ?></h3><p>استلام جزئي</p></div><div class="icon-box"><i class="bi bi-check2-circle"></i></div></div></div></div>
-        <div class="col-md-2"><div class="card1 primary"><div class="d-flex justify-content-between"><div><h3><?= number_format($poStats['pending_value'],0) ?> ج</h3><p>قيمة معلقة</p></div><div class="icon-box"><i class="bi bi-cash-stack"></i></div></div></div></div>
-        <div class="col-md-2"><div class="card1 danger"><div class="d-flex justify-content-between"><div><h3><?= $poStats['cancelled'] ?></h3><p>ملغاة</p></div><div class="icon-box"><i class="bi bi-x-circle"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 primary"><div class="d-flex justify-content-between"><div><h3><?= intval($poStats['total'] ?? 0) ?></h3><p>إجمالي أوامر الشراء</p></div><div class="icon-box"><i class="bi bi-file-earmark-text"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 warning"><div class="d-flex justify-content-between"><div><h3><?= intval($poStats['draft'] ?? 0) ?></h3><p>مسودات</p></div><div class="icon-box"><i class="bi bi-pencil-square"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 info"><div class="d-flex justify-content-between"><div><h3><?= intval($poStats['sent'] ?? 0) ?></h3><p>مرسلة</p></div><div class="icon-box"><i class="bi bi-send"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 success"><div class="d-flex justify-content-between"><div><h3><?= intval($poStats['partial'] ?? 0) ?></h3><p>استلام جزئي</p></div><div class="icon-box"><i class="bi bi-check2-circle"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 primary"><div class="d-flex justify-content-between"><div><h3><?= number_format(floatval($poStats['pending_value'] ?? 0), 0) ?> ج</h3><p>قيمة معلقة</p></div><div class="icon-box"><i class="bi bi-cash-stack"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 danger"><div class="d-flex justify-content-between"><div><h3><?= intval($poStats['cancelled'] ?? 0) ?></h3><p>ملغاة</p></div><div class="icon-box"><i class="bi bi-x-circle"></i></div></div></div></div>
     </div>
 
     <!-- Stats Row 2: Invoices & Dues -->
     <div class="row g-3 mb-4">
-        <div class="col-md-3"><div class="card1 primary"><div class="d-flex justify-content-between"><div><h3><?= $invStats['total'] ?></h3><p>فواتير الشراء</p></div><div class="icon-box"><i class="bi bi-receipt"></i></div></div></div></div>
-        <div class="col-md-3"><div class="card1 success"><div class="d-flex justify-content-between"><div><h3><?= $invStats['paid'] ?></h3><p>فواتير مسددة</p></div><div class="icon-box"><i class="bi bi-check-circle"></i></div></div></div></div>
-        <div class="col-md-3"><div class="card1 warning"><div class="d-flex justify-content-between"><div><h3><?= $invStats['open']+$invStats['partial'] ?></h3><p>فواتير مستحقة</p></div><div class="icon-box"><i class="bi bi-hourglass-split"></i></div></div></div></div>
-        <div class="col-md-3"><div class="card1 danger"><div class="d-flex justify-content-between"><div><h3><?= number_format($invStats['total_dues'],0) ?> ج</h3><p>إجمالي المستحقات</p></div><div class="icon-box"><i class="bi bi-exclamation-triangle"></i></div></div></div></div>
+        <div class="col-md-3"><div class="card1 primary"><div class="d-flex justify-content-between"><div><h3><?= intval($invStats['total'] ?? 0) ?></h3><p>فواتير الشراء</p></div><div class="icon-box"><i class="bi bi-receipt"></i></div></div></div></div>
+        <div class="col-md-3"><div class="card1 success"><div class="d-flex justify-content-between"><div><h3><?= intval($invStats['paid'] ?? 0) ?></h3><p>فواتير مسددة</p></div><div class="icon-box"><i class="bi bi-check-circle"></i></div></div></div></div>
+        <div class="col-md-3"><div class="card1 warning"><div class="d-flex justify-content-between"><div><h3><?= intval($invStats['open'] ?? 0) + intval($invStats['partial'] ?? 0) ?></h3><p>فواتير مستحقة</p></div><div class="icon-box"><i class="bi bi-hourglass-split"></i></div></div></div></div>
+        <div class="col-md-3"><div class="card1 danger"><div class="d-flex justify-content-between"><div><h3><?= number_format(floatval($invStats['total_dues'] ?? 0), 0) ?> ج</h3><p>إجمالي المستحقات</p></div><div class="icon-box"><i class="bi bi-exclamation-triangle"></i></div></div></div></div>
     </div>
 
     <div class="row">
@@ -188,7 +188,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 <div class="due-card">
                     <div class="d-flex justify-content-between">
                         <strong><?= $sd['supplier_name'] ?></strong>
-                        <span class="text-danger fw-bold"><?= number_format($sd['total_due'],2) ?> ج</span>
+                        <span class="text-danger fw-bold"><?= number_format(floatval($sd['total_due'] ?? 0), 2) ?> ج</span>
                     </div>
                     <small class="text-muted"><?= $sd['inv_count'] ?> فاتورة | <?= $sd['supplier_code'] ?></small>
                 </div>
@@ -207,7 +207,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                 <div class="lowstock-row">
                     <div class="d-flex justify-content-between">
                         <div><strong><?= $ls['product_name'] ?></strong><small class="text-muted"> (<?= $ls['product_code'] ?>)</small></div>
-                        <span class="badge bg-danger"><?= number_format($ls['current_qty'],1) ?> / <?= $ls['reorder_point'] ?></span>
+                        <span class="badge bg-danger"><?= number_format(floatval($ls['current_qty'] ?? 0), 1) ?> / <?= $ls['reorder_point'] ?></span>
                     </div>
                     <small class="text-muted"><?= $ls['category'] ?> | <a href="orders/create.php?product_id=<?= $ls['id'] ?>" class="text-primary">أمر شراء</a></small>
                 </div>
@@ -225,7 +225,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                         <strong><?= $po['po_number'] ?></strong>
                         <span class="status-pill bg-<?= $po_colors[$po['status']] ?>"><?= $po_labels[$po['status']] ?></span>
                     </div>
-                    <div><small><i class="bi bi-shop"></i> <?= $po['supplier_name'] ?> | <i class="bi bi-cash"></i> <?= number_format($po['grand_total'],2) ?> ج</small></div>
+                    <div><small><i class="bi bi-shop"></i> <?= $po['supplier_name'] ?> | <i class="bi bi-cash"></i> <?= number_format(floatval($po['grand_total'] ?? 0), 2) ?> ج</small></div>
                     <small class="text-muted"><?= timeAgo($po['created_at']) ?> | <?= $po['creator'] ?></small>
                 </div>
                 <?php } ?>
@@ -242,7 +242,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                         <strong><?= $inv['invoice_number'] ?></strong>
                         <span class="status-pill bg-<?= $inv_colors[$inv['status']] ?>"><?= $inv_labels[$inv['status']] ?></span>
                     </div>
-                    <div><small><i class="bi bi-shop"></i> <?= $inv['supplier_name'] ?> | <i class="bi bi-cash"></i> <?= number_format($inv['grand_total'],2) ?> ج</small></div>
+                    <div><small><i class="bi bi-shop"></i> <?= $inv['supplier_name'] ?> | <i class="bi bi-cash"></i> <?= number_format(floatval($inv['grand_total'] ?? 0), 2) ?> ج</small></div>
                     <small class="text-muted"><?= arabicDate($inv['invoice_date']) ?> | <?= $inv['creator'] ?></small>
                 </div>
                 <?php } ?>
