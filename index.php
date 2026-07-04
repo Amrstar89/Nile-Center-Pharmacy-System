@@ -2,12 +2,15 @@
 require_once __DIR__ . '/core/config.php';
 require_once __DIR__ . '/core/auth.php';
 require_once __DIR__ . '/core/estock-bridge.php';
+
 if (isset($_GET['logout']) && $_GET['logout'] == 1) {
     session_destroy();
     redirect(APP_URL . '/index.php');
 }
+
+// If logged in, redirect to dashboard
 if (isLoggedIn()) {
-    redirect(APP_URL . '/modules/customer-requests/index.php');
+    redirect(APP_URL . '/modules/dashboard/');
 }
 
 $error = '';
@@ -17,13 +20,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Try ESTOCK login first
     if (isESTOCKAvailable() && loginWithESTOCK($username, $password)) {
-        $redirect = $_SESSION['redirect_after_login'] ?? APP_URL . '/modules/customer-requests/index.php';
+        $redirect = $_SESSION['redirect_after_login'] ?? APP_URL . '/modules/dashboard/';
         unset($_SESSION['redirect_after_login']);
         redirect($redirect);
     }
     // Fallback to MySQL login
     elseif (login($username, $password)) {
-        $redirect = $_SESSION['redirect_after_login'] ?? APP_URL . '/modules/customer-requests/index.php';
+        $redirect = $_SESSION['redirect_after_login'] ?? APP_URL . '/modules/dashboard/';
         unset($_SESSION['redirect_after_login']);
         redirect($redirect);
     } else {

@@ -1,6 +1,6 @@
 <?php
 /**
- * Nile Center - Customer Requests System
+ * Nile Center - Pharmacy ERP System
  * Core Configuration File
  */
 
@@ -15,8 +15,8 @@ define('DB_CHARSET', 'utf8mb4');
 
 // Application Settings
 // ====================
-define('APP_NAME', 'نايل سنتر - طلبات العملاء');
-define('APP_VERSION', '1.0.0');
+define('APP_NAME', 'نايل سنتر - نظام إدارة الصيدلية');
+define('APP_VERSION', '2.0.0');
 define('APP_URL', 'http://26.201.9.238:8080/nile-center-system');  // Update with your server IP
 define('TIMEZONE', 'Africa/Cairo');
 define('SESSION_LIFETIME', 7200);  // 2 hours

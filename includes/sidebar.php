@@ -21,10 +21,14 @@ if (!empty($project_name)) {
 // Current page detection
 $current_page = basename($script_name);
 $current_uri = $request_uri;
+$is_dashboard = strpos($current_uri, '/dashboard/') !== false;
 $is_customers = strpos($current_uri, '/customers/') !== false;
 $is_products = strpos($current_uri, '/products/') !== false;
 $is_suppliers = strpos($current_uri, '/suppliers/') !== false;
 $is_customer_requests = strpos($current_uri, '/customer-requests/') !== false;
+$is_sales = strpos($current_uri, '/sales/') !== false;
+$is_purchases = strpos($current_uri, '/purchases/') !== false;
+$is_shifts = strpos($current_uri, '/shifts/') !== false;
 $is_admin = strpos($current_uri, '/admin/') !== false;
 $is_inventory = strpos($current_uri, '/inventory/') !== false;
 ?>
@@ -130,8 +134,44 @@ $is_inventory = strpos($current_uri, '/inventory/') !== false;
         </div>
         <div class="sidebar-section">
             <div class="nav-item">
-                <a href="<?= $base_url ?>/index.php" class="nav-link <?= $current_page === 'index.php' && !$is_customers && !$is_products && !$is_suppliers && !$is_customer_requests && !$is_admin ? 'active' : '' ?>">
+                <a href="<?= $base_url ?>/modules/dashboard/" class="nav-link <?= $is_dashboard ? 'active' : '' ?>">
                     <i class="bi bi-house-door"></i> لوحة التحكم
+                </a>
+            </div>
+        </div>
+
+        <!-- المبيعات -->
+        <div class="sidebar-heading" onclick="toggleSection(this)">
+            <span><i class="bi bi-cash-register"></i> المبيعات</span>
+            <i class="bi bi-chevron-down toggle-icon"></i>
+        </div>
+        <div class="sidebar-section">
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/sales/" class="nav-link <?= $is_sales && $current_page === 'index.php' ? 'active' : '' ?>">
+                    <i class="bi bi-receipt"></i> قائمة المبيعات
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/sales/create.php" class="nav-link <?= $is_sales && $current_page === 'create.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-circle"></i> فاتورة بيع جديدة
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/sales/pos.php" class="nav-link <?= $is_sales && $current_page === 'pos.php' ? 'active' : '' ?>">
+                    <i class="bi bi-cart-check"></i> نقطة البيع (POS)
+                </a>
+            </div>
+        </div>
+
+        <!-- المشتريات -->
+        <div class="sidebar-heading" onclick="toggleSection(this)">
+            <span><i class="bi bi-cart-plus"></i> المشتريات</span>
+            <i class="bi bi-chevron-down toggle-icon"></i>
+        </div>
+        <div class="sidebar-section">
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/purchases/" class="nav-link <?= $is_purchases ? 'active' : '' ?>">
+                    <i class="bi bi-shop"></i> شاشة المشتريات
                 </a>
             </div>
         </div>
@@ -143,33 +183,26 @@ $is_inventory = strpos($current_uri, '/inventory/') !== false;
         </div>
         <div class="sidebar-section">
             <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/customer-requests/index.php" class="nav-link <?= $is_customer_requests && $current_page === 'index.php' ? 'active' : '' ?>">
-                    <i class="bi bi-house-door"></i> الرئيسية
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/customer-requests/new-order.php" class="nav-link <?= $current_page === 'new-order.php' ? 'active' : '' ?>">
-                    <i class="bi bi-plus-circle"></i> طلب جديد
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/customer-requests/orders.php" class="nav-link <?= $current_page === 'orders.php' ? 'active' : '' ?>">
+                <a href="<?= $base_url ?>/modules/customer-requests/orders.php" class="nav-link <?= $is_customer_requests && $current_page === 'orders.php' ? 'active' : '' ?>">
                     <i class="bi bi-list-task"></i> متابعة الطلبات
                 </a>
             </div>
             <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/customer-requests/purchases.php" class="nav-link <?= $current_page === 'purchases.php' ? 'active' : '' ?>">
-                    <i class="bi bi-cart3"></i> شاشة المشتريات
+                <a href="<?= $base_url ?>/modules/customer-requests/new-order.php" class="nav-link <?= $is_customer_requests && $current_page === 'new-order.php' ? 'active' : '' ?>">
+                    <i class="bi bi-plus-circle"></i> طلب جديد
                 </a>
             </div>
+        </div>
+
+        <!-- الشيفتات -->
+        <div class="sidebar-heading" onclick="toggleSection(this)">
+            <span><i class="bi bi-arrow-left-right"></i> الشيفتات</span>
+            <i class="bi bi-chevron-down toggle-icon"></i>
+        </div>
+        <div class="sidebar-section">
             <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/customer-requests/shift-handover.php" class="nav-link <?= $current_page === 'shift-handover.php' ? 'active' : '' ?>">
-                    <i class="bi bi-arrow-left-right"></i> تسليم الشيفت
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="<?= $base_url ?>/modules/customer-requests/shift-receive.php" class="nav-link <?= $current_page === 'shift-receive.php' ? 'active' : '' ?>">
-                    <i class="bi bi-box-arrow-in-down"></i> استلام الشيفت
+                <a href="<?= $base_url ?>/modules/shifts/" class="nav-link <?= $is_shifts ? 'active' : '' ?>">
+                    <i class="bi bi-box-arrow-in-down"></i> استلام / تسليم الشيفت
                 </a>
             </div>
         </div>
@@ -229,50 +262,43 @@ $is_inventory = strpos($current_uri, '/inventory/') !== false;
         </div>
 
         <?php if (isAdmin()): ?>
-        
- <!-- إدارة المخازن -->
-<div class="sidebar-heading" onclick="toggleSection(this)">
-    <span><i class="bi bi-box-seam"></i> إدارة المخازن</span>
-    <i class="bi bi-chevron-down toggle-icon"></i>
-</div>
-<div class="sidebar-section">
-    <div class="nav-item">
-        <a href="<?= $base_url ?>/modules/inventory/stores/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/stores/') !== false && in_array($current_page, ['index.php', 'view.php', 'edit.php']) ? 'active' : '' ?>">
-            <i class="bi bi-building"></i> المخازن
-        </a>
-    </div>
-    <div class="nav-item">
-        <a href="<?= $base_url ?>/modules/inventory/stores/create.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/stores/') !== false && $current_page === 'create.php' ? 'active' : '' ?>">
-            <i class="bi bi-plus-lg"></i> إضافة مخزن
-        </a>
-    </div>
-    <div class="nav-item">
-        <a href="<?= $base_url ?>/modules/inventory/transfers/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/transfers/') !== false ? 'active' : '' ?>">
-            <i class="bi bi-arrow-left-right"></i> التحويلات
-        </a>
-    </div>
-    <div class="nav-item">
-        <a href="<?= $base_url ?>/modules/inventory/adjustments/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/adjustments/') !== false ? 'active' : '' ?>">
-            <i class="bi bi-clipboard-check"></i> الجرد والتسويات
-        </a>
-    </div>
-    <div class="nav-item">
-        <a href="<?= $base_url ?>/modules/inventory/opening_balance/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/opening_balance/') !== false ? 'active' : '' ?>">
-            <i class="bi bi-journal-plus"></i> الرصيد الافتتاحي
-        </a>
-    </div>
-    <div class="nav-item">
-        <a href="<?= $base_url ?>/modules/inventory/price_adjustment/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/price_adjustment/') !== false ? 'active' : '' ?>">
-            <i class="bi bi-currency-exchange"></i> تعديل الأرصدة والأسعار
-        </a>
-    </div>
-    <div class="nav-item">
-        <a href="<?= $base_url ?>/modules/inventory/product_movement/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/product_movement/') !== false ? 'active' : '' ?>">
-            <i class="bi bi-graph-up-arrow"></i> حركة الأصناف
-        </a>
-    </div>
-</div>
-
+        <!-- إدارة المخازن -->
+        <div class="sidebar-heading" onclick="toggleSection(this)">
+            <span><i class="bi bi-box-seam"></i> إدارة المخازن</span>
+            <i class="bi bi-chevron-down toggle-icon"></i>
+        </div>
+        <div class="sidebar-section">
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/stores/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/stores/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-building"></i> المخازن
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/transfers/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/transfers/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-arrow-left-right"></i> التحويلات
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/adjustments/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/adjustments/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-clipboard-check"></i> الجرد والتسويات
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/opening_balance/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/opening_balance/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-journal-plus"></i> الرصيد الافتتاحي
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/price_adjustment/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/price_adjustment/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-currency-exchange"></i> تعديل الأرصدة والأسعار
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/inventory/product_movement/index.php" class="nav-link <?= $is_inventory && strpos($current_uri, '/inventory/product_movement/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-graph-up-arrow"></i> حركة الأصناف
+                </a>
+            </div>
+        </div>
 
         <!-- الإدارة -->
         <div class="sidebar-heading" onclick="toggleSection(this)">
@@ -306,16 +332,6 @@ $is_inventory = strpos($current_uri, '/inventory/') !== false;
                 </a>
             </div>
             <div class="nav-item">
-                <a href="<?= $base_url ?>/admin/products.php" class="nav-link <?= $is_admin && $current_page === 'products.php' ? 'active' : '' ?>">
-                    <i class="bi bi-box-seam"></i> إدارة الأصناف
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="<?= $base_url ?>/admin/suppliers.php" class="nav-link <?= $is_admin && $current_page === 'suppliers.php' ? 'active' : '' ?>">
-                    <i class="bi bi-truck"></i> إدارة الموردين
-                </a>
-            </div>
-            <div class="nav-item">
                 <a href="<?= $base_url ?>/admin/sync-estock.php" class="nav-link <?= $current_page === 'sync-estock.php' ? 'active' : '' ?>">
                     <i class="bi bi-arrow-repeat"></i> مزامنة e-Stock
                 </a>
@@ -333,11 +349,9 @@ $is_inventory = strpos($current_uri, '/inventory/') !== false;
 </div>
 
 <script>
-    // Toggle sidebar sections (accordion)
     function toggleSection(heading) {
         const section = heading.nextElementSibling;
         const isCollapsed = section.classList.contains('collapsed');
-
         if (isCollapsed) {
             section.classList.remove('collapsed');
             heading.classList.remove('collapsed');
@@ -347,14 +361,12 @@ $is_inventory = strpos($current_uri, '/inventory/') !== false;
             heading.classList.add('collapsed');
             section.style.maxHeight = '0';
         }
-
         saveAccordionState();
     }
 
     document.addEventListener('DOMContentLoaded', function() {
         const sections = document.querySelectorAll('.sidebar-section');
         const headings = document.querySelectorAll('.sidebar-heading');
-
         const savedState = localStorage.getItem('sidebarAccordionState');
 
         if (savedState) {
