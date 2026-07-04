@@ -4,572 +4,264 @@ require_once __DIR__ . '/../../core/auth.php';
 requireAuth();
 
 $db = getDB();
+$page_title = 'إدارة المشتريات';
 
-// Handle mark as purchased
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'mark_purchased') {
-    header('Content-Type: application/json');
-    $item_id = $_POST['item_id'] ?? 0;
-    $supplier_id = $_POST['supplier_id'] ?? 0;
-    $supplier_price = $_POST['supplier_price'] ?? 0;
-    $sell_price = $_POST['sell_price'] ?? 0;
-    $profit_margin = $_POST['profit_margin'] ?? 0;
-    $quantity = $_POST['quantity'] ?? 1;
-    $notes = $_POST['notes'] ?? '';
+// ─── Quick Stats ───
+$today = date('Y-m-d');
+$monthStart = date('Y-m-01');
 
-    try {
-        $db->beginTransaction();
+// PO Stats
+$poStats = $db->query("
+    SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status='draft' THEN 1 ELSE 0 END) as draft,
+        SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) as sent,
+        SUM(CASE WHEN status='partial' THEN 1 ELSE 0 END) as partial,
+        SUM(CASE WHEN status='received' THEN 1 ELSE 0 END) as received,
+        SUM(CASE WHEN status='cancelled' THEN 1 ELSE 0 END) as cancelled,
+        SUM(CASE WHEN status!='cancelled' AND status!='received' THEN grand_total ELSE 0 END) as pending_value
+    FROM purchase_orders
+")->fetch();
 
-        $stmt = $db->prepare("SELECT * FROM order_items WHERE id = ?");
-        $stmt->execute([$item_id]);
-        $item = $stmt->fetch();
+// Invoice Stats
+$invStats = $db->query("
+    SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status='open' THEN 1 ELSE 0 END) as open,
+        SUM(CASE WHEN status='partial' THEN 1 ELSE 0 END) as partial,
+        SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END) as paid,
+        SUM(CASE WHEN status IN ('open','partial') THEN remaining_amount ELSE 0 END) as total_dues,
+        SUM(CASE WHEN invoice_date='$today' THEN grand_total ELSE 0 END) as today_total
+    FROM purchase_invoices
+")->fetch();
 
-        if (!$item) {
-            echo json_encode(['success' => false, 'message' => 'الصنف غير موجود']);
-            exit;
-        }
+// Monthly purchase chart data
+$monthData = $db->query("
+    SELECT DATE(invoice_date) as d, SUM(grand_total) as total, COUNT(*) as cnt
+    FROM purchase_invoices
+    WHERE invoice_date >= '$monthStart' AND status != 'cancelled'
+    GROUP BY DATE(invoice_date) ORDER BY d
+")->fetchAll();
 
-        $total_cost = $supplier_price * $quantity;
-        $total_sell = $sell_price * $quantity;
-        $profit = $total_sell - $total_cost;
+// Recent POs
+$recentPOs = $db->query("
+    SELECT po.*, s.supplier_name, s.supplier_code, u.full_name as creator
+    FROM purchase_orders po
+    JOIN suppliers s ON po.supplier_id = s.id
+    JOIN users u ON po.created_by = u.id
+    ORDER BY po.created_at DESC LIMIT 8
+")->fetchAll();
 
-        $stmt = $db->prepare("
-            INSERT INTO purchased_items 
-            (order_item_id, supplier_id, supplier_price, sell_price, profit_margin, quantity, total_cost, total_sell, profit, notes, purchased_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $item_id, $supplier_id, $supplier_price, $sell_price, $profit_margin,
-            $quantity, $total_cost, $total_sell, $profit, $notes, $_SESSION['user_id']
-        ]);
-
-        $db->prepare("UPDATE order_items SET needs_purchase = 0, unit_price = ?, final_price = ? * quantity, purchased_at = NOW() WHERE id = ?")
-           ->execute([$sell_price, $sell_price, $item_id]);
-
-        $stmt = $db->prepare("SELECT order_id FROM order_items WHERE id = ?");
-        $stmt->execute([$item_id]);
-        $order_id = $stmt->fetch()['order_id'];
-
-        $stmt = $db->prepare("SELECT SUM(final_price) as total FROM order_items WHERE order_id = ?");
-        $stmt->execute([$order_id]);
-        $total = $stmt->fetch()['total'] ?? 0;
-
-        $db->prepare("UPDATE orders SET final_total = ? WHERE id = ?")->execute([$total, $order_id]);
-
-        $db->commit();
-
-        echo json_encode(['success' => true, 'message' => 'تم تسجيل الشراء بنجاح']);
-    } catch (Exception $e) {
-        $db->rollBack();
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-    exit;
-}
-
-// Handle add new supplier
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_new_supplier') {
-    header('Content-Type: application/json');
-    $supplier_name = $_POST['supplier_name'] ?? '';
-    $supplier_phone = $_POST['supplier_phone'] ?? '';
-    $supplier_code = 'SUP' . time();
-
-    try {
-        $stmt = $db->prepare("INSERT INTO suppliers (supplier_code, supplier_name, phone, is_active) VALUES (?, ?, ?, 1)");
-        $stmt->execute([$supplier_code, $supplier_name, $supplier_phone]);
-        $new_id = $db->lastInsertId();
-
-        echo json_encode(['success' => true, 'id' => $new_id, 'name' => $supplier_name, 'code' => $supplier_code]);
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-    exit;
-}
-
-// Handle add/update supplier price
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_supplier_price') {
-    header('Content-Type: application/json');
-    $item_id = $_POST['item_id'] ?? 0;
-    $supplier_id = $_POST['supplier_id'] ?? 0;
-    $supplier_price = $_POST['supplier_price'] ?? 0;
-    $sell_price = $_POST['sell_price'] ?? 0;
-    $profit_margin = $_POST['profit_margin'] ?? 0;
-    $notes = $_POST['notes'] ?? '';
-    $delivery_time_id = $_POST['delivery_time_id'] ?? null;
-
-    try {
-        $stmt = $db->prepare("SELECT product_id, product_code, product_name FROM order_items WHERE id = ?");
-        $stmt->execute([$item_id]);
-        $item = $stmt->fetch();
-
-        if (!$item) {
-            echo json_encode(['success' => false, 'message' => 'الصنف غير موجود']);
-            exit;
-        }
-
-        $product_code = $item['product_code'];
-        $product_id = $item['product_id'];
-
-        if ($product_id) {
-            $stmt = $db->prepare("SELECT product_code FROM products WHERE id = ?");
-            $stmt->execute([$product_id]);
-            $product = $stmt->fetch();
-            if ($product) {
-                $product_code = $product['product_code'];
-            }
-        }
-
-        if (!$product_code) {
-            echo json_encode(['success' => false, 'message' => 'لا يمكن إضافة سعر لصنف بدون كود']);
-            exit;
-        }
-
-        $stmt = $db->prepare("DELETE FROM supplier_prices WHERE product_code = ? AND supplier_id = ?");
-        $stmt->execute([$product_code, $supplier_id]);
-
-        $stmt = $db->prepare("
-            INSERT INTO supplier_prices 
-            (product_id, product_code, supplier_id, supplier_price, sell_price, profit_margin, notes, delivery_time_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $product_id, $product_code, $supplier_id, 
-            $supplier_price, $sell_price, $profit_margin, $notes, $delivery_time_id
-        ]);
-
-        echo json_encode(['success' => true, 'message' => 'تم حفظ السعر بنجاح']);
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-    exit;
-}
-
-// Handle set price for order
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'set_order_price') {
-    header('Content-Type: application/json');
-    $item_id = $_POST['item_id'] ?? 0;
-    $sell_price = $_POST['sell_price'] ?? 0;
-
-    try {
-        $db->beginTransaction();
-
-        $stmt = $db->prepare("SELECT * FROM order_items WHERE id = ?");
-        $stmt->execute([$item_id]);
-        $item = $stmt->fetch();
-
-        if (!$item) {
-            echo json_encode(['success' => false, 'message' => 'الصنف غير موجود']);
-            exit;
-        }
-
-        $final_price = $sell_price * $item['quantity'];
-
-        $db->prepare("UPDATE order_items SET unit_price = ?, final_price = ?, discount_type = NULL, discount_value = 0 WHERE id = ?")
-           ->execute([$sell_price, $final_price, $item_id]);
-
-        $order_id = $item['order_id'];
-        $stmt = $db->prepare("SELECT SUM(final_price) as total FROM order_items WHERE order_id = ?");
-        $stmt->execute([$order_id]);
-        $total = $stmt->fetch()['total'] ?? 0;
-
-        $db->prepare("UPDATE orders SET final_total = ? WHERE id = ?")->execute([$total, $order_id]);
-
-        $db->commit();
-
-        echo json_encode(['success' => true, 'message' => 'تم تحديث السعر في الطلب بنجاح']);
-    } catch (Exception $e) {
-        $db->rollBack();
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-    exit;
-}
-
-// Get items need purchase
-$stmt = $db->query("
-    SELECT oi.*, o.order_number, o.customer_name, o.customer_phone, o.branch_code, o.priority,
-           os.status_name, os.status_color
-    FROM order_items oi
-    JOIN orders o ON oi.order_id = o.id
-    JOIN order_statuses os ON o.status_id = os.id
-    WHERE oi.needs_purchase = 1
-    ORDER BY o.priority DESC, o.created_at ASC
-");
-$need_purchase_items = $stmt->fetchAll();
-
-// Get supplier prices
-$supplierPrices = [];
-$stmt = $db->query("
-    SELECT sp.*, s.supplier_name, s.supplier_code, s.phone, dt.time_name as delivery_time
-    FROM supplier_prices sp
-    JOIN suppliers s ON sp.supplier_id = s.id
-    LEFT JOIN delivery_times dt ON sp.delivery_time_id = dt.id
-    WHERE sp.is_active = 1
-    ORDER BY sp.created_at DESC
-");
-$allPrices = $stmt->fetchAll();
-
-foreach ($allPrices as $price) {
-    $supplierPrices[$price['product_code']][] = $price;
-}
-
-// Get purchased items history
-$stmt = $db->query("
-    SELECT pi.*, oi.product_name, oi.product_code, s.supplier_name, s.supplier_code, s.phone,
-           o.order_number, o.customer_name
-    FROM purchased_items pi
-    JOIN order_items oi ON pi.order_item_id = oi.id
+// Recent Invoices
+$recentInvs = $db->query("
+    SELECT pi.*, s.supplier_name, s.supplier_code, u.full_name as creator
+    FROM purchase_invoices pi
     JOIN suppliers s ON pi.supplier_id = s.id
-    JOIN orders o ON oi.order_id = o.id
-    ORDER BY pi.purchased_at DESC
-    LIMIT 50
-");
-$purchased_history = $stmt->fetchAll();
+    JOIN users u ON pi.created_by = u.id
+    ORDER BY pi.created_at DESC LIMIT 8
+")->fetchAll();
 
-// Get suppliers
-$stmt = $db->query("SELECT s.*, dt.time_name as delivery_time 
-                    FROM suppliers s 
-                    LEFT JOIN delivery_times dt ON s.delivery_time_id = dt.id
-                    WHERE s.is_active = 1 ORDER BY s.supplier_name");
-$suppliers = $stmt->fetchAll();
+// Suppliers with dues
+$supplierDues = $db->query("
+    SELECT s.id, s.supplier_name, s.supplier_code, s.phone,
+           COUNT(pi.id) as inv_count,
+           SUM(pi.remaining_amount) as total_due
+    FROM suppliers s
+    JOIN purchase_invoices pi ON s.id = pi.supplier_id
+    WHERE pi.status IN ('open','partial')
+    GROUP BY s.id
+    HAVING total_due > 0
+    ORDER BY total_due DESC LIMIT 6
+")->fetchAll();
 
-// Get delivery times
-$delivery_times = $db->query("SELECT * FROM delivery_times WHERE is_active = 1 ORDER BY sort_order")->fetchAll();
+// Low stock items that need purchase
+$lowStock = $db->query("
+    SELECT p.id, p.product_name, p.product_code, p.manual_code, p.min_stock, p.reorder_point,
+           COALESCE(ii.quantity, 0) as current_qty,
+           c.category_name_ar as category
+    FROM products p
+    LEFT JOIN inventory_items ii ON p.id = ii.product_id
+    LEFT JOIN product_categories c ON p.category_id = c.id
+    WHERE p.is_active = 1
+      AND (ii.quantity <= p.reorder_point OR ii.quantity IS NULL)
+      AND p.reorder_point > 0
+    ORDER BY (ii.quantity / p.reorder_point) ASC
+    LIMIT 8
+")->fetchAll();
 
-$page_title = 'شاشة المشتريات';
 require_once __DIR__ . '/../../includes/sidebar.php';
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $page_title ?> - <?= APP_NAME ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --primary: #667eea; --secondary: #764ba2; }
-        body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .main-content { margin-right: 260px; padding: 20px; }
-        .topbar { background: white; border-radius: 15px; padding: 15px 25px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
-        .content-card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .item-card { background: #f8f9fa; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 2px solid transparent; transition: all 0.3s; }
-        .item-card:hover { border-color: var(--primary); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .supplier-price { background: #e3f2fd; border-radius: 8px; padding: 10px; margin: 5px 0; border: 2px solid transparent; }
-        .purchased-item { background: #e8f5e9; border-radius: 8px; padding: 10px; margin: 5px 0; }
-        .section-title { border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 20px; }
-        .priority-badge { padding: 4px 10px; border-radius: 15px; font-size: 11px; font-weight: 600; }
-        .priority-normal { background: #e9ecef; color: #495057; }
-        .priority-urgent { background: #fff3cd; color: #856404; }
-        .priority-critical { background: #f8d7da; color: #721c24; }
-        .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; color: white; }
-        .profit-badge { background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
-        .delivery-time { background: #fff3cd; padding: 4px 8px; border-radius: 10px; font-size: 12px; color: #856404; }
-        @media (max-width: 768px) { .main-content { margin-right: 0; } }
-        @media print { .topbar, .no-print { display: none !important; } }
+        :root{--primary:#667eea;--secondary:#764ba2;--success:#198754;--warning:#ffc107;--danger:#dc3545;--info:#0dcaf0;}
+        body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
+        .main-content{margin-right:260px;padding:20px}
+        .topbar{background:white;border-radius:15px;padding:15px 25px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;justify-content:space-between;align-items:center}
+        .card1{background:white;border-radius:15px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,0.05);margin-bottom:20px;border-right:4px solid var(--primary);transition:all .3s}
+        .card1:hover{transform:translateY(-3px);box-shadow:0 8px 25px rgba(0,0,0,0.1)}
+        .card1 .icon-box{width:50px;height:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:12px}
+        .card1 h3{font-size:26px;font-weight:700;margin-bottom:3px}
+        .card1 p{color:#6c757d;margin:0;font-size:13px}
+        .card1.primary{border-color:var(--primary)}.card1.primary .icon-box{background:linear-gradient(135deg,#667eea,#764ba2);color:white}
+        .card1.success{border-color:var(--success)}.card1.success .icon-box{background:linear-gradient(135deg,#198754,#20c997);color:white}
+        .card1.warning{border-color:var(--warning)}.card1.warning .icon-box{background:linear-gradient(135deg,#ffc107,#ff9800);color:white}
+        .card1.danger{border-color:var(--danger)}.card1.danger .icon-box{background:linear-gradient(135deg,#dc3545,#f44336);color:white}
+        .card1.info{border-color:var(--info)}.card1.info .icon-box{background:linear-gradient(135deg,#0dcaf0,#03a9f4);color:white}
+        .sec-card{background:white;border-radius:15px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,0.05);margin-bottom:20px}
+        .sec-title{font-size:16px;font-weight:700;margin-bottom:15px;display:flex;align-items:center;gap:8px}
+        .sec-title::after{content:'';flex:1;height:2px;background:linear-gradient(90deg,var(--primary),transparent);margin-right:10px}
+        .qbtn{display:flex;align-items:center;padding:15px 20px;border-radius:12px;text-decoration:none;color:#333;font-weight:600;transition:all .3s;background:#f8f9fa;border:2px solid transparent;margin-bottom:10px}
+        .qbtn:hover{background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-color:var(--primary);transform:translateX(-5px)}
+        .qbtn:hover i{color:white!important}
+        .qbtn i{font-size:22px;margin-left:12px;color:var(--primary);transition:all .3s}
+        .po-row,.inv-row{padding:12px 15px;border-radius:10px;margin-bottom:8px;border:1px solid #f0f0f0;transition:all .2s;font-size:13px}
+        .po-row:hover,.inv-row:hover{background:#f8f9fa;border-color:var(--primary)}
+        .status-pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;color:white}
+        .due-card{background:linear-gradient(135deg,#fff3cd,#ffecb3);border:1px solid #ffc107;border-radius:12px;padding:15px;margin-bottom:10px}
+        .lowstock-row{padding:10px;border-radius:8px;margin-bottom:6px;background:#f8f9fa;border-right:3px solid var(--danger);font-size:13px}
+        @media(max-width:768px){.main-content{margin-right:0}}
     </style>
 </head>
 <body>
-    <?= $sidebar ?? '' ?>
-    <div class="main-content">
-        <div class="topbar">
-            <div><h5 class="mb-0"><i class="bi bi-cart-plus"></i> <?= $page_title ?></h5><small class="text-muted">متابعة المشتريات وأسعار الموردين</small></div>
-            <div class="d-flex align-items-center">
-                <div class="user-avatar" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg, var(--primary), var(--secondary));color:white;display:flex;align-items:center;justify-content:center;font-weight:700;margin-left:10px;"><?= mb_substr($_SESSION['user_name'], 0, 1) ?></div>
-                <div><div class="fw-bold"><?= $_SESSION['user_name'] ?></div><small class="text-muted"><?= $_SESSION['user_role'] === 'admin' ? 'مدير النظام' : 'صيدلي' ?></small></div>
+<?= $sidebar ?? '' ?>
+<div class="main-content">
+    <div class="topbar">
+        <div>
+            <h5 class="mb-0"><i class="bi bi-cart-plus"></i> <?= $page_title ?></h5>
+            <small class="text-muted">متابعة أوامر الشراء، الفواتير، والمدفوعات</small>
+        </div>
+        <div><small class="text-muted"><?= arabicDate(date('Y-m-d')) ?></small></div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><a href="orders/create.php" class="qbtn"><i class="bi bi-file-earmark-plus"></i><div>أمر شراء جديد</div></a></div>
+        <div class="col-md-3"><a href="invoices/create.php" class="qbtn"><i class="bi bi-receipt"></i><div>فاتورة شراء مباشرة</div></a></div>
+        <div class="col-md-3"><a href="returns/create.php" class="qbtn"><i class="bi bi-arrow-return-left"></i><div>مرتجع للمورد</div></a></div>
+        <div class="col-md-3"><a href="payments/create.php" class="qbtn"><i class="bi bi-cash-coin"></i><div>دفعة لمورد</div></a></div>
+    </div>
+
+    <!-- Stats Row 1: Orders -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-2"><div class="card1 primary"><div class="d-flex justify-content-between"><div><h3><?= $poStats['total'] ?></h3><p>إجمالي أوامر الشراء</p></div><div class="icon-box"><i class="bi bi-file-earmark-text"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 warning"><div class="d-flex justify-content-between"><div><h3><?= $poStats['draft'] ?></h3><p>مسودات</p></div><div class="icon-box"><i class="bi bi-pencil-square"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 info"><div class="d-flex justify-content-between"><div><h3><?= $poStats['sent'] ?></h3><p>مرسلة</p></div><div class="icon-box"><i class="bi bi-send"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 success"><div class="d-flex justify-content-between"><div><h3><?= $poStats['partial'] ?></h3><p>استلام جزئي</p></div><div class="icon-box"><i class="bi bi-check2-circle"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 primary"><div class="d-flex justify-content-between"><div><h3><?= number_format($poStats['pending_value'],0) ?> ج</h3><p>قيمة معلقة</p></div><div class="icon-box"><i class="bi bi-cash-stack"></i></div></div></div></div>
+        <div class="col-md-2"><div class="card1 danger"><div class="d-flex justify-content-between"><div><h3><?= $poStats['cancelled'] ?></h3><p>ملغاة</p></div><div class="icon-box"><i class="bi bi-x-circle"></i></div></div></div></div>
+    </div>
+
+    <!-- Stats Row 2: Invoices & Dues -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="card1 primary"><div class="d-flex justify-content-between"><div><h3><?= $invStats['total'] ?></h3><p>فواتير الشراء</p></div><div class="icon-box"><i class="bi bi-receipt"></i></div></div></div></div>
+        <div class="col-md-3"><div class="card1 success"><div class="d-flex justify-content-between"><div><h3><?= $invStats['paid'] ?></h3><p>فواتير مسددة</p></div><div class="icon-box"><i class="bi bi-check-circle"></i></div></div></div></div>
+        <div class="col-md-3"><div class="card1 warning"><div class="d-flex justify-content-between"><div><h3><?= $invStats['open']+$invStats['partial'] ?></h3><p>فواتير مستحقة</p></div><div class="icon-box"><i class="bi bi-hourglass-split"></i></div></div></div></div>
+        <div class="col-md-3"><div class="card1 danger"><div class="d-flex justify-content-between"><div><h3><?= number_format($invStats['total_dues'],0) ?> ج</h3><p>إجمالي المستحقات</p></div><div class="icon-box"><i class="bi bi-exclamation-triangle"></i></div></div></div></div>
+    </div>
+
+    <div class="row">
+        <!-- Chart -->
+        <div class="col-lg-8">
+            <div class="sec-card">
+                <div class="sec-title"><i class="bi bi-graph-up"></i> مشتريات الشهر الحالي</div>
+                <canvas id="purchaseChart" height="100"></canvas>
             </div>
         </div>
-
-        <?php if (isset($_SESSION['success'])): ?><?= showAlert($_SESSION['success'], 'success') ?><?php unset($_SESSION['success']); ?><?php endif; ?>
-        <?php if (isset($_SESSION['error'])): ?><?= showAlert($_SESSION['error'], 'danger') ?><?php unset($_SESSION['error']); ?><?php endif; ?>
-
-        <!-- Need Purchase Section -->
-        <div class="content-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="section-title"><i class="bi bi-cart-plus me-2"></i>أصناف تحتاج شراء (<?= count($need_purchase_items) ?>)</h5>
-                <button class="btn btn-primary no-print" onclick="window.print()"><i class="bi bi-printer me-1"></i> طباعة</button>
-            </div>
-
-            <?php if (count($need_purchase_items) > 0): ?>
-                <?php foreach ($need_purchase_items as $item): 
-                    $lookup_code = $item['product_code'];
-                    if (!$lookup_code && $item['product_id']) {
-                        $stmt = $db->prepare("SELECT product_code FROM products WHERE id = ?");
-                        $stmt->execute([$item['product_id']]);
-                        $prod = $stmt->fetch();
-                        if ($prod) $lookup_code = $prod['product_code'];
-                    }
-                    $prices = $lookup_code ? ($supplierPrices[$lookup_code] ?? []) : [];
-                ?>
-                <div class="item-card">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <h6 class="mb-1"><?= htmlspecialchars($item['product_name']) ?></h6>
-                            <?php if ($item['product_code']): ?><small class="text-muted">كود: <?= htmlspecialchars($item['product_code']) ?></small><?php endif; ?>
-                            <div class="mt-2">
-                                <span class="priority-badge priority-<?= $item['priority'] ?>"><?= $item['priority'] === 'normal' ? 'عادي' : ($item['priority'] === 'urgent' ? 'عاجل' : 'حرج') ?></span>
-                                <span class="status-badge ms-2" style="background: <?= $item['status_color'] ?>"><?= $item['status_name'] ?></span>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div><strong>الكمية:</strong> <?= $item['quantity'] ?></div>
-                            <div><strong>السعر الحالي:</strong> <?= number_format($item['unit_price'], 2) ?> ج</div>
-                            <div><strong>الإجمالي:</strong> <?= number_format($item['final_price'], 2) ?> ج</div>
-                        </div>
-                        <div class="col-md-3">
-                            <div><strong>الطلب:</strong> <?= $item['order_number'] ?></div>
-                            <div><strong>العميل:</strong> <?= $item['customer_name'] ?></div>
-                        </div>
-                        <div class="col-md-3 text-end">
-                            <button class="btn btn-info btn-sm mb-1" onclick="showPriceModal(<?= $item['id'] ?>, '<?= htmlspecialchars($item['product_name']) ?>', <?= $item['quantity'] ?>, '<?= htmlspecialchars($lookup_code ?? '') ?>')">
-                                <i class="bi bi-tag"></i> إضافة/تعديل سعر
-                            </button>
-                        </div>
+        <!-- Supplier Dues -->
+        <div class="col-lg-4">
+            <div class="sec-card">
+                <div class="sec-title"><i class="bi bi-exclamation-triangle"></i> مستحقات الموردين</div>
+                <?php foreach($supplierDues as $sd): ?>
+                <div class="due-card">
+                    <div class="d-flex justify-content-between">
+                        <strong><?= $sd['supplier_name'] ?></strong>
+                        <span class="text-danger fw-bold"><?= number_format($sd['total_due'],2) ?> ج</span>
                     </div>
-                    <?php if (count($prices) > 0): ?>
-                    <div class="mt-3">
-                        <h6 class="text-muted"><i class="bi bi-shop"></i> أسعار الموردين المتاحة:</h6>
-                        <?php foreach ($prices as $price): ?>
-                        <div class="supplier-price">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <strong><?= htmlspecialchars($price['supplier_name']) ?></strong>
-                                    <small class="text-muted d-block"><?= htmlspecialchars($price['supplier_code']) ?></small>
-                                </div>
-                                <div class="col-md-3">
-                                    <div>سعر المورد</div>
-                                    <div class="text-primary"><?= number_format($price['supplier_price'], 2) ?> ج</div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div>سعر البيع</div>
-                                    <div class="text-success"><?= number_format($price['sell_price'], 2) ?> ج</div>
-                                    <span class="profit-badge"><i class="bi bi-graph-up"></i> ربح <?= $price['profit_margin'] ?>%</span>
-                                    <?php if ($price['delivery_time']): ?><span class="delivery-time ms-2"><i class="bi bi-clock"></i> <?= $price['delivery_time'] ?></span><?php endif; ?>
-                                </div>
-                                <div class="col-md-2 text-end">
-                                    <button class="btn btn-success btn-sm w-100 mb-1" onclick="purchaseFromSupplier(<?= $item['id'] ?>, <?= $price['supplier_id'] ?>, <?= $price['supplier_price'] ?>, <?= $price['sell_price'] ?>, <?= $price['profit_margin'] ?>, <?= $item['quantity'] ?>)">
-                                        <i class="bi bi-check-lg"></i> شراء
-                                    </button>
-                                    <button class="btn btn-warning btn-sm w-100 mb-1" onclick="editPrice(<?= $item['id'] ?>, <?= $price['id'] ?>, '<?= htmlspecialchars($price['supplier_name']) ?>', <?= $price['supplier_id'] ?>, <?= $price['supplier_price'] ?>, <?= $price['sell_price'] ?>, <?= $price['profit_margin'] ?>, <?= $price['delivery_time_id'] ?? 'null' ?>, '<?= htmlspecialchars($price['notes'] ?? '') ?>')">
-                                        <i class="bi bi-pencil"></i> تعديل
-                                    </button>
-                                    <button class="btn btn-info btn-sm w-100" onclick="setOrderPrice(<?= $item['id'] ?>, <?= $price['supplier_id'] ?>, <?= $price['supplier_price'] ?>, <?= $price['sell_price'] ?>, <?= $price['profit_margin'] ?>)">
-                                        <i class="bi bi-cart-check"></i> تسجيل السعر
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <?php else: ?>
-                    <div class="alert alert-warning mt-2"><i class="bi bi-exclamation-triangle"></i> لا يوجد أسعار موردين مسجلة.</div>
-                    <?php endif; ?>
+                    <small class="text-muted"><?= $sd['inv_count'] ?> فاتورة | <?= $sd['supplier_code'] ?></small>
                 </div>
                 <?php endforeach; ?>
-            <?php else: ?>
-                <div class="text-center py-5"><i class="bi bi-check-circle text-success" style="font-size: 48px;"></i><h5 class="mt-3">لا يوجد أصناف تحتاج شراء</h5></div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Purchased History -->
-        <?php if (count($purchased_history) > 0): ?>
-        <div class="content-card">
-            <h5 class="section-title"><i class="bi bi-clock-history me-2"></i>تاريخ المشتريات (آخر 50)</h5>
-            <?php foreach ($purchased_history as $ph): ?>
-            <div class="purchased-item">
-                <div class="row">
-                    <div class="col-md-3">
-                        <strong><?= htmlspecialchars($ph['product_name']) ?></strong>
-                        <small class="text-muted d-block">كود: <?= htmlspecialchars($ph['product_code'] ?? 'N/A') ?></small>
-                    </div>
-                    <div class="col-md-3">
-                        <div><strong>المورد:</strong> <?= htmlspecialchars($ph['supplier_name']) ?></div>
-                        <small class="text-muted"><?= htmlspecialchars($ph['supplier_code']) ?></small>
-                    </div>
-                    <div class="col-md-3">
-                        <div><strong>سعر المورد:</strong> <?= number_format($ph['supplier_price'], 2) ?> ج × <?= $ph['quantity'] ?> = <?= number_format($ph['total_cost'], 2) ?> ج</div>
-                        <div><strong>سعر البيع:</strong> <?= number_format($ph['sell_price'], 2) ?> ج</div>
-                        <span class="profit-badge"><i class="bi bi-cash-coin"></i> ربح <?= number_format($ph['profit'], 2) ?> ج</span>
-                    </div>
-                    <div class="col-md-3">
-                        <div><strong>الطلب:</strong> <?= $ph['order_number'] ?></div>
-                        <div><strong>العميل:</strong> <?= $ph['customer_name'] ?></div>
-                        <small class="text-muted"><i class="bi bi-calendar"></i> <?= date('Y-m-d h:i A', strtotime($ph['purchased_at'])) ?></small>
-                    </div>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- Price Modal -->
-    <div class="modal fade" id="priceModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalTitle">إضافة/تعديل سعر مورد</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="modalItemId">
-                    <input type="hidden" id="modalQuantity">
-                    <input type="hidden" id="modalPriceId" value="0">
-                    <input type="hidden" id="modalProductCode">
-                    <div class="mb-3">
-                        <label class="form-label">الصنف</label>
-                        <input type="text" class="form-control" id="modalProductName" readonly>
-                    </div>
-                    <div class="alert alert-info">
-                        <h6><i class="bi bi-person-plus"></i> مورد جديد؟</h6>
-                        <div class="row">
-                            <div class="col-md-5"><input type="text" class="form-control" id="newSupplierName" placeholder="اسم المورد"></div>
-                            <div class="col-md-5"><input type="text" class="form-control" id="newSupplierPhone" placeholder="التليفون"></div>
-                            <div class="col-md-2"><button class="btn btn-success w-100" onclick="addNewSupplier()"><i class="bi bi-plus-lg"></i></button></div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6 class="text-primary"><i class="bi bi-shop"></i> سعر المورد</h6>
-                            <div class="mb-3"><label>المورد</label><select class="form-select" id="modalSupplier"><option value="">-- اختر مورد --</option><?php foreach ($suppliers as $sup): ?><option value="<?= $sup['id'] ?>"><?= htmlspecialchars($sup['supplier_name']) ?> (<?= htmlspecialchars($sup['supplier_code']) ?>)</option><?php endforeach; ?></select></div>
-                            <div class="mb-3"><label>سعر المورد</label><input type="number" class="form-control" id="modalSupplierPrice" step="0.01" oninput="calculateSellPrice()"></div>
-                            <div class="mb-3"><label>وقت التوفير</label><select class="form-select" id="modalDeliveryTime"><?php foreach ($delivery_times as $dt): ?><option value="<?= $dt['id'] ?>"><?= htmlspecialchars($dt['time_name']) ?></option><?php endforeach; ?></select></div>
-                        </div>
-                        <div class="col-md-6">
-                            <h6 class="text-success"><i class="bi bi-cash-coin"></i> سعر البيع</h6>
-                            <div class="mb-3"><label>هامش الربح (%)</label><input type="number" class="form-control" id="modalProfitMargin" value="20" step="0.01" oninput="calculateSellPrice()"></div>
-                            <div class="mb-3"><label>سعر البيع</label><input type="number" class="form-control" id="modalSellPrice" step="0.01" oninput="calculateMargin()"></div>
-                            <div class="alert alert-info"><small>سعر البيع = سعر المورد + (سعر المورد × هامش الربح / 100)</small></div>
-                        </div>
-                    </div>
-                    <div class="mb-3"><label>ملاحظات</label><textarea class="form-control" id="modalNotes" rows="2"></textarea></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="button" class="btn btn-primary" onclick="savePrice()">حفظ السعر</button>
-                </div>
+                <?php if(empty($supplierDues)): ?><p class="text-muted text-center py-3">لا توجد مستحقات</p><?php endif; ?>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script>
-        const priceModal = new bootstrap.Modal(document.getElementById('priceModal'));
+    <div class="row">
+        <!-- Low Stock -->
+        <div class="col-lg-4">
+            <div class="sec-card">
+                <div class="sec-title"><i class="bi bi-exclamation-triangle-fill text-danger"></i> أصناف تحتاج شراء (وصلت الحد الأدنى)</div>
+                <?php foreach($lowStock as $ls): ?>
+                <div class="lowstock-row">
+                    <div class="d-flex justify-content-between">
+                        <div><strong><?= $ls['product_name'] ?></strong><small class="text-muted"> (<?= $ls['product_code'] ?>)</small></div>
+                        <span class="badge bg-danger"><?= number_format($ls['current_qty'],1) ?> / <?= $ls['reorder_point'] ?></span>
+                    </div>
+                    <small class="text-muted"><?= $ls['category'] ?> | <a href="orders/create.php?product_id=<?= $ls['id'] ?>" class="text-primary">أمر شراء</a></small>
+                </div>
+                <?php endforeach; ?>
+                <?php if(empty($lowStock)): ?><p class="text-muted text-center py-3">لا توجد أصناف وصلت الحد الأدنى</p><?php endif; ?>
+            </div>
+        </div>
+        <!-- Recent POs -->
+        <div class="col-lg-4">
+            <div class="sec-card">
+                <div class="sec-title"><i class="bi bi-clock-history"></i> أحدث أوامر الشراء</div>
+                <?php foreach($recentPOs as $po): 
+                    $colors=['draft'=>'secondary','sent'=>'info','partial'=>'warning','received'=>'success','cancelled'=>'danger'];
+                    $labels=['draft'=>'مسودة','sent'=>'مرسل','partial'=>'جزئي','received'=>'مستلم','cancelled'=>'ملغي'];
+                ?>
+                <div class="po-row">
+                    <div class="d-flex justify-content-between">
+                        <strong><?= $po['po_number'] ?></strong>
+                        <span class="status-pill bg-<?= $colors[$po['status']'] ?>"><?= $labels[$po['status']] ?></span>
+                    </div>
+                    <div><small><i class="bi bi-shop"></i> <?= $po['supplier_name'] ?> | <i class="bi bi-cash"></i> <?= number_format($po['grand_total'],2) ?> ج</small></div>
+                    <small class="text-muted"><?= timeAgo($po['created_at']) ?> | <?= $po['creator'] ?></small>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <!-- Recent Invoices -->
+        <div class="col-lg-4">
+            <div class="sec-card">
+                <div class="sec-title"><i class="bi bi-receipt"></i> أحدث فواتير الشراء</div>
+                <?php foreach($recentInvs as $inv): 
+                    $icolors=['open'=>'warning','partial'=>'info','paid'=>'success','cancelled'=>'danger'];
+                    $ilabels=['open'=>'مفتوحة','partial'=>'جزئي','paid'=>'مسددة','cancelled'=>'ملغية'];
+                ?>
+                <div class="inv-row">
+                    <div class="d-flex justify-content-between">
+                        <strong><?= $inv['invoice_number'] ?></strong>
+                        <span class="status-pill bg-<?= $icolors[$inv['status']'] ?>"><?= $ilabels[$inv['status']] ?></span>
+                    </div>
+                    <div><small><i class="bi bi-shop"></i> <?= $inv['supplier_name'] ?> | <i class="bi bi-cash"></i> <?= number_format($inv['grand_total'],2) ?> ج</small></div>
+                    <small class="text-muted"><?= arabicDate($inv['invoice_date']) ?> | <?= $inv['creator'] ?></small>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+</div>
 
-        function showPriceModal(itemId, productName, quantity, productCode) {
-            document.getElementById('modalTitle').textContent = 'إضافة سعر مورد';
-            document.getElementById('modalItemId').value = itemId;
-            document.getElementById('modalQuantity').value = quantity;
-            document.getElementById('modalPriceId').value = 0;
-            document.getElementById('modalProductName').value = productName;
-            document.getElementById('modalProductCode').value = productCode;
-            document.getElementById('modalSupplier').value = '';
-            document.getElementById('modalSupplierPrice').value = '';
-            document.getElementById('modalSellPrice').value = '';
-            document.getElementById('modalProfitMargin').value = 20;
-            document.getElementById('modalDeliveryTime').value = '';
-            document.getElementById('modalNotes').value = '';
-            document.getElementById('newSupplierName').value = '';
-            document.getElementById('newSupplierPhone').value = '';
-            priceModal.show();
-        }
-
-        function editPrice(itemId, priceId, supplierName, supplierId, supplierPrice, sellPrice, profitMargin, deliveryTimeId, notes) {
-            document.getElementById('modalTitle').textContent = 'تعديل سعر: ' + supplierName;
-            document.getElementById('modalItemId').value = itemId;
-            document.getElementById('modalPriceId').value = priceId;
-            document.getElementById('modalSupplier').value = supplierId;
-            document.getElementById('modalSupplierPrice').value = supplierPrice;
-            document.getElementById('modalSellPrice').value = sellPrice;
-            document.getElementById('modalProfitMargin').value = profitMargin;
-            document.getElementById('modalDeliveryTime').value = deliveryTimeId || '';
-            document.getElementById('modalNotes').value = notes;
-            priceModal.show();
-        }
-
-        function calculateSellPrice() {
-            const supplierPrice = parseFloat(document.getElementById('modalSupplierPrice').value) || 0;
-            const margin = parseFloat(document.getElementById('modalProfitMargin').value) || 0;
-            const sellPrice = supplierPrice + (supplierPrice * margin / 100);
-            document.getElementById('modalSellPrice').value = sellPrice.toFixed(2);
-        }
-
-        function calculateMargin() {
-            const supplierPrice = parseFloat(document.getElementById('modalSupplierPrice').value) || 0;
-            const sellPrice = parseFloat(document.getElementById('modalSellPrice').value) || 0;
-            if (supplierPrice > 0) {
-                const margin = ((sellPrice - supplierPrice) / supplierPrice) * 100;
-                document.getElementById('modalProfitMargin').value = margin.toFixed(2);
-            }
-        }
-
-        function addNewSupplier() {
-            const name = document.getElementById('newSupplierName').value.trim();
-            const phone = document.getElementById('newSupplierPhone').value.trim();
-            if (!name) { alert('يرجى إدخال اسم المورد'); return; }
-            $.ajax({
-                url: 'index.php',
-                method: 'POST',
-                data: { action: 'add_new_supplier', supplier_name: name, supplier_phone: phone },
-                success: function(response) {
-                    if (response.success) {
-                        const select = document.getElementById('modalSupplier');
-                        const option = document.createElement('option');
-                        option.value = response.id;
-                        option.text = response.name + ' (' + response.code + ')';
-                        select.add(option);
-                        select.value = response.id;
-                        document.getElementById('newSupplierName').value = '';
-                        document.getElementById('newSupplierPhone').value = '';
-                        alert('تم إضافة المورد بنجاح');
-                    } else { alert('خطأ: ' + response.message); }
-                }
-            });
-        }
-
-        function savePrice() {
-            const itemId = document.getElementById('modalItemId').value;
-            const supplierId = document.getElementById('modalSupplier').value;
-            const supplierPrice = document.getElementById('modalSupplierPrice').value;
-            const sellPrice = document.getElementById('modalSellPrice').value;
-            const profitMargin = document.getElementById('modalProfitMargin').value;
-            const deliveryTimeId = document.getElementById('modalDeliveryTime').value;
-            const notes = document.getElementById('modalNotes').value;
-            if (!supplierId || !supplierPrice || !sellPrice) { alert('يرجى ملء جميع البيانات المطلوبة'); return; }
-            $.ajax({
-                url: 'index.php',
-                method: 'POST',
-                data: { action: 'add_supplier_price', item_id: itemId, supplier_id: supplierId, supplier_price: supplierPrice, sell_price: sellPrice, profit_margin: profitMargin, delivery_time_id: deliveryTimeId, notes: notes },
-                success: function(response) {
-                    if (response.success) { alert('تم حفظ السعر بنجاح'); location.reload(); }
-                    else { alert('خطأ: ' + response.message); }
-                }
-            });
-        }
-
-        function purchaseFromSupplier(itemId, supplierId, supplierPrice, sellPrice, profitMargin, quantity) {
-            if (!confirm('هل تريد شراء هذا الصنف من المورد بسعر ' + supplierPrice + ' ج وبيعه بـ ' + sellPrice + ' ج؟')) return;
-            $.ajax({
-                url: 'index.php',
-                method: 'POST',
-                data: { action: 'mark_purchased', item_id: itemId, supplier_id: supplierId, supplier_price: supplierPrice, sell_price: sellPrice, profit_margin: profitMargin, quantity: quantity },
-                success: function(response) {
-                    if (response.success) { alert('تم تسجيل الشراء بنجاح'); location.reload(); }
-                    else { alert('خطأ: ' + response.message); }
-                }
-            });
-        }
-
-        function setOrderPrice(itemId, supplierId, supplierPrice, sellPrice, profitMargin) {
-            if (!confirm('هل تريد تسجيل هذا السعر (' + sellPrice + ' ج) في الطلب للعميل؟')) return;
-            $.ajax({
-                url: 'index.php',
-                method: 'POST',
-                data: { action: 'set_order_price', item_id: itemId, sell_price: sellPrice },
-                success: function(response) {
-                    if (response.success) { alert('تم تحديث السعر بنجاح'); location.reload(); }
-                    else { alert('خطأ: ' + response.message); }
-                }
-            });
-        }
-    </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx=document.getElementById('purchaseChart').getContext('2d');
+const data=<?= json_encode($monthData) ?>;
+new Chart(ctx,{
+    type:'bar',
+    data:{labels:data.map(d=>d.d.substring(8)+'/'+d.d.substring(5,7)),datasets:[{
+        label:'مشتريات (ج)',data:data.map(d=>d.total),backgroundColor:'rgba(102,126,234,0.7)',borderColor:'#667eea',borderWidth:1,borderRadius:6
+    },{label:'عدد الفواتير',data:data.map(d=>d.cnt),backgroundColor:'rgba(118,75,162,0.5)',borderColor:'#764ba2',borderWidth:1,borderRadius:6,yAxisID:'y1'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.05)'}},y1:{position:'right',beginAtZero:true,grid:{display:false},ticks:{stepSize:1}},x:{grid:{display:false}}}}
+});
+</script>
 </body>
 </html>
