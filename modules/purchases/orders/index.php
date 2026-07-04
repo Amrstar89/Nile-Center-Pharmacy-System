@@ -36,6 +36,9 @@ $orders = $stmt->fetchAll();
 $suppliers = $db->query("SELECT id, supplier_name FROM suppliers WHERE is_active = 1 ORDER BY supplier_name")->fetchAll();
 
 require_once __DIR__ . '/../../../includes/sidebar.php';
+
+$colors_arr = ['draft'=>'secondary','sent'=>'info','partial'=>'warning','received'=>'success','cancelled'=>'danger'];
+$labels_arr = ['draft'=>'مسودة','sent'=>'مرسل','partial'=>'جزئي','received'=>'مستلم','cancelled'=>'ملغي'];
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -78,7 +81,7 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
             <div class="col-md-2">
                 <select name="supplier" class="form-select">
                     <option value="">كل الموردين</option>
-                    <?php foreach($suppliers as $sup): ?><option value="<?= $sup['id'] ?>" <?= $supplier==$sup['id']?'selected':'' ?>><?= $sup['supplier_name'] ?></option><?php endforeach; ?>
+                    <?php foreach($suppliers as $sup){ ?><option value="<?= $sup['id'] ?>" <?= $supplier==$sup['id']?'selected':'' ?>><?= $sup['supplier_name'] ?></option><?php } ?>
                 </select>
             </div>
             <div class="col-md-2"><input type="date" name="date_from" class="form-control" value="<?= $date_from ?>"></div>
@@ -93,9 +96,7 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
             <table class="table table-hover">
                 <thead><tr><th>رقم الأمر</th><th>المورد</th><th>التاريخ</th><th>الأصناف</th><th>التقدم</th><th>الإجمالي</th><th>الحالة</th><th>بواسطة</th><th></th></tr></thead>
                 <tbody>
-                <?php foreach($orders as $o):
-                    $colors=['draft'=>'secondary','sent'=>'info','partial'=>'warning','received'=>'success','cancelled'=>'danger'];
-                    $labels=['draft'=>'مسودة','sent'=>'مرسل','partial'=>'جزئي','received'=>'مستلم','cancelled'=>'ملغي'];
+                <?php foreach($orders as $o){ 
                     $pct = $o['total_qty'] > 0 ? round(($o['total_received']/$o['total_qty'])*100) : 0;
                 ?>
                 <tr>
@@ -105,16 +106,16 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
                     <td><?= $o['items_count'] ?> صنف<br><small class="text-muted"><?= $o['total_qty'] ?> وحدة</small></td>
                     <td style="min-width:120px">
                         <div class="d-flex align-items-center gap-2">
-                            <div class="progress flex-fill progress-slim"><div class="progress-bar bg-<?= $colors[$o['status']] ?>" style="width:<?= $pct ?%"></div></div>
+                            <div class="progress flex-fill progress-slim"><div class="progress-bar bg-<?= $colors_arr[$o['status']] ?>" style="width:<?= $pct ?>%"></div></div>
                             <small class="text-muted"><?= $pct ?>%</small>
                         </div>
                     </td>
                     <td class="fw-bold"><?= number_format($o['grand_total'],2) ?> ج</td>
-                    <td><span class="status-pill bg-<?= $colors[$o['status']] ?>"><?= $labels[$o['status']] ?></span></td>
+                    <td><span class="status-pill bg-<?= $colors_arr[$o['status']] ?>"><?= $labels_arr[$o['status']] ?></span></td>
                     <td><?= $o['creator'] ?></td>
                     <td><a href="view.php?id=<?= $o['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a></td>
                 </tr>
-                <?php endforeach; ?>
+                <?php } ?>
                 </tbody>
             </table>
         </div>
