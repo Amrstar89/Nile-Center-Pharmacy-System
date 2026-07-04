@@ -15,6 +15,12 @@ $units = $db->query("SELECT id, unit_name_ar FROM product_units WHERE is_active 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        // Validate items exist
+        $items = $_POST['items'] ?? [];
+        if (empty($items)) {
+            throw new Exception('يجب إضافة صنف واحد على الأقل للفاتورة');
+        }
+        
         $db->beginTransaction();
         
         $year = date('Y');
@@ -40,9 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Calculate totals
         $subtotal = 0;
-        foreach ($_POST['items'] as $item) {
-            $qty = floatval($item['quantity']);
-            $cost = floatval($item['unit_cost']);
+        foreach ($items as $item) {
+            $qty = floatval($item['quantity'] ?? 0);
+            $cost = floatval($item['unit_cost'] ?? 0);
             $discPct = floatval($item['discount_percent'] ?? 0);
             $line = $qty * $cost * (1 - $discPct/100);
             $subtotal += $line;
@@ -78,23 +84,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         
-        foreach ($_POST['items'] as $item) {
+        foreach ($items as $item) {
             $pid = intval($item['product_id'] ?? 0);
-            $qty = floatval($item['quantity']);
-            $cost = floatval($item['unit_cost']);
+            $qty = floatval($item['quantity'] ?? 0);
+            $cost = floatval($item['unit_cost'] ?? 0);
             $discPct = floatval($item['discount_percent'] ?? 0);
             $line = $qty * $cost * (1 - $discPct/100);
-            $itemStmt->execute([$inv_id, $pid ?: null, $item['product_name'], $item['product_code'] ?? null,
+            $itemStmt->execute([$inv_id, $pid ?: null, $item['product_name'] ?? '', $item['product_code'] ?? null,
                 $item['barcode'] ?? null, intval($item['unit_id'] ?? 0) ?: null, $item['unit_name'] ?? 'علبة',
                 $qty, $cost, floatval($item['sell_price'] ?? 0), $discPct, $vat_percent,
                 $item['expiry_date'] ?: null, $item['batch_number'] ?? null, $line]);
             
             // Update inventory
             if ($store_id && $pid) {
-                $existing = $db->prepare("SELECT id, quantity FROM inventory_items WHERE store_id = ? AND product_id = ?")->execute([$store_id, $pid]) ? $db->prepare("SELECT id, quantity FROM inventory_items WHERE store_id = ? AND product_id = ?")->fetch() : null;
-                if ($existing) {
+                $existing = $db->prepare("SELECT id, quantity FROM inventory_items WHERE store_id = ? AND product_id = ?");
+                $existing->execute([$store_id, $pid]);
+                $existingData = $existing->fetch();
+                if ($existingData) {
                     $db->prepare("UPDATE inventory_items SET quantity = quantity + ?, unit_cost = ?, updated_at = NOW() WHERE id = ?")
-                       ->execute([$qty, $cost, $existing['id']]);
+                       ->execute([$qty, $cost, $existingData['id']]);
                 } else {
                     $db->prepare("INSERT INTO inventory_items (store_id, product_id, quantity, unit_cost, is_active, created_at) VALUES (?, ?, ?, ?, 1, NOW())")
                        ->execute([$store_id, $pid, $qty, $cost]);
@@ -533,7 +541,7 @@ function fillRow(id, product) {
     document.getElementById('name_'+id).value = product.product_name || '';
     document.getElementById('code_'+id).value = product.product_code || '';
     document.getElementById('bc_'+id).value = product.barcode || '';
-    document.getElementById('cost_'+id).value = product.unit_cost || 0;
+    document.getElementBy document.getElementById('cost_'+id).value = product.unit_cost || 0;
     document.getElementById('sell_'+id).value = product.sell_price || 0;
     document.getElementById('stock_'+id).value = product.stock_qty || 0;
     document.getElementById('company_'+id).value = product.company_name || '';
