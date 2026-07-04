@@ -6,7 +6,7 @@ requireAuth();
 $db = getDB();
 $page_title = 'إدارة المشتريات';
 
-// ─── Quick Stats ───
+// Quick Stats
 $today = date('Y-m-d');
 $monthStart = date('Y-m-01');
 
@@ -89,6 +89,12 @@ $lowStock = $db->query("
     LIMIT 8
 ")->fetchAll();
 
+// Define lookup arrays once (outside loops)
+$po_colors = ['draft'=>'secondary','sent'=>'info','partial'=>'warning','received'=>'success','cancelled'=>'danger'];
+$po_labels = ['draft'=>'مسودة','sent'=>'مرسل','partial'=>'جزئي','received'=>'مستلم','cancelled'=>'ملغي'];
+$inv_colors = ['open'=>'warning','partial'=>'info','paid'=>'success','cancelled'=>'danger'];
+$inv_labels = ['open'=>'مفتوحة','partial'=>'جزئي','paid'=>'مسددة','cancelled'=>'ملغية'];
+
 require_once __DIR__ . '/../../includes/sidebar.php';
 ?>
 <!DOCTYPE html>
@@ -145,7 +151,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         <div class="col-md-3"><a href="orders/create.php" class="qbtn"><i class="bi bi-file-earmark-plus"></i><div>أمر شراء جديد</div></a></div>
         <div class="col-md-3"><a href="invoices/create.php" class="qbtn"><i class="bi bi-receipt"></i><div>فاتورة شراء مباشرة</div></a></div>
         <div class="col-md-3"><a href="returns/create.php" class="qbtn"><i class="bi bi-arrow-return-left"></i><div>مرتجع للمورد</div></a></div>
-        <div class="col-md-3"><a href="payments/create.php" class="qbtn"><i class="bi bi-cash-coin"></i><div>دفعة لمورد</div></a></div>
+        <div class="col-md-3"><a href="reports/" class="qbtn"><i class="bi bi-graph-up"></i><div>تقارير المشتريات</div></a></div>
     </div>
 
     <!-- Stats Row 1: Orders -->
@@ -178,7 +184,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         <div class="col-lg-4">
             <div class="sec-card">
                 <div class="sec-title"><i class="bi bi-exclamation-triangle"></i> مستحقات الموردين</div>
-                <?php foreach($supplierDues as $sd): ?>
+                <?php foreach($supplierDues as $sd){ ?>
                 <div class="due-card">
                     <div class="d-flex justify-content-between">
                         <strong><?= $sd['supplier_name'] ?></strong>
@@ -186,8 +192,8 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                     </div>
                     <small class="text-muted"><?= $sd['inv_count'] ?> فاتورة | <?= $sd['supplier_code'] ?></small>
                 </div>
-                <?php endforeach; ?>
-                <?php if(empty($supplierDues)): ?><p class="text-muted text-center py-3">لا توجد مستحقات</p><?php endif; ?>
+                <?php } ?>
+                <?php if(empty($supplierDues)){ ?><p class="text-muted text-center py-3">لا توجد مستحقات</p><?php } ?>
             </div>
         </div>
     </div>
@@ -197,7 +203,7 @@ require_once __DIR__ . '/../../includes/sidebar.php';
         <div class="col-lg-4">
             <div class="sec-card">
                 <div class="sec-title"><i class="bi bi-exclamation-triangle-fill text-danger"></i> أصناف تحتاج شراء (وصلت الحد الأدنى)</div>
-                <?php foreach($lowStock as $ls): ?>
+                <?php foreach($lowStock as $ls){ ?>
                 <div class="lowstock-row">
                     <div class="d-flex justify-content-between">
                         <div><strong><?= $ls['product_name'] ?></strong><small class="text-muted"> (<?= $ls['product_code'] ?>)</small></div>
@@ -205,46 +211,42 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                     </div>
                     <small class="text-muted"><?= $ls['category'] ?> | <a href="orders/create.php?product_id=<?= $ls['id'] ?>" class="text-primary">أمر شراء</a></small>
                 </div>
-                <?php endforeach; ?>
-                <?php if(empty($lowStock)): ?><p class="text-muted text-center py-3">لا توجد أصناف وصلت الحد الأدنى</p><?php endif; ?>
+                <?php } ?>
+                <?php if(empty($lowStock)){ ?><p class="text-muted text-center py-3">لا توجد أصناف وصلت الحد الأدنى</p><?php } ?>
             </div>
         </div>
         <!-- Recent POs -->
         <div class="col-lg-4">
             <div class="sec-card">
                 <div class="sec-title"><i class="bi bi-clock-history"></i> أحدث أوامر الشراء</div>
-                <?php foreach($recentPOs as $po): 
-                    $colors=['draft'=>'secondary','sent'=>'info','partial'=>'warning','received'=>'success','cancelled'=>'danger'];
-                    $labels=['draft'=>'مسودة','sent'=>'مرسل','partial'=>'جزئي','received'=>'مستلم','cancelled'=>'ملغي'];
-                ?>
+                <?php foreach($recentPOs as $po){ ?>
                 <div class="po-row">
                     <div class="d-flex justify-content-between">
                         <strong><?= $po['po_number'] ?></strong>
-                        <span class="status-pill bg-<?= $colors[$po['status']'] ?>"><?= $labels[$po['status']] ?></span>
+                        <span class="status-pill bg-<?= $po_colors[$po['status']] ?>"><?= $po_labels[$po['status']] ?></span>
                     </div>
                     <div><small><i class="bi bi-shop"></i> <?= $po['supplier_name'] ?> | <i class="bi bi-cash"></i> <?= number_format($po['grand_total'],2) ?> ج</small></div>
                     <small class="text-muted"><?= timeAgo($po['created_at']) ?> | <?= $po['creator'] ?></small>
                 </div>
-                <?php endforeach; ?>
+                <?php } ?>
+                <?php if(empty($recentPOs)){ ?><p class="text-muted text-center py-3">لا توجد أوامر شراء</p><?php } ?>
             </div>
         </div>
         <!-- Recent Invoices -->
         <div class="col-lg-4">
             <div class="sec-card">
                 <div class="sec-title"><i class="bi bi-receipt"></i> أحدث فواتير الشراء</div>
-                <?php foreach($recentInvs as $inv): 
-                    $icolors=['open'=>'warning','partial'=>'info','paid'=>'success','cancelled'=>'danger'];
-                    $ilabels=['open'=>'مفتوحة','partial'=>'جزئي','paid'=>'مسددة','cancelled'=>'ملغية'];
-                ?>
+                <?php foreach($recentInvs as $inv){ ?>
                 <div class="inv-row">
                     <div class="d-flex justify-content-between">
                         <strong><?= $inv['invoice_number'] ?></strong>
-                        <span class="status-pill bg-<?= $icolors[$inv['status']'] ?>"><?= $ilabels[$inv['status']] ?></span>
+                        <span class="status-pill bg-<?= $inv_colors[$inv['status']] ?>"><?= $inv_labels[$inv['status']] ?></span>
                     </div>
                     <div><small><i class="bi bi-shop"></i> <?= $inv['supplier_name'] ?> | <i class="bi bi-cash"></i> <?= number_format($inv['grand_total'],2) ?> ج</small></div>
                     <small class="text-muted"><?= arabicDate($inv['invoice_date']) ?> | <?= $inv['creator'] ?></small>
                 </div>
-                <?php endforeach; ?>
+                <?php } ?>
+                <?php if(empty($recentInvs)){ ?><p class="text-muted text-center py-3">لا توجد فواتير شراء</p><?php } ?>
             </div>
         </div>
     </div>
