@@ -16,7 +16,7 @@ $return->execute([$id]);
 $ret = $return->fetch();
 if (!$ret) { $_SESSION['error'] = 'المرتجع غير موجود'; redirect(APP_URL . '/modules/purchases/returns/'); }
 
-$items = $db->prepare("SELECT pri.*, p.product_code, p.barcode
+$items = $db->prepare("SELECT pri.*, p.product_code as p_code
     FROM purchase_return_items pri
     LEFT JOIN products p ON pri.product_id = p.id
     WHERE pri.return_id = ?");
@@ -142,7 +142,7 @@ body{background:#f8f9fa;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                 <tr>
                     <td><?= $i + 1 ?></td>
                     <td style="text-align:right;font-weight:600"><?= $it['product_name'] ?></td>
-                    <td><?= $it['product_code'] ?? '-' ?></td>
+                    <td><?= $it['product_code'] ?? $it['p_code'] ?? '-' ?></td>
                     <td><?= $it['barcode'] ?? '-' ?></td>
                     <td><?= number_format($it['quantity'], 3) ?></td>
                     <td><?= number_format($it['unit_cost'], 2) ?></td>
