@@ -96,6 +96,9 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 .items-table .barcode-w input{flex:1;padding-left:28px}
 .items-table .barcode-w .btn-f2{position:absolute;left:2px;top:2px;bottom:2px;width:24px;border:none;background:#f0f0f0;border-radius:3px;cursor:pointer;font-size:10px;color:#666;display:flex;align-items:center;justify-content:center}
 .items-table .barcode-w .btn-f2:hover{background:var(--po-blue);color:#fff}
+.items-table .print-icon{font-size:16px;cursor:pointer}
+.items-table .print-on{color:#198754}
+.items-table .print-off{color:#ddd}
 .bottom-bar{background:#e1f5fe;border-top:2px solid var(--po-blue);padding:10px 20px;position:sticky;bottom:0;z-index:50}
 .bottom-bar .row1{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
 .bottom-bar .item{display:flex;align-items:center;gap:4px;background:#fff;padding:4px 10px;border-radius:6px;border:1px solid #ddd;font-size:12px}
@@ -124,6 +127,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <div class="btn-icon" onclick="openF2Search()" title="بحث F2"><i class="bi bi-search"></i></div>
     <div class="btn-icon" onclick="clearAll()" title="مسح الكل"><i class="bi bi-trash"></i></div>
     <div class="divider"></div>
+    <div class="btn-icon" onclick="ColOrder.openModal()" title="تخصيص الأعمدة"><i class="bi bi-layout-three-columns"></i></div>
     <div class="btn-icon" onclick="window.print()" title="طباعة"><i class="bi bi-printer"></i></div>
     <div class="btn-icon" onclick="savePO()" title="حفظ Ctrl+S"><i class="bi bi-save"></i></div>
     <div class="divider"></div>
@@ -171,6 +175,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <div class="toolbar-right">
     <button type="button" class="tool-btn" onclick="addRow()"><i class="bi bi-plus-lg"></i><span class="tooltip">إضافة صنف</span></button>
     <button type="button" class="tool-btn" onclick="openF2Search()"><i class="bi bi-search"></i><span class="tooltip">بحث F2</span></button>
+    <button type="button" class="tool-btn" onclick="ColOrder.openModal()"><i class="bi bi-layout-three-columns"></i><span class="tooltip">الأعمدة</span></button>
     <button type="button" class="tool-btn" onclick="window.print()"><i class="bi bi-printer"></i><span class="tooltip">طباعة</span></button>
     <div style="height:1px;background:rgba(255,255,255,0.3);margin:4px 0"></div>
     <button type="button" class="tool-btn" onclick="clearAll()" style="color:#ffebee"><i class="bi bi-trash"></i><span class="tooltip">مسح</span></button>
@@ -178,32 +183,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 </div>
 <div class="items-section">
 <table class="items-table" id="itemsTable">
-<thead>
-<tr>
-    <th>#</th>
-    <th style="min-width:24px">ط</th>
-    <th style="min-width:100px">الباركود</th>
-    <th style="min-width:80px">كود الصنف</th>
-    <th style="min-width:170px">اسم الصنف</th>
-    <th style="min-width:60px">الوحدة</th>
-    <th style="min-width:60px">الكمية</th>
-    <th style="min-width:60px">سعر البيع</th>
-    <th style="min-width:50px">بونص</th>
-    <th style="min-width:110px">الصلاحية</th>
-    <th style="min-width:55px">خصم %</th>
-    <th style="min-width:60px">ق الخصم</th>
-    <th style="min-width:60px">سعر الشراء</th>
-    <th style="min-width:55px">ضريبة %</th>
-    <th style="min-width:60px">ق الضريبة</th>
-    <th style="min-width:75px">إجمالي تكلفة</th>
-    <th style="min-width:55px">ربح ص</th>
-    <th style="min-width:55px">ربح %</th>
-    <th style="min-width:90px">الشركة</th>
-    <th style="min-width:70px">الموقع</th>
-    <th style="min-width:55px">الباتش</th>
-    <th style="min-width:24px"></th>
-</tr>
-</thead>
+<thead><tr id="headerRow"></tr></thead>
 <tbody id="itemsBody"></tbody>
 </table>
 </div>
@@ -227,7 +207,113 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 </form>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../../../js/product-search.js"></script>
+<script src="../../../js/col-order.js"></script>
 <script>
+/* ===== Column Definitions ===== */
+const colDefs=[
+    {key:'rownum',label:'#',width:'30px',fixed:true},
+    {key:'print',label:'ط',width:'24px'},
+    {key:'barcode',label:'الباركود',width:'100px'},
+    {key:'code',label:'كود الصنف',width:'80px'},
+    {key:'name',label:'اسم الصنف',width:'170px'},
+    {key:'unit',label:'الوحدة',width:'60px'},
+    {key:'qty',label:'الكمية',width:'60px'},
+    {key:'sell',label:'سعر البيع',width:'60px'},
+    {key:'bonus',label:'بونص',width:'50px'},
+    {key:'expiry',label:'الصلاحية',width:'110px'},
+    {key:'disc_pct',label:'خصم %',width:'55px'},
+    {key:'disc_val',label:'ق الخصم',width:'60px'},
+    {key:'cost',label:'سعر الشراء',width:'60px'},
+    {key:'vat_pct',label:'ضريبة %',width:'55px'},
+    {key:'vat_val',label:'ق الضريبة',width:'60px'},
+    {key:'total',label:'إجمالي تكلفة',width:'75px'},
+    {key:'profit_v',label:'ربح ص',width:'55px'},
+    {key:'profit_p',label:'ربح %',width:'55px'},
+    {key:'company',label:'الشركة',width:'90px'},
+    {key:'location',label:'الموقع',width:'70px'},
+    {key:'batch',label:'الباتش',width:'55px'},
+    {key:'delete',label:'',width:'24px',fixed:true}
+];
+
+function buildRowHTML(id,d){
+    const data=d||{};
+    let uo='<option value="">--</option>';
+    units.forEach(u=>uo+='<option value="'+u.id+'">'+u.unit_name_ar+'</option>');
+    let html='<tr id="r_'+id+'" data-rid="'+id+'">';
+    const order=ColOrder.getOrder();
+    order.filter(c=>c.visible).forEach(c=>{
+        switch(c.key){
+            case 'rownum':
+                html+='<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(data.product_id||'')+'"></td>';
+                break;
+            case 'print':
+                html+='<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="tglPrint('+id+')"></i><input type="hidden" name="items['+id+'][has_barcode_print]" id="prv_'+id+'" value="0"></td>';
+                break;
+            case 'barcode':
+                html+='<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(data.barcode||'')+'" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>';
+                break;
+            case 'code':
+                html+='<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(data.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>';
+                break;
+            case 'name':
+                html+='<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(data.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>';
+                break;
+            case 'unit':
+                html+='<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+uo+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value=""></td>';
+                break;
+            case 'qty':
+                html+='<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(data.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>';
+                break;
+            case 'sell':
+                html+='<td><input type="number" name="items['+id+'][sell_price]" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(data.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>';
+                break;
+            case 'bonus':
+                html+='<td><input type="number" name="items['+id+'][bonus]" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>';
+                break;
+            case 'expiry':
+                html+='<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>';
+                break;
+            case 'disc_pct':
+                html+='<td><input type="number" name="items['+id+'][discount_percent]" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>';
+                break;
+            case 'disc_val':
+                html+='<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>';
+                break;
+            case 'cost':
+                html+='<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(data.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>';
+                break;
+            case 'vat_pct':
+                html+='<td><input type="number" name="items['+id+'][vat_percent]" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>';
+                break;
+            case 'vat_val':
+                html+='<td><input type="number" name="items['+id+'][vat_value]" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>';
+                break;
+            case 'total':
+                html+='<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>';
+                break;
+            case 'profit_v':
+                html+='<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>';
+                break;
+            case 'profit_p':
+                html+='<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>';
+                break;
+            case 'company':
+                html+='<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(data.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>';
+                break;
+            case 'location':
+                html+='<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(data.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>';
+                break;
+            case 'batch':
+                html+='<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>';
+                break;
+            case 'delete':
+                html+='<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>';
+                break;
+        }
+    });
+    html+='</tr>';return html;
+}
+
 let R=0; const units=<?= json_encode($units) ?>; const suppliers=<?= json_encode($suppliers) ?>;
 function onSupChange(){
     const sel=document.getElementById('supplier_id');
@@ -247,34 +333,10 @@ function fltStores(){
 }
 function addRow(data){
     R++;const id=R;
-    let uo='<option value="">--</option>';
-    units.forEach(u=>uo+='<option value="'+u.id+'">'+u.unit_name_ar+'</option>');
-    const d=data||{};
-    const tr=document.createElement('tr');
-    tr.id='r_'+id;tr.dataset.rid=id;
-    tr.innerHTML=
-        '<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(d.product_id||'')+'"></td>'+
-        '<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="tglPrint('+id+')"></i><input type="hidden" name="items['+id+'][has_barcode_print]" id="prv_'+id+'" value="0"></td>'+
-        '<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>'+
-        '<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>'+
-        '<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>'+
-        '<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+uo+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value=""></td>'+
-        '<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(d.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>'+
-        '<td><input type="number" name="items['+id+'][sell_price]" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(d.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>'+
-        '<td><input type="number" name="items['+id+'][bonus]" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>'+
-        '<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>'+
-        '<td><input type="number" name="items['+id+'][discount_percent]" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>'+
-        '<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>'+
-        '<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>'+
-        '<td><input type="number" name="items['+id+'][vat_percent]" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>'+
-        '<td><input type="number" name="items['+id+'][vat_value]" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>'+
-        '<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>'+
-        '<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>'+
-        '<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>'+
-        '<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(d.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>'+
-        '<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(d.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>'+
-        '<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>'+
-        '<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>';
+    const html=buildRowHTML(id,data);
+    const temp=document.createElement('tbody');
+    temp.innerHTML=html;
+    const tr=temp.firstElementChild;
     document.getElementById('itemsBody').appendChild(tr);
     document.getElementById('bc_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
     document.getElementById('nm_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
@@ -399,6 +461,9 @@ document.addEventListener('keydown',function(e){
     if(e.ctrlKey&&e.key==='s'){e.preventDefault();savePO();}
     if(e.key==='F3'){e.preventDefault();addRow();}
 });
+
+// Initialize column order
+ColOrder.init(colDefs,'purchase_order_cols','headerRow',buildRowHTML);
 addRow();
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
 </script>
