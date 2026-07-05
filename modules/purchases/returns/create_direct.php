@@ -50,7 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db->commit();
         $_SESSION['success'] = 'تم إنشاء المرتجع المباشر ' . $ret_number . ' بنجاح';
         redirect(APP_URL . '/modules/purchases/returns/');
-    } catch (Exception $e) { $db->rollBack(); $error = $e->getMessage(); }
+    } catch (Exception $e) {
+        if ($db->inTransaction()) { $db->rollBack(); }
+        $error = $e->getMessage();
+    }
 }
 require_once __DIR__ . '/../../../includes/sidebar.php';
 ?>
@@ -63,7 +66,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 <style>
 :root{--ret-red:#c0392b;--primary:#667eea;--sidebar-bg:#1a1a2e;--green:#198754;--red:#dc3545;}
-*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0}
+*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0;overflow-y:auto}
 .main-content{padding:0;margin-right:0 !important}
 .top-header{background:var(--ret-red);color:#fff;padding:8px 20px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:100}
 .top-header .menu-item{color:rgba(255,255,255,0.8);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;transition:all .2s;text-decoration:none;white-space:nowrap}
@@ -105,8 +108,21 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 .bottom-bar .item.ro{background:#ffcdd2;border-color:#ef9a9a}
 .bottom-bar .item.ro strong{color:#b71c1c}
 .bottom-bar .grand{background:linear-gradient(135deg,#e74c3c,var(--ret-red));color:#fff;padding:8px 20px;border-radius:10px;font-size:16px;font-weight:700}
-.bottom-bar .item input{height:26px;padding:2px 5px;font-size:12px;width:80px;border:1px solid #ccc;border-radius:4px}
+.bottom-bar .item input,.bottom-bar .item select{height:26px;padding:2px 5px;font-size:12px;width:80px;border:1px solid #ccc;border-radius:4px}
 .supplier-section{background:#fff3cd;padding:10px 20px;border-top:1px solid #ffc107}
+/* Column Order Modal */
+.col-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center}
+.col-modal.show{display:flex}
+.col-modal-box{background:#fff;border-radius:12px;padding:20px;width:360px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.col-modal-box h5{margin:0 0 15px;font-size:16px;color:var(--ret-red)}
+.col-list{list-style:none;padding:0;margin:0}
+.col-list li{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e9ecef;border-radius:6px;margin-bottom:6px;background:#fff;cursor:move;transition:all .2s}
+.col-list li:hover{background:#f8f9fa}
+.col-list li.dragging{opacity:0.5}
+.col-list li .drag-handle{color:#999;font-size:14px;cursor:move}
+.col-list li label{flex:1;margin:0;font-size:13px;cursor:pointer}
+.col-list li input[type="checkbox"]{cursor:pointer}
+.col-actions{display:flex;gap:8px;margin-top:15px;justify-content:flex-end}
 @media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon{display:none!important}}
 @media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}}
 </style>
@@ -126,6 +142,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <div class="btn-icon" onclick="openF2Search()" title="بحث F2"><i class="bi bi-search"></i></div>
     <div class="btn-icon" onclick="clearAll()" title="مسح الكل"><i class="bi bi-trash"></i></div>
     <div class="divider"></div>
+    <div class="btn-icon" onclick="openColModal()" title="تخصيص الأعمدة"><i class="bi bi-layout-three-columns"></i></div>
     <div class="btn-icon" onclick="window.print()" title="طباعة"><i class="bi bi-printer"></i></div>
     <div class="btn-icon" onclick="saveRet()" title="حفظ Ctrl+S"><i class="bi bi-save"></i></div>
     <div class="divider"></div>
@@ -145,7 +162,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     </div>
     <div class="col-lg-1 col-md-2">
         <label class="form-label small text-muted">كود المورد</label>
-        <input type="text" id="sup_code_dsp" class="form-control form-control-sm" readonly style="background:#e9ecef;font-weight:700;text-align:center">
+        <input type="text" id="sup_code_dsp" class="form-control form-control-sm" placeholder="كود" oninput="onSupCodeInput()" style="font-weight:700;text-align:center">
     </div>
     <div class="col-lg-1 col-md-2">
         <label class="form-label small text-muted">تاريخ المرتجع</label>
@@ -174,6 +191,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <div class="toolbar-right">
     <button type="button" class="tool-btn" onclick="addRow()"><i class="bi bi-plus-lg"></i><span class="tooltip">إضافة صنف</span></button>
     <button type="button" class="tool-btn" onclick="openF2Search()"><i class="bi bi-search"></i><span class="tooltip">بحث F2</span></button>
+    <button type="button" class="tool-btn" onclick="openColModal()"><i class="bi bi-layout-three-columns"></i><span class="tooltip">الأعمدة</span></button>
     <button type="button" class="tool-btn" onclick="window.print()"><i class="bi bi-printer"></i><span class="tooltip">طباعة</span></button>
     <div style="height:1px;background:rgba(255,255,255,0.3);margin:4px 0"></div>
     <button type="button" class="tool-btn" onclick="clearAll()" style="color:#ffebee"><i class="bi bi-trash"></i><span class="tooltip">مسح</span></button>
@@ -182,23 +200,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <!-- Items Table -->
 <div class="items-section">
 <table class="items-table" id="itemsTable">
-<thead>
-<tr>
-    <th>#</th>
-    <th style="min-width:100px">الباركود</th>
-    <th style="min-width:80px">كود الصنف</th>
-    <th style="min-width:170px">اسم الصنف</th>
-    <th style="min-width:60px">الوحدة</th>
-    <th style="min-width:60px">الكمية</th>
-    <th style="min-width:80px">الرصيد الحالي</th>
-    <th style="min-width:60px">سعر الشراء</th>
-    <th style="min-width:110px">الصلاحية</th>
-    <th style="min-width:55px">الباتش</th>
-    <th style="min-width:60px">إجمالي</th>
-    <th style="min-width:150px">السبب / ملاحظات</th>
-    <th style="min-width:24px"></th>
-</tr>
-</thead>
+<thead><tr id="headerRow"></tr></thead>
 <tbody id="itemsBody"></tbody>
 </table>
 </div>
@@ -218,13 +220,150 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 </div>
 </div>
 </form>
+<!-- Column Order Modal -->
+<div class="col-modal" id="colModal">
+<div class="col-modal-box">
+    <h5><i class="bi bi-layout-three-columns"></i> تخصيص الأعمدة</h5>
+    <p class="text-muted" style="font-size:12px">اسحب للترتيب - أزل التحديد للإخفاء</p>
+    <ul class="col-list" id="colList"></ul>
+    <div class="col-actions">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="resetColOrder()">إعادة ضبط</button>
+        <button type="button" class="btn btn-sm btn-primary" onclick="saveColOrder()">حفظ</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeColModal()">إغلاق</button>
+    </div>
+</div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../../../js/product-search.js"></script>
 <script>
+/* ===== Column Definitions ===== */
+const colDefs=[
+    {key:'rownum',label:'#',width:'30px',fixed:true},
+    {key:'barcode',label:'الباركود',width:'100px'},
+    {key:'code',label:'كود الصنف',width:'80px'},
+    {key:'name',label:'اسم الصنف',width:'170px'},
+    {key:'unit',label:'الوحدة',width:'60px'},
+    {key:'qty',label:'الكمية',width:'60px'},
+    {key:'stock',label:'الرصيد',width:'80px'},
+    {key:'cost',label:'سعر الشراء',width:'60px'},
+    {key:'expiry',label:'الصلاحية',width:'110px'},
+    {key:'batch',label:'الباتش',width:'55px'},
+    {key:'total',label:'الإجمالي',width:'60px'},
+    {key:'reason',label:'السبب',width:'150px'},
+    {key:'delete',label:'',width:'24px',fixed:true}
+];
+const STORAGE_KEY='return_direct_col_order';
+let currentOrder=[];
+let dragSrc=null;
+
+function initColOrder(){
+    const saved=localStorage.getItem(STORAGE_KEY);
+    currentOrder=saved?JSON.parse(saved):colDefs.map(c=>({key:c.key,visible:!c.hidden}));
+    renderHeader();
+}
+function getColDef(key){return colDefs.find(c=>c.key===key)||{};}
+function renderHeader(){
+    const hr=document.getElementById('headerRow');
+    hr.innerHTML=currentOrder.filter(c=>c.visible).map(c=>{
+        const d=getColDef(c.key);
+        const style=d.width?'style="min-width:'+d.width+'"':'';
+        return '<th '+style+'>'+d.label+'</th>';
+    }).join('');
+}
+function buildRowHTML(id,d){
+    const dta=d||{};
+    let uo='<option value="">--</option>';
+    units.forEach(u=>uo+='<option value="'+u.id+'">'+u.unit_name_ar+'</option>');
+    let html='<tr id="r_'+id+'" data-rid="'+id+'">';
+    currentOrder.filter(c=>c.visible).forEach(c=>{
+        switch(c.key){
+            case 'rownum':html+='<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(dta.product_id||'')+'"></td>';break;
+            case 'barcode':html+='<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(dta.barcode||'')+'" placeholder="باركود" onkeydown="handleEnter(event,'+id+')"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>';break;
+            case 'code':html+='<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(dta.product_code||'')+'" onkeydown="handleEnter(event,'+id+')"></td>';break;
+            case 'name':html+='<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(dta.product_name||'')+'" required onkeydown="handleEnter(event,'+id+')"></td>';break;
+            case 'unit':html+='<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+')">'+uo+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value=""></td>';break;
+            case 'qty':html+='<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="1" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+')"></td>';break;
+            case 'stock':html+='<td><input type="number" id="st_'+id+'" class="form-control form-control-sm num row-calc" value="'+(dta.stock_qty||'')+'" readonly></td>';break;
+            case 'cost':html+='<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(dta.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+')"></td>';break;
+            case 'expiry':html+='<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+')"></td>';break;
+            case 'batch':html+='<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+')"></td>';break;
+            case 'total':html+='<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>';break;
+            case 'reason':html+='<td><input type="text" name="items['+id+'][reason]" id="rn_'+id+'" class="form-control form-control-sm" placeholder="سبب الإرجاع..." onkeydown="handleEnter(event,'+id+')"></td>';break;
+            case 'delete':html+='<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>';break;
+        }
+    });
+    html+='</tr>';return html;
+}
+
+/* ===== Modal Functions ===== */
+function openColModal(){
+    const list=document.getElementById('colList');list.innerHTML='';
+    currentOrder.forEach((c,idx)=>{
+        if(c.key==='rownum'||c.key==='delete')return;
+        const d=getColDef(c.key);
+        const li=document.createElement('li');li.draggable=true;li.dataset.index=idx;
+        li.innerHTML='<span class="drag-handle"><i class="bi bi-grip-vertical"></i></span>'+
+            '<input type="checkbox" '+(c.visible?'checked':'')+' onchange="toggleColVisible('+idx+',this.checked)">'+
+            '<label>'+d.label+'</label>';
+        li.addEventListener('dragstart',dragStart);
+        li.addEventListener('dragover',dragOver);
+        li.addEventListener('drop',drop);
+        li.addEventListener('dragend',dragEnd);
+        list.appendChild(li);
+    });
+    document.getElementById('colModal').classList.add('show');
+}
+function closeColModal(){document.getElementById('colModal').classList.remove('show');}
+function toggleColVisible(idx,visible){currentOrder[idx].visible=visible;}
+function saveColOrder(){
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(currentOrder));
+    renderHeader();
+    closeColModal();
+    // Re-render existing rows to match new order
+    const rows=[];
+    document.querySelectorAll('#itemsBody tr').forEach(tr=>{
+        const id=tr.dataset.rid;
+        const d={product_id:document.querySelector('#r_'+id+' input[name*="[product_id]"]')?.value||''};
+        document.querySelectorAll('#r_'+id+' input, #r_'+id+' select').forEach(inp=>{
+            if(inp.name){
+                const m=inp.name.match(/\[([^\]]+)\]$/);
+                if(m)d[m[1]]=inp.value;
+            }
+        });
+        const st=document.getElementById('st_'+id)?.value||'';
+        if(st)d.stock_qty=st;
+        rows.push({id,data:d});
+    });
+    document.getElementById('itemsBody').innerHTML='';
+    rows.forEach(r=>{
+        const temp=document.createElement('tbody');
+        temp.innerHTML=buildRowHTML(r.id,r.data);
+        const newRow=temp.firstElementChild;
+        document.getElementById('itemsBody').appendChild(newRow);
+        // Re-attach listeners
+        const rid=r.id;
+        document.getElementById('bc_'+rid).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(rid);}});
+        document.getElementById('nm_'+rid).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(rid);}});
+    });
+    recalc();
+}
+function resetColOrder(){currentOrder=colDefs.map(c=>({key:c.key,visible:!c.hidden}));saveColOrder();closeColModal();}
+function dragStart(e){dragSrc=this;this.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
+function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';return false;}
+function drop(e){e.stopPropagation();const srcIdx=parseInt(dragSrc.dataset.index);const tgtIdx=parseInt(this.dataset.index);if(srcIdx!==tgtIdx){const item=currentOrder.splice(srcIdx,1)[0];currentOrder.splice(tgtIdx,0,item);openColModal();}return false;}
+function dragEnd(){this.classList.remove('dragging');}
+
+/* ===== Row Functions ===== */
 let R=0; const units=<?= json_encode($units) ?>;
 document.getElementById('supplier_id').addEventListener('change',function(){
-    document.getElementById('sup_code_dsp').value=this.options[this.selectedIndex].dataset.code||'';
+    const sel=this;
+    document.getElementById('sup_code_dsp').value=sel.options[sel.selectedIndex].dataset.code||'';
 });
+function onSupCodeInput(){
+    const code=document.getElementById('sup_code_dsp').value.trim();
+    const sel=document.getElementById('supplier_id');
+    for(let i=0;i<sel.options.length;i++){if(sel.options[i].dataset.code===code){sel.selectedIndex=i;return;}}
+}
 function fltStores(){
     const bid=document.getElementById('branchSel').value;
     const sel=document.getElementById('store_id');
@@ -232,30 +371,16 @@ function fltStores(){
 }
 function addRow(data){
     R++;const id=R;
-    let uo='<option value="">--</option>';
-    units.forEach(u=>uo+='<option value="'+u.id+'">'+u.unit_name_ar+'</option>');
     const d=data||{};
-    const tr=document.createElement('tr');
-    tr.id='r_'+id;tr.dataset.rid=id;
-    tr.innerHTML=
-        '<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(d.product_id||'')+'"></td>'+
-        '<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>'+
-        '<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'"></td>'+
-        '<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required></td>'+
-        '<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm">'+uo+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value=""></td>'+
-        '<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="1" step="0.001" min="0.001" required oninput="calc('+id+')"></td>'+
-        '<td><input type="number" id="st_'+id+'" class="form-control form-control-sm num row-calc" value="'+(d.stock_qty||'')+'" readonly></td>'+
-        '<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')"></td>'+
-        '<td><input type="month" name="items['+id+'][expiry_date]" class="form-control form-control-sm" style="font-size:11px"></td>'+
-        '<td><input type="text" name="items['+id+'][batch_number]" class="form-control form-control-sm num" placeholder="باتش"></td>'+
-        '<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>'+
-        '<td><input type="text" name="items['+id+'][reason]" class="form-control form-control-sm" placeholder="سبب الإرجاع..."></td>'+
-        '<td><span class="btn-del" onclick="delRow('+id+')"><i class="bi bi-trash-fill"></i></span></td>';
+    const temp=document.createElement('tbody');
+    temp.innerHTML=buildRowHTML(id,d);
+    const tr=temp.firstElementChild;
     document.getElementById('itemsBody').appendChild(tr);
     document.getElementById('bc_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
     document.getElementById('nm_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
     if(data)calc(id);
     recalc();
+    setTimeout(()=>{const el=document.getElementById('bc_'+id);if(el)el.focus();},50);
     return id;
 }
 function delRow(id){const r=document.getElementById('r_'+id);if(r)r.remove();recalc();}
@@ -263,15 +388,16 @@ function clearAll(){if(!confirm('مسح كل الأصناف؟'))return;document.
 function calc(id){
     const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
     const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-    document.getElementById('tl_'+id).value=(qt*cs).toFixed(2);
+    const tl=document.getElementById('tl_'+id);
+    if(tl)tl.value=(qt*cs).toFixed(2);
     recalc();
 }
 function recalc(){
     let n=0,total=0;
     document.querySelectorAll('#itemsBody tr').forEach(tr=>{
-        const id=tr.dataset.rid;
-        n++;
-        total+=(parseFloat(document.getElementById('tl_'+id)?.value)||0);
+        const id=tr.dataset.rid;n++;
+        const tl=document.getElementById('tl_'+id);
+        if(tl)total+=(parseFloat(tl.value)||0);
     });
     document.getElementById('t_items').textContent=n;
     document.getElementById('t_total').textContent=total.toFixed(2);
@@ -292,17 +418,28 @@ function fill(id,p){
     document.getElementById('co_'+id).value=p.product_code||'';
     document.getElementById('bc_'+id).value=p.barcode||'';
     document.getElementById('cs_'+id).value=p.unit_cost||0;
-    document.getElementById('st_'+id).value=p.stock_qty||0;
+    const st=document.getElementById('st_'+id);
+    if(st)st.value=p.stock_qty||0;
     const pi=document.querySelector('#r_'+id+' input[name*="[product_id]"]');
     if(pi)pi.value=p.product_id||p.id||'';
     calc(id);
 }
 function saveRet(){document.getElementById('retForm').submit();}
+function handleEnter(e,id){
+    if(e.key==='Enter'){
+        e.preventDefault();
+        const active=document.activeElement;
+        const inputs=Array.from(document.querySelectorAll('#r_'+id+' input:not([type="hidden"]), #r_'+id+' select'));
+        const idx=inputs.indexOf(active);
+        if(idx>=0&&idx<inputs.length-1){inputs[idx+1].focus();}
+        else{addRow();}
+    }
+}
 document.addEventListener('keydown',function(e){
     if(e.ctrlKey&&e.key==='s'){e.preventDefault();saveRet();}
     if(e.key==='F3'){e.preventDefault();addRow();}
-    if(e.key==='F2'){const a=document.activeElement;const r=a.closest('tr');if(r&&r.dataset.rid){e.preventDefault();f2r(r.dataset.rid);}}
 });
+initColOrder();
 addRow();
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
 </script>
