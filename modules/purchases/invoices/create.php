@@ -14,7 +14,6 @@ $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $items = $_POST['items'] ?? [];
-        // Remove helper entries
         if (isset($items['_dummy'])) unset($items['_dummy']);
         if (empty($items)) { throw new Exception('يجب إضافة صنف واحد على الأقل'); }
         $db->beginTransaction();
@@ -51,25 +50,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $grand = $subtotal + $total_vat - $extra_discount_val;
         if ($extra_discount_pct > 0) { $grand = $grand * (1 - $extra_discount_pct/100); }
         
-        // New payment logic
         $status = 'open';
         if ($payment_method === 'cash' || $payment_method === 'bank_transfer' || $payment_method === 'wallet_transfer') {
-            // Cash-like: deferred amount is what goes to supplier payable
             $paid_amount = $grand - $deferred_amount;
-            if ($deferred_amount <= 0) {
-                $status = 'paid';
-            } else {
-                $status = 'partial';
-            }
+            if ($deferred_amount <= 0) { $status = 'paid'; }
+            else { $status = 'partial'; }
         } elseif ($payment_method === 'credit' || $payment_method === 'under_collection') {
-            // Credit-like: paid_amount is what's paid now, rest goes to supplier payable
-            if ($paid_amount >= $grand) {
-                $status = 'paid';
-            } elseif ($paid_amount > 0) {
-                $status = 'partial';
-            } else {
-                $status = 'open';
-            }
+            if ($paid_amount >= $grand) { $status = 'paid'; }
+            elseif ($paid_amount > 0) { $status = 'partial'; }
+            else { $status = 'open'; }
         }
         $db->prepare("INSERT INTO purchase_invoices (invoice_number, supplier_id, store_id, invoice_date, due_date, status, subtotal, vat_percent, vat_amount, grand_total, paid_amount, extra_discount_pct, extra_discount_val, payment_method, supplier_invoice_no, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")
            ->execute([$inv_number, $supplier_id, $store_id ?: null, $invoice_date, $due_date, $status, $subtotal, 0, $total_vat, $grand, $paid_amount, $extra_discount_pct, $extra_discount_val, $payment_method, $supplier_inv_no ?: null, $notes, $_SESSION['user_id']]);
@@ -87,12 +76,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 else { $db->prepare("INSERT INTO inventory_items (store_id, product_id, quantity, unit_cost, is_active, created_at) VALUES (?, ?, ?, ?, 1, NOW())")->execute([$store_id, $pid, $qty + $bonus, $cost]); }
             }
         }
-        // Record payment if applicable
         if ($paid_amount > 0) {
             $db->prepare("INSERT INTO supplier_payments (payment_number, supplier_id, invoice_id, amount, payment_date, payment_method, notes, created_by) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)")
                ->execute(['PAY' . time(), $supplier_id, $inv_id, $paid_amount, $payment_method, 'دفعة من فاتورة ' . $inv_number, $_SESSION['user_id']]);
         }
-        // Record supplier payable (deferred amount) if any
         if ($status !== 'paid' && ($grand - $paid_amount) > 0) {
             $db->prepare("INSERT INTO supplier_transactions (supplier_id, invoice_id, transaction_type, amount, notes, created_by, created_at) VALUES (?, ?, 'invoice_deferred', ?, ?, ?, NOW())")
                ->execute([$supplier_id, $inv_id, $grand - $paid_amount, 'مبلغ مؤجل من فاتورة ' . $inv_number, $_SESSION['user_id']]);
@@ -198,6 +185,8 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 <!-- Invoice Header -->
 <div class="invoice-header">
 <form method="POST" id="invForm" autocomplete="off">
+<!-- Hidden dummy to ensure items array always exists in POST -->
+<input type="hidden" name="items[_dummy][product_id]" value="">
 <div class="row g-2">
     <div class="col-lg-2 col-md-3">
         <label class="form-label small text-muted">المورد <span class="text-danger">*</span></label>
@@ -337,14 +326,11 @@ function onPayMethodChange(){
     const dueWrap=document.getElementById('dueDateWrap');
     const paidWrap=document.getElementById('paidFromWrap');
     const defWrap=document.getElementById('deferredWrap');
-    // Cash-like: show deferred, hide paid
     if(m==='cash'||m==='bank_transfer'||m==='wallet_transfer'){
         dueWrap.classList.add('d-none');
         paidWrap.classList.add('d-none');
         defWrap.classList.remove('d-none');
-    }
-    // Credit-like: show paid, hide deferred
-    else if(m==='credit'||m==='under_collection'){
+    } else if(m==='credit'||m==='under_collection'){
         dueWrap.classList.remove('d-none');
         paidWrap.classList.remove('d-none');
         defWrap.classList.add('d-none');
@@ -352,7 +338,7 @@ function onPayMethodChange(){
     recalc();
 }
 
-/* ===== Row Building - Hardcoded with visibility check ===== */
+/* ===== Row Building - insertAdjacentHTML for reliable form submission ===== */
 let R=0;
 const allUnits=<?= json_encode($units) ?>;
 const suppliers=<?= json_encode($suppliers) ?>;
@@ -365,9 +351,7 @@ function getUnitOptions(selUnitId){
     return h;
 }
 
-function addRow(data){
-    R++;const id=R;
-    const d=data||{};
+function buildRowCells(id,d){
     const V=function(k){return ColOrder.isVisible(k);};
     const vis=function(k,html){return V(k)?html:'';};
     let h='';
@@ -393,10 +377,15 @@ function addRow(data){
     h+=vis('location','<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(d.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
     h+=vis('batch','<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>');
     h+=vis('delete','<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>');
-    const tr=document.createElement('tr');
-    tr.id='r_'+id;tr.dataset.rid=id;
-    tr.innerHTML=h;
-    document.getElementById('itemsBody').appendChild(tr);
+    return h;
+}
+
+function addRow(data){
+    R++;const id=R;
+    const d=data||{};
+    const cells=buildRowCells(id,d);
+    // CRITICAL: Use insertAdjacentHTML on tbody for reliable form submission
+    document.getElementById('itemsBody').insertAdjacentHTML('beforeend','<tr id="r_'+id+'" data-rid="'+id+'">'+cells+'</tr>');
     // Attach F2 listeners
     const bc=document.getElementById('bc_'+id);
     const nm=document.getElementById('nm_'+id);
@@ -565,10 +554,8 @@ function fill(id,p){
     document.getElementById('sp_'+id).value=p.sell_price||0;
     document.getElementById('cy_'+id).value=p.company_name||'';
     document.getElementById('lc_'+id).value=p.location||'';
-    // Set unit if product has one
     if(p.unit_id){document.getElementById('un_'+id).value=p.unit_id;}
     if(p.unit_name){document.getElementById('unm_'+id).value=p.unit_name;}
-    // Set product units (big/medium/small) if available
     if(p.units && p.units.length>0){
         const sel=document.getElementById('un_'+id);
         sel.innerHTML='';
