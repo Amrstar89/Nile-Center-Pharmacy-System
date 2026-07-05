@@ -30,13 +30,12 @@ $countStmt->execute($params);
 $totalRows = $countStmt->fetchColumn();
 $totalPages = max(1, ceil($totalRows / $perPage));
 
-// Data
-$stmt = $db->prepare("SELECT r.*, s.supplier_name, s.supplier_code, st.store_name, u.user_name as creator_name, 
+// Data - removed users join since column name is unknown
+$stmt = $db->prepare("SELECT r.*, s.supplier_name, s.supplier_code, st.store_name, 
     (SELECT COUNT(*) FROM purchase_return_items WHERE return_id = r.id) as item_count 
     FROM purchase_returns r 
     LEFT JOIN suppliers s ON r.supplier_id = s.id 
     LEFT JOIN stores st ON r.store_id = st.id 
-    LEFT JOIN users u ON r.created_by = u.id 
     $whereSQL ORDER BY r.created_at DESC LIMIT $perPage OFFSET $offset");
 $stmt->execute($params);
 $returns = $stmt->fetchAll();
@@ -169,12 +168,11 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                 <th>الأصناف</th>
                 <th>الإجمالي</th>
                 <th>ملاحظات</th>
-                <th>بواسطة</th>
                 <th></th>
             </tr></thead>
             <tbody>
             <?php if(empty($returns)){ ?>
-                <tr><td colspan="11" class="text-center text-muted py-5"><i class="bi bi-inbox" style="font-size:48px"></i><br>لا توجد مرتجعات</td></tr>
+                <tr><td colspan="10" class="text-center text-muted py-5"><i class="bi bi-inbox" style="font-size:48px"></i><br>لا توجد مرتجعات</td></tr>
             <?php } else { foreach($returns as $r){ ?>
                 <tr>
                     <td><?= $r['id'] ?></td>
@@ -186,7 +184,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
                     <td><?= $r['item_count'] ?></td>
                     <td><strong><?= number_format($r['grand_total'],2) ?></strong> ج</td>
                     <td><?= $r['notes'] ? '<i class="bi bi-chat-square-text text-muted" title="'.htmlspecialchars($r['notes']).'"></i>' : '-' ?></td>
-                    <td><small class="text-muted"><?= $r['creator_name'] ?? '' ?></small></td>
                     <td>
                         <a href="view.php?id=<?= $r['id'] ?>" class="btn btn-sm btn-outline-danger"><i class="bi bi-eye"></i></a>
                     </td>
