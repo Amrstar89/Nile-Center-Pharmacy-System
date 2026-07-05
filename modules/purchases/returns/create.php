@@ -51,7 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db->commit();
         $_SESSION['success'] = 'تم إنشاء المرتجع ' . $ret_number . ' بنجاح';
         redirect(APP_URL . '/modules/purchases/returns/');
-    } catch (Exception $e) { $db->rollBack(); $error = $e->getMessage(); }
+    } catch (Exception $e) {
+        if ($db->inTransaction()) { $db->rollBack(); }
+        $error = $e->getMessage();
+    }
 }
 require_once __DIR__ . '/../../../includes/sidebar.php';
 ?>
@@ -64,7 +67,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 <style>
 :root{--ret-red:#c0392b;--primary:#667eea;--secondary:#764ba2;--sidebar-bg:#1a1a2e;}
-*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0}
+*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0;overflow-y:auto}
 .main-content{padding:0;margin-right:0 !important}
 .top-header{background:var(--ret-red);color:#fff;padding:8px 20px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:100}
 .top-header .menu-item{color:rgba(255,255,255,0.8);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;transition:all .2s;text-decoration:none;white-space:nowrap}
