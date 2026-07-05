@@ -7,7 +7,7 @@ $db = getDB();
 $id = intval($_GET['id'] ?? 0);
 if (!$id) { redirect(APP_URL . '/modules/purchases/returns/'); }
 
-$return = $db->prepare("SELECT pr.*, s.supplier_name, s.supplier_code, st.store_name, u.user_name as created_by_name
+$return = $db->prepare("SELECT pr.*, s.supplier_name, s.supplier_code, st.store_name, u.name as created_by_name
     FROM purchase_returns pr
     LEFT JOIN suppliers s ON pr.supplier_id = s.id
     LEFT JOIN stores st ON pr.store_id = st.id
