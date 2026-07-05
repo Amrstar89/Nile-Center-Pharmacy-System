@@ -28,23 +28,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($items as $item) {
             $qty = floatval($item['quantity'] ?? 0); $bonus = floatval($item['bonus'] ?? 0);
             $cost = floatval($item['unit_cost'] ?? 0); $discPct = floatval($item['discount_percent'] ?? 0);
-            $itemVatPct = floatval($item['vat_percent'] ?? 0); $totalQty = $qty + $bonus;
+            $itemVatPct = floatval($item['vat_percent'] ?? 0); $itemVatVal = floatval($item['vat_value'] ?? 0);
+            $totalQty = $qty + $bonus;
             $afterDisc = $totalQty * $cost * (1 - $discPct/100); $subtotal += $afterDisc;
-            $total_vat += $afterDisc * ($itemVatPct/100);
+            if ($itemVatVal > 0) { $total_vat += $itemVatVal; }
+            else { $total_vat += $afterDisc * ($itemVatPct/100); }
         }
         $db->prepare("INSERT INTO purchase_orders (po_number, supplier_id, store_id, order_date, expected_date, status, subtotal, vat_percent, vat_amount, grand_total, notes, created_by) VALUES (?, ?, ?, NOW(), ?, 'draft', ?, 0, ?, ?, ?, ?)")
            ->execute([$po_number, $supplier_id, $store_id ?: null, $expected_date, $subtotal, $total_vat, $subtotal + $total_vat, $notes, $_SESSION['user_id']]);
         $po_id = $db->lastInsertId();
-        $itemStmt = $db->prepare("INSERT INTO purchase_order_items (po_id, product_id, product_name, product_code, barcode, unit_id, unit_name, quantity, bonus_qty, unit_cost, sell_price, discount_percent, vat_percent, expiry_date, batch_number, line_total, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $itemStmt = $db->prepare("INSERT INTO purchase_order_items (po_id, product_id, product_name, product_code, barcode, unit_id, unit_name, quantity, bonus_qty, unit_cost, sell_price, discount_percent, vat_percent, vat_value, expiry_date, batch_number, line_total, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         foreach ($items as $item) {
             $pid = intval($item['product_id'] ?? 0); $qty = floatval($item['quantity'] ?? 0); $bonus = floatval($item['bonus'] ?? 0);
             $cost = floatval($item['unit_cost'] ?? 0); $discPct = floatval($item['discount_percent'] ?? 0); $totalQty = $qty + $bonus; $line = $totalQty * $cost * (1 - $discPct/100);
-            $itemStmt->execute([$po_id, $pid ?: null, $item['product_name'] ?? '', $item['product_code'] ?? null, $item['barcode'] ?? null, intval($item['unit_id'] ?? 0) ?: null, $item['unit_name'] ?? 'علبة', $qty, $bonus, $cost, floatval($item['sell_price'] ?? 0), $discPct, floatval($item['vat_percent'] ?? 0), ($item['expiry_date'] ?? null) ?: null, $item['batch_number'] ?? null, $line, $item['notes'] ?? '']);
+            $itemVatPct = floatval($item['vat_percent'] ?? 0); $itemVatVal = floatval($item['vat_value'] ?? 0);
+            $itemStmt->execute([$po_id, $pid ?: null, $item['product_name'] ?? '', $item['product_code'] ?? null, $item['barcode'] ?? null, intval($item['unit_id'] ?? 0) ?: null, $item['unit_name'] ?? 'علبة', $qty, $bonus, $cost, floatval($item['sell_price'] ?? 0), $discPct, $itemVatPct, $itemVatVal, ($item['expiry_date'] ?? null) ?: null, $item['batch_number'] ?? null, $line, $item['notes'] ?? '']);
         }
         logActivity('purchase_order_create', 'purchase_orders', $po_id); $db->commit();
         $_SESSION['success'] = 'تم إنشاء أمر الشراء ' . $po_number . ' بنجاح';
         redirect(APP_URL . '/modules/purchases/orders/view.php?id=' . $po_id);
-    } catch (Exception $e) { $db->rollBack(); $error = $e->getMessage(); }
+    } catch (Exception $e) {
+        if ($db->inTransaction()) { $db->rollBack(); }
+        $error = $e->getMessage();
+    }
 }
 
 require_once __DIR__ . '/../../../includes/sidebar.php';
@@ -57,30 +63,26 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 <style>
-:root{--primary:#667eea;--secondary:#764ba2;--sidebar-bg:#1a1a2e;--green:#198754;--red:#dc3545;--po-blue:#0277bd;}
-*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0}
+:root{--po-blue:#0277bd;--red:#dc3545;}
+*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0;overflow-y:auto}
 .main-content{padding:0;margin-right:0 !important}
 .top-header{background:var(--po-blue);color:#fff;padding:8px 20px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:100}
 .top-header .menu-item{color:rgba(255,255,255,0.8);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;transition:all .2s;text-decoration:none;white-space:nowrap}
 .top-header .menu-item:hover,.top-header .menu-item.active{background:rgba(255,255,255,0.2);color:#fff}
-.top-header .menu-item i{margin-left:6px}
 .sub-menu-bar{background:#f8f9fa;border-bottom:1px solid #ddd;padding:5px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .sub-menu-bar .btn-icon{width:36px;height:36px;border-radius:8px;border:1px solid #ccc;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;font-size:16px}
 .sub-menu-bar .btn-icon:hover{background:var(--po-blue);color:#fff;border-color:var(--po-blue)}
 .sub-menu-bar .divider{width:1px;height:28px;background:#ccc;margin:0 5px}
 .invoice-header{background:#fff;padding:15px 20px;border-bottom:1px solid #ddd}
-.toolbar-right{position:fixed;right:0;top:110px;width:55px;background:linear-gradient(180deg,#29b6f6 0%,#0277bd 100%);border-radius:10px 0 0 10px;padding:8px 4px;display:flex;flex-direction:column;gap:6px;z-index:50;box-shadow:-2px 2px 10px rgba(0,0,0,0.2)}
+.toolbar-right{position:fixed;right:0;top:110px;width:55px;background:linear-gradient(180deg,#29b6f6 0%,var(--po-blue) 100%);border-radius:10px 0 0 10px;padding:8px 4px;display:flex;flex-direction:column;gap:6px;z-index:50;box-shadow:-2px 2px 10px rgba(0,0,0,0.2)}
 .toolbar-right .tool-btn{width:46px;height:46px;border-radius:10px;border:none;background:rgba(255,255,255,0.25);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;font-size:18px;position:relative}
 .toolbar-right .tool-btn:hover{background:#fff;color:var(--po-blue);transform:scale(1.1)}
 .toolbar-right .tool-btn .tooltip{position:absolute;left:55px;top:50%;transform:translateY(-50%);background:#333;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s}
 .toolbar-right .tool-btn:hover .tooltip{opacity:1}
-.items-section{overflow-x:auto;overflow-y:visible;padding:10px;background:#fff;margin:0 55px 0 0;position:relative}
+.items-section{overflow-x:auto;padding:10px;background:#fff;margin:0 55px 0 0}
 .items-section::-webkit-scrollbar{height:10px}
-.items-section::-webkit-scrollbar-track{background:#f0f0f0}
-.items-section::-webkit-scrollbar-thumb{background:#ccc;border-radius:5px}
-.items-table{width:100%;border-collapse:collapse;font-size:12px;min-width:2200px}
+.items-table{width:100%;border-collapse:collapse;font-size:12px;min-width:2400px}
 .items-table th{background:var(--po-blue);color:#fff;padding:6px 4px;text-align:center;font-weight:600;font-size:11px;white-space:nowrap;position:sticky;top:0;z-index:10}
-.items-table th:first-child{width:30px}
 .items-table td{padding:3px 4px;border-bottom:1px solid #e9ecef;text-align:center;background:#fff;vertical-align:middle}
 .items-table tr:hover td{background:#e1f5fe}
 .items-table td input,.items-table td select{border:1px solid #ddd;border-radius:4px;padding:2px 4px;font-size:12px;text-align:center;height:28px;width:100%}
@@ -90,14 +92,10 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 .items-table .row-total{font-weight:700;color:var(--po-blue);background:#e1f5fe !important}
 .items-table .row-calc{background:#e3f2fd}
 .items-table .btn-del{color:var(--red);cursor:pointer;font-size:15px;padding:0 3px}
-.items-table .btn-del:hover{transform:scale(1.2)}
 .items-table .barcode-w{position:relative;display:flex;align-items:center;min-width:100px}
 .items-table .barcode-w input{flex:1;padding-left:28px}
 .items-table .barcode-w .btn-f2{position:absolute;left:2px;top:2px;bottom:2px;width:24px;border:none;background:#f0f0f0;border-radius:3px;cursor:pointer;font-size:10px;color:#666;display:flex;align-items:center;justify-content:center}
 .items-table .barcode-w .btn-f2:hover{background:var(--po-blue);color:#fff}
-.items-table .print-icon{font-size:16px;cursor:pointer}
-.items-table .print-on{color:var(--green)}
-.items-table .print-off{color:#ddd}
 .bottom-bar{background:#e1f5fe;border-top:2px solid var(--po-blue);padding:10px 20px;position:sticky;bottom:0;z-index:50}
 .bottom-bar .row1{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
 .bottom-bar .item{display:flex;align-items:center;gap:4px;background:#fff;padding:4px 10px;border-radius:6px;border:1px solid #ddd;font-size:12px}
@@ -106,14 +104,13 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 .bottom-bar .item.ro{background:#b3e5fc;border-color:#81d4fa}
 .bottom-bar .item.ro strong{color:#01579b}
 .bottom-bar .grand{background:linear-gradient(135deg,#29b6f6,var(--po-blue));color:#fff;padding:8px 20px;border-radius:10px;font-size:16px;font-weight:700}
-.bottom-bar .item input,.bottom-bar .item select{height:26px;padding:2px 5px;font-size:12px;width:80px;border:1px solid #ccc;border-radius:4px}
+.bottom-bar .item input{height:26px;padding:2px 5px;font-size:12px;width:80px;border:1px solid #ccc;border-radius:4px}
 .supplier-section{background:#fff3cd;padding:10px 20px;border-top:1px solid #ffc107}
 @media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon{display:none!important}}
 @media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}}
 </style>
 </head>
 <body>
-<!-- Top Header -->
 <div class="top-header">
     <span style="font-weight:700"><i class="bi bi-capsule"></i> <?= APP_NAME ?></span>
     <a href="../" class="menu-item"><i class="bi bi-arrow-right"></i> عودة</a>
@@ -122,7 +119,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <a href="../../dashboard/" class="menu-item"><i class="bi bi-speedometer2"></i> الرئيسية</a>
     <div class="ms-auto" style="font-size:12px;opacity:.7"><?= $_SESSION['user_name'] ?? '' ?> | <?= arabicDate(date('Y-m-d')) ?></div>
 </div>
-<!-- Sub Menu Toolbar -->
 <div class="sub-menu-bar">
     <div class="btn-icon" onclick="addRow()" title="إضافة صنف (F3)"><i class="bi bi-plus-lg"></i></div>
     <div class="btn-icon" onclick="openF2Search()" title="بحث F2"><i class="bi bi-search"></i></div>
@@ -132,9 +128,8 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <div class="btn-icon" onclick="savePO()" title="حفظ Ctrl+S"><i class="bi bi-save"></i></div>
     <div class="divider"></div>
     <div class="btn-icon" style="color:var(--red)" onclick="window.location='./'" title="خروج"><i class="bi bi-x-lg"></i></div>
-    <div class="ms-auto text-muted" style="font-size:12px"><i class="bi bi-info-circle"></i> F2=بحث | F3=إضافة صف | Ctrl+S=حفظ</div>
+    <div class="ms-auto text-muted" style="font-size:12px"><i class="bi bi-info-circle"></i> F2=بحث | F3=إضافة صف | Enter=التالي | Ctrl+S=حفظ</div>
 </div>
-<!-- PO Header -->
 <div class="invoice-header">
 <form method="POST" id="poForm">
 <div class="row g-2">
@@ -147,7 +142,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     </div>
     <div class="col-lg-1 col-md-2">
         <label class="form-label small text-muted">كود المورد</label>
-        <input type="text" id="sup_code_dsp" class="form-control form-control-sm" readonly style="background:#e9ecef;font-weight:700;text-align:center">
+        <input type="text" id="sup_code_dsp" class="form-control form-control-sm" placeholder="كود" oninput="onSupCodeInput()" style="font-weight:700;text-align:center">
     </div>
     <div class="col-lg-1 col-md-2">
         <label class="form-label small text-muted">تاريخ التوقع</label>
@@ -173,7 +168,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     </div>
 </div>
 </div>
-<!-- Toolbar Right -->
 <div class="toolbar-right">
     <button type="button" class="tool-btn" onclick="addRow()"><i class="bi bi-plus-lg"></i><span class="tooltip">إضافة صنف</span></button>
     <button type="button" class="tool-btn" onclick="openF2Search()"><i class="bi bi-search"></i><span class="tooltip">بحث F2</span></button>
@@ -182,27 +176,26 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <button type="button" class="tool-btn" onclick="clearAll()" style="color:#ffebee"><i class="bi bi-trash"></i><span class="tooltip">مسح</span></button>
     <button type="button" class="tool-btn" onclick="window.location='./'" style="color:#ffebee"><i class="bi bi-x-lg"></i><span class="tooltip">خروج</span></button>
 </div>
-<!-- Items Table -->
 <div class="items-section">
 <table class="items-table" id="itemsTable">
 <thead>
 <tr>
     <th>#</th>
-    <th style="min-width:24px" title="طباعة باركود">ط</th>
+    <th style="min-width:24px">ط</th>
     <th style="min-width:100px">الباركود</th>
     <th style="min-width:80px">كود الصنف</th>
     <th style="min-width:170px">اسم الصنف</th>
     <th style="min-width:60px">الوحدة</th>
     <th style="min-width:60px">الكمية</th>
+    <th style="min-width:60px">سعر البيع</th>
     <th style="min-width:50px">بونص</th>
     <th style="min-width:110px">الصلاحية</th>
     <th style="min-width:55px">خصم %</th>
+    <th style="min-width:60px">ق الخصم</th>
     <th style="min-width:60px">سعر الشراء</th>
     <th style="min-width:55px">ضريبة %</th>
     <th style="min-width:60px">ق الضريبة</th>
-    <th style="min-width:75px">إجمالي التكلفة</th>
-    <th style="min-width:60px">خصم إضافي</th>
-    <th style="min-width:60px">سعر البيع</th>
+    <th style="min-width:75px">إجمالي تكلفة</th>
     <th style="min-width:55px">ربح ص</th>
     <th style="min-width:55px">ربح %</th>
     <th style="min-width:90px">الشركة</th>
@@ -214,7 +207,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <tbody id="itemsBody"></tbody>
 </table>
 </div>
-<!-- Bottom Summary -->
 <div class="bottom-bar">
 <div class="row1">
     <div class="item ro"><label>الأصناف:</label><strong id="t_items">0</strong></div>
@@ -226,7 +218,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <div class="ms-auto grand">الإجمالي: <span id="t_grand">0.00</span> ج</div>
 </div>
 </div>
-<!-- Save Section -->
 <div class="supplier-section">
 <div class="row w-100 align-items-center g-2">
     <div class="col-md-8"><input type="text" name="notes" class="form-control form-control-sm" placeholder="ملاحظات..."></div>
@@ -241,6 +232,13 @@ let R=0; const units=<?= json_encode($units) ?>; const suppliers=<?= json_encode
 function onSupChange(){
     const sel=document.getElementById('supplier_id');
     document.getElementById('sup_code_dsp').value=sel.options[sel.selectedIndex].dataset.code||'';
+}
+function onSupCodeInput(){
+    const code=document.getElementById('sup_code_dsp').value.trim();
+    const sel=document.getElementById('supplier_id');
+    for(let i=0;i<sel.options.length;i++){
+        if(sel.options[i].dataset.code===code){sel.selectedIndex=i;onSupChange();return;}
+    }
 }
 function fltStores(){
     const bid=document.getElementById('branchSel').value;
@@ -257,52 +255,84 @@ function addRow(data){
     tr.innerHTML=
         '<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(d.product_id||'')+'"></td>'+
         '<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="tglPrint('+id+')"></i><input type="hidden" name="items['+id+'][has_barcode_print]" id="prv_'+id+'" value="0"></td>'+
-        '<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>'+
-        '<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'"></td>'+
-        '<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required></td>'+
-        '<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm">'+uo+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value=""></td>'+
-        '<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(d.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')"></td>'+
-        '<td><input type="number" name="items['+id+'][bonus]" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')"></td>'+
-        '<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px"></td>'+
-        '<td><input type="number" name="items['+id+'][discount_percent]" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="calc('+id+')"></td>'+
-        '<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')"></td>'+
-        '<td><input type="number" name="items['+id+'][vat_percent]" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="calc('+id+')"></td>'+
-        '<td><input type="number" id="vv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>'+
+        '<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>'+
+        '<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>'+
+        '<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>'+
+        '<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+uo+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value=""></td>'+
+        '<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(d.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>'+
+        '<td><input type="number" name="items['+id+'][sell_price]" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(d.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>'+
+        '<td><input type="number" name="items['+id+'][bonus]" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>'+
+        '<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>'+
+        '<td><input type="number" name="items['+id+'][discount_percent]" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>'+
+        '<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>'+
+        '<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>'+
+        '<td><input type="number" name="items['+id+'][vat_percent]" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>'+
+        '<td><input type="number" name="items['+id+'][vat_value]" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>'+
         '<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>'+
-        '<td><input type="number" name="items['+id+'][extra_discount]" id="xd_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="calc('+id+')"></td>'+
-        '<td><input type="number" name="items['+id+'][sell_price]" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(d.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')"></td>'+
         '<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>'+
         '<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>'+
         '<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(d.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>'+
         '<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(d.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>'+
-        '<td><input type="text" name="items['+id+'][batch_number]" class="form-control form-control-sm num" placeholder="باتش"></td>'+
-        '<td><span class="btn-del" onclick="delRow('+id+')"><i class="bi bi-trash-fill"></i></span></td>';
+        '<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>'+
+        '<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>';
     document.getElementById('itemsBody').appendChild(tr);
     document.getElementById('bc_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
     document.getElementById('nm_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
     if(data)calc(id);
     recalc();
+    setTimeout(()=>document.getElementById('bc_'+id).focus(),50);
     return id;
 }
-function tglPrint(id){
-    const ico=document.getElementById('pr_'+id);const inp=document.getElementById('prv_'+id);
-    if(inp.value==='1'){inp.value='0';ico.classList.remove('print-on');ico.classList.add('print-off');}
-    else{inp.value='1';ico.classList.remove('print-off');ico.classList.add('print-on');}
+function onDiscPct(id){
+    const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
+    const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+    const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+    const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+    const base=(qt+bn)*cs;
+    document.getElementById('dv_'+id).value=(base*dp/100).toFixed(2);
+    calc(id);
 }
-function delRow(id){const r=document.getElementById('r_'+id);if(r)r.remove();recalc();}
-function clearAll(){if(!confirm('مسح كل الأصناف؟'))return;document.getElementById('itemsBody').innerHTML='';R=0;recalc();}
+function onDiscVal(id){
+    const dv=parseFloat(document.getElementById('dv_'+id).value)||0;
+    const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+    const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+    const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+    const base=(qt+bn)*cs;
+    document.getElementById('dp_'+id).value=base>0?((dv/base)*100).toFixed(2):0;
+    calc(id);
+}
+function onVatPct(id){
+    const vp=parseFloat(document.getElementById('vp_'+id).value)||0;
+    const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+    const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+    const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+    const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
+    const base=(qt+bn)*cs;
+    const afterDisc=base*(1-dp/100);
+    document.getElementById('vv_'+id).value=(afterDisc*vp/100).toFixed(2);
+    calc(id);
+}
+function onVatVal(id){
+    const vv=parseFloat(document.getElementById('vv_'+id).value)||0;
+    const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+    const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+    const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+    const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
+    const base=(qt+bn)*cs;
+    const afterDisc=base*(1-dp/100);
+    document.getElementById('vp_'+id).value=afterDisc>0?((vv/afterDisc)*100).toFixed(2):0;
+    calc(id);
+}
 function calc(id){
     const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
     const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
     const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
     const sp=parseFloat(document.getElementById('sp_'+id).value)||0;
     const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
-    const vp=parseFloat(document.getElementById('vp_'+id).value)||0;
-    const xd=parseFloat(document.getElementById('xd_'+id).value)||0;
+    const vv=parseFloat(document.getElementById('vv_'+id).value)||0;
     const tq=qt+bn;const base=tq*cs;const disc=base*(dp/100);const afterDisc=base-disc;
-    const vatVal=afterDisc*(vp/100);const totalCost=afterDisc+vatVal-xd;
+    const totalCost=afterDisc+vv;
     const profitVal=(sp-cs)*qt;const profitPct=cs>0?(((sp-cs)/cs)*100):0;
-    document.getElementById('vv_'+id).value=vatVal.toFixed(2);
     document.getElementById('tl_'+id).value=totalCost.toFixed(2);
     document.getElementById('pv_'+id).value=profitVal.toFixed(2);
     document.getElementById('pp_'+id).value=profitPct.toFixed(1);
@@ -327,6 +357,21 @@ function recalc(){
     document.getElementById('t_profit_pct').textContent=tc>0?((tp/tc)*100).toFixed(1)+'%':'0%';
     document.getElementById('t_grand').textContent=(tc+tv).toFixed(2);
 }
+const fieldMap=['bc','co','nm','un','qt','sp','bn','ex','dp','dv','cs','vp','vv','ba'];
+function handleEnter(e,id,fieldIdx){
+    if(e.key==='Enter'){
+        e.preventDefault();
+        if(fieldIdx===fieldMap.length-1){addRow();}
+        else{const el=document.getElementById(fieldMap[fieldIdx+1]+'_'+id);if(el)el.focus();}
+    }
+}
+function tglPrint(id){
+    const ico=document.getElementById('pr_'+id);const inp=document.getElementById('prv_'+id);
+    if(inp.value==='1'){inp.value='0';ico.classList.remove('print-on');ico.classList.add('print-off');}
+    else{inp.value='1';ico.classList.remove('print-off');ico.classList.add('print-on');}
+}
+function delRow(id){const r=document.getElementById('r_'+id);if(r)r.remove();recalc();}
+function clearAll(){if(!confirm('مسح كل الأصناف؟'))return;document.getElementById('itemsBody').innerHTML='';R=0;recalc();}
 function f2r(id){
     const sid=document.getElementById('store_id').value;
     if(!sid){alert('اختر المخزن أولاً');return;}
@@ -353,7 +398,6 @@ function savePO(){document.getElementById('poForm').submit();}
 document.addEventListener('keydown',function(e){
     if(e.ctrlKey&&e.key==='s'){e.preventDefault();savePO();}
     if(e.key==='F3'){e.preventDefault();addRow();}
-    if(e.key==='F2'){const a=document.activeElement;const r=a.closest('tr');if(r&&r.dataset.rid){e.preventDefault();f2r(r.dataset.rid);}}
 });
 addRow();
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
