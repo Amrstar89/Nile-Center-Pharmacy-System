@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 02, 2026 at 12:15 AM
+-- Generation Time: Jul 06, 2026 at 01:16 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -164,7 +164,15 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (117, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 17:22:05'),
 (118, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 19:38:28'),
 (119, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-06-30 20:43:54'),
-(120, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-01 20:02:18');
+(120, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-01 20:02:18'),
+(121, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-02 19:32:30'),
+(122, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-04 11:04:14'),
+(123, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-04 13:40:29'),
+(124, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-04 14:08:40'),
+(125, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-04 17:34:06'),
+(126, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-04 17:34:27'),
+(127, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-05 19:23:34'),
+(128, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-05 19:35:16');
 
 -- --------------------------------------------------------
 
@@ -1112,6 +1120,37 @@ INSERT INTO `order_statuses` (`id`, `status_name`, `status_color`, `sort_order`,
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `po_receipts`
+--
+
+CREATE TABLE `po_receipts` (
+  `id` int(11) NOT NULL,
+  `po_id` int(11) NOT NULL,
+  `receipt_date` date NOT NULL DEFAULT curdate(),
+  `received_by` int(11) NOT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `po_receipt_items`
+--
+
+CREATE TABLE `po_receipt_items` (
+  `id` int(11) NOT NULL,
+  `receipt_id` int(11) NOT NULL,
+  `po_item_id` int(11) NOT NULL,
+  `quantity` decimal(12,3) NOT NULL DEFAULT 0.000,
+  `unit_cost` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `batch_number` varchar(50) DEFAULT NULL,
+  `expiry_date` date DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `price_adjustments`
 --
 
@@ -1639,6 +1678,156 @@ INSERT INTO `purchased_items` (`id`, `order_item_id`, `supplier_id`, `supplier_p
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `purchase_invoices`
+--
+
+CREATE TABLE `purchase_invoices` (
+  `id` int(11) NOT NULL,
+  `invoice_number` varchar(20) NOT NULL,
+  `po_id` int(11) DEFAULT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `branch_id` int(11) DEFAULT NULL,
+  `store_id` int(11) DEFAULT NULL,
+  `invoice_date` date NOT NULL DEFAULT curdate(),
+  `due_date` date DEFAULT NULL,
+  `status` enum('open','partial','paid','cancelled') NOT NULL DEFAULT 'open',
+  `subtotal` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `discount_type` enum('percentage','fixed') DEFAULT NULL,
+  `discount_value` decimal(12,2) DEFAULT 0.00,
+  `vat_percent` decimal(5,2) DEFAULT 0.00,
+  `vat_amount` decimal(12,2) DEFAULT 0.00,
+  `shipping_cost` decimal(12,2) DEFAULT 0.00,
+  `grand_total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `paid_amount` decimal(12,2) DEFAULT 0.00,
+  `remaining_amount` decimal(12,2) GENERATED ALWAYS AS (`grand_total` - `paid_amount`) STORED,
+  `supplier_invoice_no` varchar(50) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_invoice_items`
+--
+
+CREATE TABLE `purchase_invoice_items` (
+  `id` int(11) NOT NULL,
+  `invoice_id` int(11) NOT NULL,
+  `product_id` int(11) DEFAULT NULL,
+  `product_name` varchar(255) NOT NULL,
+  `product_code` varchar(50) DEFAULT NULL,
+  `barcode` varchar(50) DEFAULT NULL,
+  `unit_id` int(11) DEFAULT NULL,
+  `unit_name` varchar(50) DEFAULT 'علبة',
+  `quantity` decimal(12,3) NOT NULL DEFAULT 0.000,
+  `unit_cost` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `sell_price` decimal(12,2) DEFAULT 0.00,
+  `discount_percent` decimal(5,2) DEFAULT 0.00,
+  `vat_percent` decimal(5,2) DEFAULT 0.00,
+  `expiry_date` date DEFAULT NULL,
+  `batch_number` varchar(50) DEFAULT NULL,
+  `line_total` decimal(12,2) NOT NULL DEFAULT 0.00
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_orders`
+--
+
+CREATE TABLE `purchase_orders` (
+  `id` int(11) NOT NULL,
+  `po_number` varchar(20) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `branch_id` int(11) DEFAULT NULL,
+  `store_id` int(11) DEFAULT NULL,
+  `order_date` date NOT NULL DEFAULT curdate(),
+  `expected_date` date DEFAULT NULL,
+  `status` enum('draft','sent','partial','received','cancelled') NOT NULL DEFAULT 'draft',
+  `subtotal` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `discount_type` enum('percentage','fixed') DEFAULT NULL,
+  `discount_value` decimal(12,2) DEFAULT 0.00,
+  `vat_percent` decimal(5,2) DEFAULT 0.00,
+  `vat_amount` decimal(12,2) DEFAULT 0.00,
+  `shipping_cost` decimal(12,2) DEFAULT 0.00,
+  `grand_total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `paid_amount` decimal(12,2) DEFAULT 0.00,
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_order_items`
+--
+
+CREATE TABLE `purchase_order_items` (
+  `id` int(11) NOT NULL,
+  `po_id` int(11) NOT NULL,
+  `product_id` int(11) DEFAULT NULL,
+  `product_name` varchar(255) NOT NULL,
+  `product_code` varchar(50) DEFAULT NULL,
+  `barcode` varchar(50) DEFAULT NULL,
+  `unit_id` int(11) DEFAULT NULL,
+  `unit_name` varchar(50) DEFAULT 'علبة',
+  `quantity` decimal(12,3) NOT NULL DEFAULT 0.000,
+  `received_qty` decimal(12,3) DEFAULT 0.000,
+  `unit_cost` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `sell_price` decimal(12,2) DEFAULT 0.00,
+  `discount_percent` decimal(5,2) DEFAULT 0.00,
+  `vat_percent` decimal(5,2) DEFAULT 0.00,
+  `line_total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `notes` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_returns`
+--
+
+CREATE TABLE `purchase_returns` (
+  `id` int(11) NOT NULL,
+  `return_number` varchar(20) NOT NULL,
+  `invoice_id` int(11) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `store_id` int(11) DEFAULT NULL,
+  `return_date` date NOT NULL DEFAULT curdate(),
+  `status` enum('open','processed','cancelled') NOT NULL DEFAULT 'open',
+  `subtotal` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `grand_total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_return_items`
+--
+
+CREATE TABLE `purchase_return_items` (
+  `id` int(11) NOT NULL,
+  `return_id` int(11) NOT NULL,
+  `invoice_item_id` int(11) NOT NULL,
+  `product_id` int(11) DEFAULT NULL,
+  `product_name` varchar(255) NOT NULL,
+  `quantity` decimal(12,3) NOT NULL DEFAULT 0.000,
+  `unit_cost` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `line_total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `reason` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `shift_handovers`
 --
 
@@ -2057,6 +2246,27 @@ INSERT INTO `supplier_due_payments` (`id`, `supplier_id`, `transaction_id`, `ref
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `supplier_payments`
+--
+
+CREATE TABLE `supplier_payments` (
+  `id` int(11) NOT NULL,
+  `payment_number` varchar(20) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `invoice_id` int(11) DEFAULT NULL,
+  `po_id` int(11) DEFAULT NULL,
+  `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `payment_date` date NOT NULL DEFAULT curdate(),
+  `payment_method` enum('cash','bank_transfer','check','credit') DEFAULT 'cash',
+  `reference_no` varchar(50) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `supplier_phones`
 --
 
@@ -2188,6 +2398,31 @@ CREATE TABLE `supplier_product_pricing` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `supplier_quotations`
+--
+
+CREATE TABLE `supplier_quotations` (
+  `id` int(11) NOT NULL,
+  `quotation_number` varchar(20) NOT NULL,
+  `supplier_id` int(11) NOT NULL,
+  `product_id` int(11) DEFAULT NULL,
+  `product_name` varchar(255) NOT NULL,
+  `product_code` varchar(50) DEFAULT NULL,
+  `supplier_price` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `sell_price` decimal(12,2) DEFAULT 0.00,
+  `profit_margin` decimal(5,2) DEFAULT 0.00,
+  `quantity` decimal(12,3) DEFAULT 1.000,
+  `delivery_days` int(11) DEFAULT 0,
+  `expiry_date` date DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `status` enum('active','accepted','rejected','expired') DEFAULT 'active',
+  `created_by` int(11) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `supplier_transactions`
 --
 
@@ -2242,7 +2477,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-07-01 22:02:18', '2026-06-15 16:53:16', '2026-07-01 20:02:18'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-07-05 21:35:16', '2026-06-15 16:53:16', '2026-07-05 19:35:16'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -2464,6 +2699,22 @@ ALTER TABLE `order_statuses`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `po_receipts`
+--
+ALTER TABLE `po_receipts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `po_id` (`po_id`),
+  ADD KEY `received_by` (`received_by`);
+
+--
+-- Indexes for table `po_receipt_items`
+--
+ALTER TABLE `po_receipt_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `receipt_id` (`receipt_id`),
+  ADD KEY `po_item_id` (`po_item_id`);
+
+--
 -- Indexes for table `price_adjustments`
 --
 ALTER TABLE `price_adjustments`
@@ -2554,6 +2805,71 @@ ALTER TABLE `purchased_items`
   ADD PRIMARY KEY (`id`),
   ADD KEY `order_item_id` (`order_item_id`),
   ADD KEY `supplier_id` (`supplier_id`);
+
+--
+-- Indexes for table `purchase_invoices`
+--
+ALTER TABLE `purchase_invoices`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `invoice_number` (`invoice_number`),
+  ADD KEY `po_id` (`po_id`),
+  ADD KEY `branch_id` (`branch_id`),
+  ADD KEY `store_id` (`store_id`),
+  ADD KEY `created_by` (`created_by`),
+  ADD KEY `idx_pi_supplier` (`supplier_id`),
+  ADD KEY `idx_pi_status` (`status`),
+  ADD KEY `idx_pi_date` (`invoice_date`);
+
+--
+-- Indexes for table `purchase_invoice_items`
+--
+ALTER TABLE `purchase_invoice_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `invoice_id` (`invoice_id`),
+  ADD KEY `product_id` (`product_id`),
+  ADD KEY `unit_id` (`unit_id`);
+
+--
+-- Indexes for table `purchase_orders`
+--
+ALTER TABLE `purchase_orders`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `po_number` (`po_number`),
+  ADD KEY `branch_id` (`branch_id`),
+  ADD KEY `store_id` (`store_id`),
+  ADD KEY `created_by` (`created_by`),
+  ADD KEY `idx_po_supplier` (`supplier_id`),
+  ADD KEY `idx_po_status` (`status`),
+  ADD KEY `idx_po_date` (`order_date`);
+
+--
+-- Indexes for table `purchase_order_items`
+--
+ALTER TABLE `purchase_order_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `po_id` (`po_id`),
+  ADD KEY `product_id` (`product_id`),
+  ADD KEY `unit_id` (`unit_id`);
+
+--
+-- Indexes for table `purchase_returns`
+--
+ALTER TABLE `purchase_returns`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `return_number` (`return_number`),
+  ADD KEY `supplier_id` (`supplier_id`),
+  ADD KEY `store_id` (`store_id`),
+  ADD KEY `created_by` (`created_by`),
+  ADD KEY `idx_pr_invoice` (`invoice_id`);
+
+--
+-- Indexes for table `purchase_return_items`
+--
+ALTER TABLE `purchase_return_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `return_id` (`return_id`),
+  ADD KEY `invoice_item_id` (`invoice_item_id`),
+  ADD KEY `product_id` (`product_id`);
 
 --
 -- Indexes for table `shift_handovers`
@@ -2654,6 +2970,17 @@ ALTER TABLE `supplier_due_payments`
   ADD KEY `fk_due_user` (`created_by`);
 
 --
+-- Indexes for table `supplier_payments`
+--
+ALTER TABLE `supplier_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `payment_number` (`payment_number`),
+  ADD KEY `invoice_id` (`invoice_id`),
+  ADD KEY `po_id` (`po_id`),
+  ADD KEY `created_by` (`created_by`),
+  ADD KEY `idx_sp_supplier` (`supplier_id`);
+
+--
 -- Indexes for table `supplier_phones`
 --
 ALTER TABLE `supplier_phones`
@@ -2688,6 +3015,17 @@ ALTER TABLE `supplier_product_pricing`
   ADD KEY `idx_default` (`is_default`);
 
 --
+-- Indexes for table `supplier_quotations`
+--
+ALTER TABLE `supplier_quotations`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `quotation_number` (`quotation_number`),
+  ADD KEY `product_id` (`product_id`),
+  ADD KEY `created_by` (`created_by`),
+  ADD KEY `idx_sq_supplier` (`supplier_id`),
+  ADD KEY `idx_sq_product` (`product_code`);
+
+--
 -- Indexes for table `supplier_transactions`
 --
 ALTER TABLE `supplier_transactions`
@@ -2713,7 +3051,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=121;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=129;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -2836,6 +3174,18 @@ ALTER TABLE `order_statuses`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
+-- AUTO_INCREMENT for table `po_receipts`
+--
+ALTER TABLE `po_receipts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `po_receipt_items`
+--
+ALTER TABLE `po_receipt_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `price_adjustments`
 --
 ALTER TABLE `price_adjustments`
@@ -2888,6 +3238,42 @@ ALTER TABLE `product_types`
 --
 ALTER TABLE `purchased_items`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT for table `purchase_invoices`
+--
+ALTER TABLE `purchase_invoices`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `purchase_invoice_items`
+--
+ALTER TABLE `purchase_invoice_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `purchase_orders`
+--
+ALTER TABLE `purchase_orders`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `purchase_order_items`
+--
+ALTER TABLE `purchase_order_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `purchase_returns`
+--
+ALTER TABLE `purchase_returns`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `purchase_return_items`
+--
+ALTER TABLE `purchase_return_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `shift_handovers`
@@ -2956,6 +3342,12 @@ ALTER TABLE `supplier_due_payments`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
+-- AUTO_INCREMENT for table `supplier_payments`
+--
+ALTER TABLE `supplier_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `supplier_phones`
 --
 ALTER TABLE `supplier_phones`
@@ -2977,6 +3369,12 @@ ALTER TABLE `supplier_products`
 -- AUTO_INCREMENT for table `supplier_product_pricing`
 --
 ALTER TABLE `supplier_product_pricing`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `supplier_quotations`
+--
+ALTER TABLE `supplier_quotations`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -3101,11 +3499,77 @@ ALTER TABLE `order_items`
   ADD CONSTRAINT `order_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
+-- Constraints for table `po_receipts`
+--
+ALTER TABLE `po_receipts`
+  ADD CONSTRAINT `po_receipts_ibfk_1` FOREIGN KEY (`po_id`) REFERENCES `purchase_orders` (`id`),
+  ADD CONSTRAINT `po_receipts_ibfk_2` FOREIGN KEY (`received_by`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `po_receipt_items`
+--
+ALTER TABLE `po_receipt_items`
+  ADD CONSTRAINT `po_receipt_items_ibfk_1` FOREIGN KEY (`receipt_id`) REFERENCES `po_receipts` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `po_receipt_items_ibfk_2` FOREIGN KEY (`po_item_id`) REFERENCES `purchase_order_items` (`id`);
+
+--
 -- Constraints for table `purchased_items`
 --
 ALTER TABLE `purchased_items`
   ADD CONSTRAINT `purchased_items_ibfk_1` FOREIGN KEY (`order_item_id`) REFERENCES `order_items` (`id`),
   ADD CONSTRAINT `purchased_items_ibfk_2` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`);
+
+--
+-- Constraints for table `purchase_invoices`
+--
+ALTER TABLE `purchase_invoices`
+  ADD CONSTRAINT `purchase_invoices_ibfk_1` FOREIGN KEY (`po_id`) REFERENCES `purchase_orders` (`id`),
+  ADD CONSTRAINT `purchase_invoices_ibfk_2` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`),
+  ADD CONSTRAINT `purchase_invoices_ibfk_3` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`),
+  ADD CONSTRAINT `purchase_invoices_ibfk_4` FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`),
+  ADD CONSTRAINT `purchase_invoices_ibfk_5` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `purchase_invoice_items`
+--
+ALTER TABLE `purchase_invoice_items`
+  ADD CONSTRAINT `purchase_invoice_items_ibfk_1` FOREIGN KEY (`invoice_id`) REFERENCES `purchase_invoices` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `purchase_invoice_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`),
+  ADD CONSTRAINT `purchase_invoice_items_ibfk_3` FOREIGN KEY (`unit_id`) REFERENCES `product_units` (`id`);
+
+--
+-- Constraints for table `purchase_orders`
+--
+ALTER TABLE `purchase_orders`
+  ADD CONSTRAINT `purchase_orders_ibfk_1` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`),
+  ADD CONSTRAINT `purchase_orders_ibfk_2` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`),
+  ADD CONSTRAINT `purchase_orders_ibfk_3` FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`),
+  ADD CONSTRAINT `purchase_orders_ibfk_4` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `purchase_order_items`
+--
+ALTER TABLE `purchase_order_items`
+  ADD CONSTRAINT `purchase_order_items_ibfk_1` FOREIGN KEY (`po_id`) REFERENCES `purchase_orders` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `purchase_order_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`),
+  ADD CONSTRAINT `purchase_order_items_ibfk_3` FOREIGN KEY (`unit_id`) REFERENCES `product_units` (`id`);
+
+--
+-- Constraints for table `purchase_returns`
+--
+ALTER TABLE `purchase_returns`
+  ADD CONSTRAINT `purchase_returns_ibfk_1` FOREIGN KEY (`invoice_id`) REFERENCES `purchase_invoices` (`id`),
+  ADD CONSTRAINT `purchase_returns_ibfk_2` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`),
+  ADD CONSTRAINT `purchase_returns_ibfk_3` FOREIGN KEY (`store_id`) REFERENCES `stores` (`id`),
+  ADD CONSTRAINT `purchase_returns_ibfk_4` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `purchase_return_items`
+--
+ALTER TABLE `purchase_return_items`
+  ADD CONSTRAINT `purchase_return_items_ibfk_1` FOREIGN KEY (`return_id`) REFERENCES `purchase_returns` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `purchase_return_items_ibfk_2` FOREIGN KEY (`invoice_item_id`) REFERENCES `purchase_invoice_items` (`id`),
+  ADD CONSTRAINT `purchase_return_items_ibfk_3` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`);
 
 --
 -- Constraints for table `shift_handovers`
@@ -3171,6 +3635,15 @@ ALTER TABLE `supplier_due_payments`
   ADD CONSTRAINT `fk_due_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
+-- Constraints for table `supplier_payments`
+--
+ALTER TABLE `supplier_payments`
+  ADD CONSTRAINT `supplier_payments_ibfk_1` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`),
+  ADD CONSTRAINT `supplier_payments_ibfk_2` FOREIGN KEY (`invoice_id`) REFERENCES `purchase_invoices` (`id`),
+  ADD CONSTRAINT `supplier_payments_ibfk_3` FOREIGN KEY (`po_id`) REFERENCES `purchase_orders` (`id`),
+  ADD CONSTRAINT `supplier_payments_ibfk_4` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+--
 -- Constraints for table `supplier_phones`
 --
 ALTER TABLE `supplier_phones`
@@ -3195,6 +3668,14 @@ ALTER TABLE `supplier_products`
 ALTER TABLE `supplier_product_pricing`
   ADD CONSTRAINT `fk_supp_pricing_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_supp_pricing_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `supplier_quotations`
+--
+ALTER TABLE `supplier_quotations`
+  ADD CONSTRAINT `supplier_quotations_ibfk_1` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`),
+  ADD CONSTRAINT `supplier_quotations_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`),
+  ADD CONSTRAINT `supplier_quotations_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
 
 --
 -- Constraints for table `supplier_transactions`

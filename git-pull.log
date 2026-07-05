@@ -104,3 +104,237 @@ Merge made by the 'ort' strategy.
  modules/inventory/opening_balance/create.php | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 [Thu 07/02/2026  0:08:36.95] Pull completed successfully! 
+[Thu 07/02/2026  0:17:50.96] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Thu 07/02/2026  0:17:52.04] No changes. Already up to date. 
+[Sat 07/04/2026 19:33:36.65] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   888f5b4..4c76755  main       -> origin/main
+[Sat 07/04/2026 19:33:43.24] Found 10 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 888f5b4..4c76755
+Fast-forward
+ admin/products.php                                 | 1294 --------------------
+ admin/suppliers.php                                |  229 ----
+ core/config.php                                    |    6 +-
+ includes/sidebar.php                               |  160 +--
+ index.php                                          |    9 +-
+ modules/customer-requests/purchases - Copy.php     |  576 ---------
+ modules/customer-requests/shift-handover.php       |  211 ----
+ modules/customer-requests/shift-receive.php        |  203 ---
+ modules/dashboard/index.php                        |  458 +++++++
+ .../purchases.php => purchases/index.php}          |  242 +---
+ modules/sales/create.php                           |   29 +
+ modules/sales/index.php                            |  199 +++
+ modules/sales/pos.php                              |   29 +
+ modules/sales/returns.php                          |   29 +
+ modules/shifts/index.php                           |  328 +++++
+ 15 files changed, 1218 insertions(+), 2784 deletions(-)
+ delete mode 100644 admin/products.php
+ delete mode 100644 admin/suppliers.php
+ delete mode 100644 modules/customer-requests/purchases - Copy.php
+ delete mode 100644 modules/customer-requests/shift-handover.php
+ delete mode 100644 modules/customer-requests/shift-receive.php
+ create mode 100644 modules/dashboard/index.php
+ rename modules/{customer-requests/purchases.php => purchases/index.php} (71%)
+ create mode 100644 modules/sales/create.php
+ create mode 100644 modules/sales/index.php
+ create mode 100644 modules/sales/pos.php
+ create mode 100644 modules/sales/returns.php
+ create mode 100644 modules/shifts/index.php
+[Sat 07/04/2026 19:33:44.09] Pull completed successfully! 
+[Sat 07/04/2026 20:51:06.39] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   4c76755..8632408  main       -> origin/main
+[Sat 07/04/2026 20:51:07.83] Found 3 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 4c76755..8632408
+Fast-forward
+ database/purchase_module.sql          | 226 ++++++++++
+ includes/sidebar.php                  |  43 +-
+ modules/purchases/index.php           | 758 ++++++++++------------------------
+ modules/purchases/invoices/create.php | 272 ++++++++++++
+ modules/purchases/invoices/index.php  | 109 +++++
+ modules/purchases/invoices/view.php   | 171 ++++++++
+ modules/purchases/orders/create.php   | 271 ++++++++++++
+ modules/purchases/orders/index.php    | 125 ++++++
+ modules/purchases/orders/receive.php  | 123 ++++++
+ modules/purchases/orders/view.php     | 172 ++++++++
+ modules/purchases/payments/create.php |   4 +
+ modules/purchases/reports/index.php   | 122 ++++++
+ modules/purchases/returns/create.php  | 140 +++++++
+ 13 files changed, 2000 insertions(+), 536 deletions(-)
+ create mode 100644 database/purchase_module.sql
+ create mode 100644 modules/purchases/invoices/create.php
+ create mode 100644 modules/purchases/invoices/index.php
+ create mode 100644 modules/purchases/invoices/view.php
+ create mode 100644 modules/purchases/orders/create.php
+ create mode 100644 modules/purchases/orders/index.php
+ create mode 100644 modules/purchases/orders/receive.php
+ create mode 100644 modules/purchases/orders/view.php
+ create mode 100644 modules/purchases/payments/create.php
+ create mode 100644 modules/purchases/reports/index.php
+ create mode 100644 modules/purchases/returns/create.php
+[Sat 07/04/2026 20:51:08.69] Pull completed successfully! 
+[Sat 07/04/2026 23:21:33.13] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   8632408..cb9c009  main       -> origin/main
+[Sat 07/04/2026 23:21:34.49] Found 4 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 8632408..cb9c009
+Fast-forward
+ modules/purchases/index.php           |  42 +--
+ modules/purchases/invoices/create.php | 638 +++++++++++++++++++++++++---------
+ modules/purchases/orders/index.php    |  15 +-
+ modules/purchases/returns/create.php  | 424 +++++++++++++++++++---
+ 4 files changed, 866 insertions(+), 253 deletions(-)
+[Sat 07/04/2026 23:21:36.25] Pull completed successfully! 
+[Sun 07/05/2026 21:23:50.22] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   cb9c009..b8de0ac  main       -> origin/main
+[Sun 07/05/2026 21:23:51.65] Found 2 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating cb9c009..b8de0ac
+Fast-forward
+ modules/purchases/index.php           | 38 +++++++++++++++++------------------
+ modules/purchases/invoices/create.php | 32 ++++++++++++++++++-----------
+ 2 files changed, 39 insertions(+), 31 deletions(-)
+[Sun 07/05/2026 21:23:52.51] Pull completed successfully! 
+[Sun 07/05/2026 22:49:55.14] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   b8de0ac..848f656  main       -> origin/main
+[Sun 07/05/2026 22:49:56.70] Found 7 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating b8de0ac..848f656
+Fast-forward
+ includes/sidebar.php                               | 308 +++++---
+ modules/purchases/invoices/create.php              | 774 +++++++++------------
+ modules/purchases/orders/create.php                | 543 +++++++++------
+ .../purchases/returns/ajax_get_invoice_items.php   |  24 +
+ modules/purchases/returns/ajax_get_invoices.php    |  13 +
+ modules/purchases/returns/create.php               | 564 ++++++---------
+ modules/purchases/returns/create_direct.php        | 310 +++++++++
+ 7 files changed, 1399 insertions(+), 1137 deletions(-)
+ create mode 100644 modules/purchases/returns/ajax_get_invoice_items.php
+ create mode 100644 modules/purchases/returns/ajax_get_invoices.php
+ create mode 100644 modules/purchases/returns/create_direct.php
+[Sun 07/05/2026 22:49:57.61] Pull completed successfully! 
+[Sun 07/05/2026 23:40:18.47] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   848f656..f8a3431  main       -> origin/main
+[Sun 07/05/2026 23:40:20.26] Found 8 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 848f656..f8a3431
+Fast-forward
+ includes/sidebar.php                        |   9 +-
+ js/col-order.js                             | 186 ++++++++++++++
+ modules/purchases/invoices/create.php       | 365 ++++++++++++++++++++--------
+ modules/purchases/orders/create.php         | 291 +++++++++++++++-------
+ modules/purchases/returns/create.php        |   7 +-
+ modules/purchases/returns/create_direct.php | 229 +++++++++++++----
+ 6 files changed, 840 insertions(+), 247 deletions(-)
+ create mode 100644 js/col-order.js
+[Sun 07/05/2026 23:40:21.06] Pull completed successfully! 
+[Mon 07/06/2026  0:42:51.43] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   f8a3431..4a57956  main       -> origin/main
+[Mon 07/06/2026  0:42:52.74] Found 3 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating f8a3431..4a57956
+Fast-forward
+ modules/purchases/invoices/create.php | 322 +++++++++++++++++-----------------
+ modules/purchases/orders/create.php   | 196 +++++++++------------
+ modules/purchases/returns/index.php   | 214 ++++++++++++++++++++++
+ 3 files changed, 455 insertions(+), 277 deletions(-)
+ create mode 100644 modules/purchases/returns/index.php
+[Mon 07/06/2026  0:42:53.60] Pull completed successfully! 
+[Mon 07/06/2026  0:56:02.46] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   4a57956..1e94a7a  main       -> origin/main
+[Mon 07/06/2026  0:56:03.84] Found 3 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 4a57956..1e94a7a
+Fast-forward
+ modules/purchases/invoices/create.php | 51 +++++++++++++----------------------
+ modules/purchases/orders/create.php   | 22 +++++++++------
+ modules/purchases/returns/index.php   |  9 +++----
+ 3 files changed, 36 insertions(+), 46 deletions(-)
+[Mon 07/06/2026  0:56:04.98] Pull completed successfully! 
+[Mon 07/06/2026  0:58:13.98] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Mon 07/06/2026  0:58:15.04] No changes. Already up to date. 
+[Mon 07/06/2026  1:05:58.43] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   1e94a7a..7727a8e  main       -> origin/main
+[Mon 07/06/2026  1:05:59.71] Found 2 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 1e94a7a..7727a8e
+Fast-forward
+ modules/purchases/invoices/create.php | 112 +++++++++++++++++++++-------------
+ modules/purchases/orders/create.php   |  93 +++++++++++++++++++---------
+ 2 files changed, 132 insertions(+), 73 deletions(-)
+[Mon 07/06/2026  1:06:00.56] Pull completed successfully! 
+[Mon 07/06/2026  1:09:09.34] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   7727a8e..928eda1  main       -> origin/main
+[Mon 07/06/2026  1:09:10.63] Found 1 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 7727a8e..928eda1
+Fast-forward
+ .../2026_07_06_purchase_module_updates.sql         | 190 +++++++++++++++++++++
+ 1 file changed, 190 insertions(+)
+ create mode 100644 database/migrations/2026_07_06_purchase_module_updates.sql
+[Mon 07/06/2026  1:09:11.46] Pull completed successfully! 
+[Mon 07/06/2026  1:15:50.14] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   928eda1..0c0874d  main       -> origin/main
+[Mon 07/06/2026  1:15:51.44] Found 1 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 928eda1..0c0874d
+Fast-forward
+ .../2026_07_06_purchase_module_simple.sql          | 114 +++++++++++++++++++++
+ 1 file changed, 114 insertions(+)
+ create mode 100644 database/migrations/2026_07_06_purchase_module_simple.sql
+[Mon 07/06/2026  1:15:52.28] Pull completed successfully! 
+[Mon 07/06/2026  1:18:03.69] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Mon 07/06/2026  1:18:04.72] No changes. Already up to date. 
+[Mon 07/06/2026  1:42:02.97] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   0c0874d..cd30e53  main       -> origin/main
+[Mon 07/06/2026  1:42:04.32] Found 3 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 0c0874d..cd30e53
+Fast-forward
+ database/migrations/2026_07_06_purchase_module.sql |  34 +++++
+ modules/purchases/invoices/create.php              | 144 ++++++---------------
+ 2 files changed, 72 insertions(+), 106 deletions(-)
+ create mode 100644 database/migrations/2026_07_06_purchase_module.sql
+[Mon 07/06/2026  1:42:05.16] Pull completed successfully! 
