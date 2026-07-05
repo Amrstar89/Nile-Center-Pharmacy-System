@@ -34,14 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db->prepare("INSERT INTO purchase_returns (return_number, invoice_id, supplier_id, store_id, return_date, subtotal, grand_total, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
            ->execute([$ret_number, $invoice_id, $supplier_id, $store_id ?: null, $return_date, $subtotal, $subtotal, $notes, $_SESSION['user_id']]);
         $ret_id = $db->lastInsertId();
-        $itemStmt = $db->prepare("INSERT INTO purchase_return_items (return_id, invoice_item_id, product_id, product_name, product_code, barcode, quantity, unit_cost, line_total, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $itemStmt = $db->prepare("INSERT INTO purchase_return_items (return_id, invoice_item_id, product_id, product_name, barcode, quantity, unit_cost, line_total, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
         foreach ($items as $item) {
             $rqty = floatval($item['return_qty'] ?? 0);
             if ($rqty <= 0) continue;
             $cost = floatval($item['unit_cost'] ?? 0);
             $line = $rqty * $cost;
             $pid = intval($item['product_id'] ?? 0);
-            $itemStmt->execute([$ret_id, $item['invoice_item_id'], $pid ?: null, $item['product_name'], $item['product_code'] ?? '', $item['barcode'] ?? '', $rqty, $cost, $line, $item['reason'] ?? '']);
+            $itemStmt->execute([$ret_id, $item['invoice_item_id'], $pid ?: null, $item['product_name'], $item['barcode'] ?? '', $rqty, $cost, $line, $item['reason'] ?? '']);
             if ($store_id && $pid) {
                 $db->prepare("UPDATE inventory_items SET quantity = GREATEST(quantity - ?, 0), updated_at = NOW() WHERE store_id = ? AND product_id = ?")
                    ->execute([$rqty, $store_id, $pid]);
@@ -67,7 +67,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 <style>
 :root{--ret-red:#c0392b;--primary:#667eea;--secondary:#764ba2;--sidebar-bg:#1a1a2e;}
-*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0;overflow-y:auto}
+*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0;overflow-y:auto;min-width:1400px}
 .main-content{padding:0;margin-right:0 !important}
 .top-header{background:var(--ret-red);color:#fff;padding:8px 20px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:100}
 .top-header .menu-item{color:rgba(255,255,255,0.8);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;transition:all .2s;text-decoration:none;white-space:nowrap}
@@ -244,7 +244,7 @@ function loadInvoiceItems(){
                 '<td><input type="checkbox" class="row-check" id="chk_'+idx+'" onchange="toggleRow('+idx+')"></td>'+
                 '<td>'+(idx+1)+'<input type="hidden" name="items['+idx+'][invoice_item_id]" value="'+it.invoice_item_id+'"><input type="hidden" name="items['+idx+'][product_id]" value="'+(it.product_id||'')+'"></td>'+
                 '<td class="product-name"><strong>'+it.product_name+'</strong><input type="hidden" name="items['+idx+'][product_name]" value="'+it.product_name+'"></td>'+
-                '<td>'+(it.product_code||'-')+'<input type="hidden" name="items['+idx+'][product_code]" value="'+(it.product_code||'')+'"></td>'+
+                '<td>'+(it.product_code||'-')+'</td>'+
                 '<td>'+(it.barcode||'-')+'<input type="hidden" name="items['+idx+'][barcode]" value="'+(it.barcode||'')+'"></td>'+
                 '<td>'+(it.unit_name||'علبة')+'</td>'+
                 '<td><input type="number" class="form-control form-control-sm num" value="'+it.quantity+'" readonly style="background:#e9ecef"></td>'+
