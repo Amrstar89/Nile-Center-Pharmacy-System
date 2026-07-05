@@ -13,8 +13,15 @@ $units = $db->query("SELECT id, unit_name_ar FROM product_units WHERE is_active 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        $items = $_POST['items'] ?? [];
-        if (isset($items['_dummy'])) unset($items['_dummy']);
+        $items = [];
+        if (!empty($_POST['items_data'])) {
+            $decoded = json_decode($_POST['items_data'], true);
+            if (is_array($decoded)) $items = $decoded;
+        }
+        if (empty($items)) {
+            $items = $_POST['items'] ?? [];
+            if (isset($items['_dummy'])) unset($items['_dummy']);
+        }
         if (empty($items)) { throw new Exception('يجب إضافة صنف واحد على الأقل'); }
         $db->beginTransaction();
         $year = date('Y');
@@ -138,9 +145,9 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <div class="ms-auto text-muted" style="font-size:12px"><i class="bi bi-info-circle"></i> F2=بحث | F3=إضافة صف | Enter=التالي | Ctrl+S=حفظ</div>
 </div>
 <div class="invoice-header">
-<form method="POST" id="poForm" autocomplete="off">
-<!-- Hidden dummy to ensure items array always exists in POST -->
-<input type="hidden" name="items[_dummy][product_id]" value="">
+<form method="POST" id="poForm" autocomplete="off" onsubmit="return beforeSubmit()">
+<!-- Hidden field for serialized item data -->
+<input type="hidden" name="items_data" id="itemsData" value="">
 <div class="row g-2">
     <div class="col-lg-2 col-md-3">
         <label class="form-label small text-muted">المورد <span class="text-danger">*</span></label>
@@ -240,7 +247,7 @@ const colDefs=[
     {key:'delete',label:'',width:'24px',fixed:true}
 ];
 
-/* ===== Row Building - insertAdjacentHTML for reliable form submission ===== */
+/* ===== Row Building ===== */
 let R=0;
 const allUnits=<?= json_encode($units) ?>;
 const suppliers=<?= json_encode($suppliers) ?>;
@@ -257,27 +264,27 @@ function buildRowCells(id,d){
     const V=function(k){return ColOrder.isVisible(k);};
     const vis=function(k,html){return V(k)?html:'';};
     let h='';
-    h+=vis('rownum','<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(d.product_id||'')+'"></td>');
-    h+=vis('print','<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="tglPrint('+id+')"></i><input type="hidden" name="items['+id+'][has_barcode_print]" id="prv_'+id+'" value="0"></td>');
-    h+=vis('barcode','<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>');
-    h+=vis('code','<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>');
-    h+=vis('name','<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>');
-    h+=vis('unit','<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+getUnitOptions(d.unit_id)+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value="'+(d.unit_name||'')+'"></td>');
-    h+=vis('qty','<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(d.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>');
-    h+=vis('sell','<td><input type="number" name="items['+id+'][sell_price]" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(d.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>');
-    h+=vis('bonus','<td><input type="number" name="items['+id+'][bonus]" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>');
-    h+=vis('expiry','<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>');
-    h+=vis('disc_pct','<td><input type="number" name="items['+id+'][discount_percent]" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>');
+    h+=vis('rownum','<td>'+id+'<input type="hidden" id="hip_'+id+'" value="'+(d.product_id||'')+'"></td>');
+    h+=vis('print','<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="tglPrint('+id+')"></i></td>');
+    h+=vis('barcode','<td><div class="barcode-w"><input type="text" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>');
+    h+=vis('code','<td><input type="text" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>');
+    h+=vis('name','<td><input type="text" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>');
+    h+=vis('unit','<td><select id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+getUnitOptions(d.unit_id)+'</select></td>');
+    h+=vis('qty','<td><input type="number" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(d.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>');
+    h+=vis('sell','<td><input type="number" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(d.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>');
+    h+=vis('bonus','<td><input type="number" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>');
+    h+=vis('expiry','<td><input type="month" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>');
+    h+=vis('disc_pct','<td><input type="number" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>');
     h+=vis('disc_val','<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>');
-    h+=vis('cost','<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>');
-    h+=vis('vat_pct','<td><input type="number" name="items['+id+'][vat_percent]" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>');
-    h+=vis('vat_val','<td><input type="number" name="items['+id+'][vat_value]" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>');
+    h+=vis('cost','<td><input type="number" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>');
+    h+=vis('vat_pct','<td><input type="number" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>');
+    h+=vis('vat_val','<td><input type="number" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>');
     h+=vis('total','<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>');
     h+=vis('profit_v','<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
     h+=vis('profit_p','<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
     h+=vis('company','<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(d.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
     h+=vis('location','<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(d.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
-    h+=vis('batch','<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>');
+    h+=vis('batch','<td><input type="text" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>');
     h+=vis('delete','<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>');
     return h;
 }
@@ -286,9 +293,7 @@ function addRow(data){
     R++;const id=R;
     const d=data||{};
     const cells=buildRowCells(id,d);
-    // CRITICAL: Use insertAdjacentHTML on tbody for reliable form submission
     document.getElementById('itemsBody').insertAdjacentHTML('beforeend','<tr id="r_'+id+'" data-rid="'+id+'">'+cells+'</tr>');
-    // Attach F2 listeners
     const bc=document.getElementById('bc_'+id);
     const nm=document.getElementById('nm_'+id);
     if(bc)bc.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
@@ -297,6 +302,38 @@ function addRow(data){
     recalc();
     setTimeout(()=>{const el=document.getElementById('bc_'+id);if(el)el.focus();},50);
     return id;
+}
+
+/* ===== CRITICAL: Serialize all row data to JSON before submit ===== */
+function beforeSubmit(){
+    const rows=[];
+    document.querySelectorAll('#itemsBody tr').forEach(tr=>{
+        const id=tr.dataset.rid;
+        if(!id)return;
+        const getVal=function(fid,def){const el=document.getElementById(fid+'_'+id);return el?el.value:(def||'');};
+        const getNum=function(fid){const el=document.getElementById(fid+'_'+id);return el?parseFloat(el.value)||0:0;};
+        const row={
+            product_id:document.getElementById('hip_'+id)?.value||'',
+            barcode:getVal('bc'),
+            product_code:getVal('co'),
+            product_name:getVal('nm'),
+            unit_id:getVal('un'),
+            unit_name:'',
+            quantity:getNum('qt')||1,
+            bonus:getNum('bn'),
+            unit_cost:getNum('cs'),
+            sell_price:getNum('sp'),
+            discount_percent:getNum('dp'),
+            vat_percent:getNum('vp'),
+            vat_value:getNum('vv'),
+            expiry_date:getVal('ex'),
+            batch_number:getVal('ba')
+        };
+        if(row.product_name)rows.push(row);
+    });
+    if(rows.length===0){alert('يجب إضافة صنف واحد على الأقل');return false;}
+    document.getElementById('itemsData').value=JSON.stringify(rows);
+    return true;
 }
 
 /* ===== Calculations ===== */
@@ -387,8 +424,8 @@ function handleEnter(e,id,fieldIdx){
 }
 function tglPrint(id){
     const ico=document.getElementById('pr_'+id);const inp=document.getElementById('prv_'+id);
-    if(inp.value==='1'){inp.value='0';ico.classList.remove('print-on');ico.classList.add('print-off');}
-    else{inp.value='1';ico.classList.remove('print-off');ico.classList.add('print-on');}
+    if(inp&&inp.value==='1'){inp.value='0';ico.classList.remove('print-on');ico.classList.add('print-off');}
+    else if(inp){inp.value='1';ico.classList.remove('print-off');ico.classList.add('print-on');}
 }
 function delRow(id){const r=document.getElementById('r_'+id);if(r)r.remove();recalc();}
 function clearAll(){if(!confirm('مسح كل الأصناف؟'))return;document.getElementById('itemsBody').innerHTML='';R=0;recalc();}
@@ -417,6 +454,7 @@ function openF2Search(){
     ProductSearch.open({storeId:parseInt(sid),onSelect:function(p){addRow(p);}});
 }
 function fill(id,p){
+    document.getElementById('hip_'+id).value=p.product_id||p.id||'';
     document.getElementById('nm_'+id).value=p.product_name||'';
     document.getElementById('co_'+id).value=p.product_code||'';
     document.getElementById('bc_'+id).value=p.barcode||'';
@@ -425,16 +463,13 @@ function fill(id,p){
     document.getElementById('cy_'+id).value=p.company_name||'';
     document.getElementById('lc_'+id).value=p.location||'';
     if(p.unit_id){document.getElementById('un_'+id).value=p.unit_id;}
-    if(p.unit_name){document.getElementById('unm_'+id).value=p.unit_name;}
     if(p.units&&p.units.length>0){
         const sel=document.getElementById('un_'+id);sel.innerHTML='';
         p.units.forEach(u=>{const opt=document.createElement('option');opt.value=u.id;opt.textContent=u.name;if(u.is_default)opt.selected=true;sel.appendChild(opt);});
     }
-    const pi=document.querySelector('#r_'+id+' input[name*="[product_id]"]');
-    if(pi)pi.value=p.product_id||p.id||'';
     calc(id);
 }
-function savePO(){document.getElementById('poForm').submit();}
+function savePO(){if(beforeSubmit())document.getElementById('poForm').submit();}
 document.addEventListener('keydown',function(e){
     if(e.ctrlKey&&e.key==='s'){e.preventDefault();savePO();}
     if(e.key==='F3'){e.preventDefault();addRow();}
