@@ -14,6 +14,7 @@ $units = $db->query("SELECT id, unit_name_ar FROM product_units WHERE is_active 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $items = $_POST['items'] ?? [];
+        if (isset($items['_dummy'])) unset($items['_dummy']);
         if (empty($items)) { throw new Exception('يجب إضافة صنف واحد على الأقل'); }
         $db->beginTransaction();
         $year = date('Y');
@@ -64,7 +65,8 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 <style>
 :root{--po-blue:#0277bd;--red:#dc3545;}
-*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0;overflow-y:auto}
+*{box-sizing:border-box}
+body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0;overflow:auto;min-width:1400px}
 .main-content{padding:0;margin-right:0 !important}
 .top-header{background:var(--po-blue);color:#fff;padding:8px 20px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:100}
 .top-header .menu-item{color:rgba(255,255,255,0.8);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;transition:all .2s;text-decoration:none;white-space:nowrap}
@@ -109,8 +111,9 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 .bottom-bar .grand{background:linear-gradient(135deg,#29b6f6,var(--po-blue));color:#fff;padding:8px 20px;border-radius:10px;font-size:16px;font-weight:700}
 .bottom-bar .item input{height:26px;padding:2px 5px;font-size:12px;width:80px;border:1px solid #ccc;border-radius:4px}
 .supplier-section{background:#fff3cd;padding:10px 20px;border-top:1px solid #ffc107}
+.d-none{display:none !important}
 @media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon{display:none!important}}
-@media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}}
+@media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}body{min-width:auto}}
 </style>
 </head>
 <body>
@@ -135,7 +138,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <div class="ms-auto text-muted" style="font-size:12px"><i class="bi bi-info-circle"></i> F2=بحث | F3=إضافة صف | Enter=التالي | Ctrl+S=حفظ</div>
 </div>
 <div class="invoice-header">
-<form method="POST" id="poForm">
+<form method="POST" id="poForm" autocomplete="off">
 <div class="row g-2">
     <div class="col-lg-2 col-md-3">
         <label class="form-label small text-muted">المورد <span class="text-danger">*</span></label>
@@ -235,123 +238,70 @@ const colDefs=[
     {key:'delete',label:'',width:'24px',fixed:true}
 ];
 
-function buildRowHTML(id,d){
-    const data=d||{};
-    let uo='<option value="">--</option>';
-    units.forEach(u=>uo+='<option value="'+u.id+'">'+u.unit_name_ar+'</option>');
-    let html='<tr id="r_'+id+'" data-rid="'+id+'">';
-    const order=ColOrder.getOrder();
-    order.filter(c=>c.visible).forEach(c=>{
-        switch(c.key){
-            case 'rownum':
-                html+='<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(data.product_id||'')+'"></td>';
-                break;
-            case 'print':
-                html+='<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="tglPrint('+id+')"></i><input type="hidden" name="items['+id+'][has_barcode_print]" id="prv_'+id+'" value="0"></td>';
-                break;
-            case 'barcode':
-                html+='<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(data.barcode||'')+'" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>';
-                break;
-            case 'code':
-                html+='<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(data.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>';
-                break;
-            case 'name':
-                html+='<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(data.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>';
-                break;
-            case 'unit':
-                html+='<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+uo+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value=""></td>';
-                break;
-            case 'qty':
-                html+='<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(data.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>';
-                break;
-            case 'sell':
-                html+='<td><input type="number" name="items['+id+'][sell_price]" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(data.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>';
-                break;
-            case 'bonus':
-                html+='<td><input type="number" name="items['+id+'][bonus]" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>';
-                break;
-            case 'expiry':
-                html+='<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>';
-                break;
-            case 'disc_pct':
-                html+='<td><input type="number" name="items['+id+'][discount_percent]" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>';
-                break;
-            case 'disc_val':
-                html+='<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>';
-                break;
-            case 'cost':
-                html+='<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(data.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>';
-                break;
-            case 'vat_pct':
-                html+='<td><input type="number" name="items['+id+'][vat_percent]" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>';
-                break;
-            case 'vat_val':
-                html+='<td><input type="number" name="items['+id+'][vat_value]" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>';
-                break;
-            case 'total':
-                html+='<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>';
-                break;
-            case 'profit_v':
-                html+='<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>';
-                break;
-            case 'profit_p':
-                html+='<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>';
-                break;
-            case 'company':
-                html+='<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(data.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>';
-                break;
-            case 'location':
-                html+='<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(data.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>';
-                break;
-            case 'batch':
-                html+='<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>';
-                break;
-            case 'delete':
-                html+='<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>';
-                break;
-        }
+/* ===== Row Building ===== */
+let R=0;
+const allUnits=<?= json_encode($units) ?>;
+const suppliers=<?= json_encode($suppliers) ?>;
+
+function getUnitOptions(selUnitId){
+    let h='<option value="">--</option>';
+    allUnits.forEach(u=>{
+        h+='<option value="'+u.id+'"'+(u.id==selUnitId?' selected':'')+'>'+u.unit_name_ar+'</option>';
     });
-    html+='</tr>';return html;
+    return h;
 }
 
-let R=0; const units=<?= json_encode($units) ?>; const suppliers=<?= json_encode($suppliers) ?>;
-function onSupChange(){
-    const sel=document.getElementById('supplier_id');
-    document.getElementById('sup_code_dsp').value=sel.options[sel.selectedIndex].dataset.code||'';
-}
-function onSupCodeInput(){
-    const code=document.getElementById('sup_code_dsp').value.trim();
-    const sel=document.getElementById('supplier_id');
-    for(let i=0;i<sel.options.length;i++){
-        if(sel.options[i].dataset.code===code){sel.selectedIndex=i;onSupChange();return;}
-    }
-}
-function fltStores(){
-    const bid=document.getElementById('branchSel').value;
-    const sel=document.getElementById('store_id');
-    for(let i=0;i<sel.options.length;i++){const o=sel.options[i];if(!o.value)continue;o.style.display=!bid||o.dataset.branch===bid?'':'none';}
-}
 function addRow(data){
     R++;const id=R;
-    const html=buildRowHTML(id,data);
-    const temp=document.createElement('tbody');
-    temp.innerHTML=html;
-    const tr=temp.firstElementChild;
+    const d=data||{};
+    const V=function(k){return ColOrder.isVisible(k);};
+    const vis=function(k,html){return V(k)?html:'';};
+    let h='';
+    h+=vis('rownum','<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(d.product_id||'')+'"></td>');
+    h+=vis('print','<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="tglPrint('+id+')"></i><input type="hidden" name="items['+id+'][has_barcode_print]" id="prv_'+id+'" value="0"></td>');
+    h+=vis('barcode','<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2r('+id+')">F2</button></div></td>');
+    h+=vis('code','<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>');
+    h+=vis('name','<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>');
+    h+=vis('unit','<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+getUnitOptions(d.unit_id)+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value="'+(d.unit_name||'')+'"></td>');
+    h+=vis('qty','<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(d.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>');
+    h+=vis('sell','<td><input type="number" name="items['+id+'][sell_price]" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(d.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>');
+    h+=vis('bonus','<td><input type="number" name="items['+id+'][bonus]" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>');
+    h+=vis('expiry','<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>');
+    h+=vis('disc_pct','<td><input type="number" name="items['+id+'][discount_percent]" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>');
+    h+=vis('disc_val','<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>');
+    h+=vis('cost','<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>');
+    h+=vis('vat_pct','<td><input type="number" name="items['+id+'][vat_percent]" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>');
+    h+=vis('vat_val','<td><input type="number" name="items['+id+'][vat_value]" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>');
+    h+=vis('total','<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>');
+    h+=vis('profit_v','<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
+    h+=vis('profit_p','<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
+    h+=vis('company','<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(d.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
+    h+=vis('location','<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(d.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
+    h+=vis('batch','<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>');
+    h+=vis('delete','<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>');
+    const tr=document.createElement('tr');
+    tr.id='r_'+id;tr.dataset.rid=id;
+    tr.innerHTML=h;
     document.getElementById('itemsBody').appendChild(tr);
-    document.getElementById('bc_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
-    document.getElementById('nm_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
-    if(data)calc(id);
+    const bc=document.getElementById('bc_'+id);
+    const nm=document.getElementById('nm_'+id);
+    if(bc)bc.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
+    if(nm)nm.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
+    if(d)calc(id);
     recalc();
-    setTimeout(()=>document.getElementById('bc_'+id).focus(),50);
+    setTimeout(()=>{const el=document.getElementById('bc_'+id);if(el)el.focus();},50);
     return id;
 }
+
+/* ===== Calculations ===== */
 function onDiscPct(id){
     const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
     const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
     const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
     const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
     const base=(qt+bn)*cs;
-    document.getElementById('dv_'+id).value=(base*dp/100).toFixed(2);
+    const dvEl=document.getElementById('dv_'+id);
+    if(dvEl)dvEl.value=(base*dp/100).toFixed(2);
     calc(id);
 }
 function onDiscVal(id){
@@ -389,15 +339,16 @@ function calc(id){
     const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
     const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
     const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-    const sp=parseFloat(document.getElementById('sp_'+id).value)||0;
+    const sp=parseFloat(document.getElementById('sp_'+id)?.value)||0;
     const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
     const vv=parseFloat(document.getElementById('vv_'+id).value)||0;
     const tq=qt+bn;const base=tq*cs;const disc=base*(dp/100);const afterDisc=base-disc;
     const totalCost=afterDisc+vv;
     const profitVal=(sp-cs)*qt;const profitPct=cs>0?(((sp-cs)/cs)*100):0;
     document.getElementById('tl_'+id).value=totalCost.toFixed(2);
-    document.getElementById('pv_'+id).value=profitVal.toFixed(2);
-    document.getElementById('pp_'+id).value=profitPct.toFixed(1);
+    const pvEl=document.getElementById('pv_'+id);const ppEl=document.getElementById('pp_'+id);
+    if(pvEl)pvEl.value=profitVal.toFixed(2);
+    if(ppEl)ppEl.value=profitPct.toFixed(1);
     recalc();
 }
 function recalc(){
@@ -407,9 +358,9 @@ function recalc(){
         const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
         const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
         const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-        const sp=parseFloat(document.getElementById('sp_'+id).value)||0;
+        const sp=parseFloat(document.getElementById('sp_'+id)?.value)||0;
         n++;tc+=cs*(qt+bn);tv+=(parseFloat(document.getElementById('vv_'+id).value)||0);
-        ts+=sp*qt;tp+=(parseFloat(document.getElementById('pv_'+id).value)||0);
+        ts+=sp*qt;tp+=(parseFloat(document.getElementById('pv_'+id)?.value)||0);
     });
     document.getElementById('t_items').textContent=n;
     document.getElementById('t_cost').textContent=tc.toFixed(2);
@@ -419,6 +370,7 @@ function recalc(){
     document.getElementById('t_profit_pct').textContent=tc>0?((tp/tc)*100).toFixed(1)+'%':'0%';
     document.getElementById('t_grand').textContent=(tc+tv).toFixed(2);
 }
+
 const fieldMap=['bc','co','nm','un','qt','sp','bn','ex','dp','dv','cs','vp','vv','ba'];
 function handleEnter(e,id,fieldIdx){
     if(e.key==='Enter'){
@@ -434,6 +386,20 @@ function tglPrint(id){
 }
 function delRow(id){const r=document.getElementById('r_'+id);if(r)r.remove();recalc();}
 function clearAll(){if(!confirm('مسح كل الأصناف؟'))return;document.getElementById('itemsBody').innerHTML='';R=0;recalc();}
+function onSupChange(){
+    const sel=document.getElementById('supplier_id');
+    document.getElementById('sup_code_dsp').value=sel.options[sel.selectedIndex].dataset.code||'';
+}
+function onSupCodeInput(){
+    const code=document.getElementById('sup_code_dsp').value.trim();
+    const sel=document.getElementById('supplier_id');
+    for(let i=0;i<sel.options.length;i++){if(sel.options[i].dataset.code===code){sel.selectedIndex=i;onSupChange();return;}}
+}
+function fltStores(){
+    const bid=document.getElementById('branchSel').value;
+    const sel=document.getElementById('store_id');
+    for(let i=0;i<sel.options.length;i++){const o=sel.options[i];if(!o.value)continue;o.style.display=!bid||o.dataset.branch===bid?'':'none';}
+}
 function f2r(id){
     const sid=document.getElementById('store_id').value;
     if(!sid){alert('اختر المخزن أولاً');return;}
@@ -452,6 +418,12 @@ function fill(id,p){
     document.getElementById('sp_'+id).value=p.sell_price||0;
     document.getElementById('cy_'+id).value=p.company_name||'';
     document.getElementById('lc_'+id).value=p.location||'';
+    if(p.unit_id){document.getElementById('un_'+id).value=p.unit_id;}
+    if(p.unit_name){document.getElementById('unm_'+id).value=p.unit_name;}
+    if(p.units&&p.units.length>0){
+        const sel=document.getElementById('un_'+id);sel.innerHTML='';
+        p.units.forEach(u=>{const opt=document.createElement('option');opt.value=u.id;opt.textContent=u.name;if(u.is_default)opt.selected=true;sel.appendChild(opt);});
+    }
     const pi=document.querySelector('#r_'+id+' input[name*="[product_id]"]');
     if(pi)pi.value=p.product_id||p.id||'';
     calc(id);
@@ -462,8 +434,8 @@ document.addEventListener('keydown',function(e){
     if(e.key==='F3'){e.preventDefault();addRow();}
 });
 
-// Initialize column order
-ColOrder.init(colDefs,'purchase_order_cols','headerRow',buildRowHTML);
+// Initialize
+ColOrder.init(colDefs,'purchase_order_cols','headerRow');
 addRow();
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
 </script>
