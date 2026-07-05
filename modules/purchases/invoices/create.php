@@ -14,6 +14,8 @@ $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $items = $_POST['items'] ?? [];
+        // Remove helper entries
+        if (isset($items['_dummy'])) unset($items['_dummy']);
         if (empty($items)) { throw new Exception('يجب إضافة صنف واحد على الأقل'); }
         $db->beginTransaction();
         $supplier_id = intval($_POST['supplier_id']);
@@ -34,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $extra_discount_pct = floatval($_POST['extra_discount_pct'] ?? 0);
         $extra_discount_val = floatval($_POST['extra_discount_val'] ?? 0);
         $notes = $_POST['notes'] ?? '';
+        $deferred_amount = floatval($_POST['deferred_amount'] ?? 0);
         $paid_amount = floatval($_POST['paid_amount'] ?? 0);
         $subtotal = 0; $total_vat = 0;
         foreach ($items as $item) {
@@ -47,13 +50,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $grand = $subtotal + $total_vat - $extra_discount_val;
         if ($extra_discount_pct > 0) { $grand = $grand * (1 - $extra_discount_pct/100); }
+        
+        // New payment logic
         $status = 'open';
         if ($payment_method === 'cash' || $payment_method === 'bank_transfer' || $payment_method === 'wallet_transfer') {
-            $status = 'paid'; $paid_amount = $grand;
-        } elseif ($paid_amount >= $grand) {
-            $status = 'paid';
-        } elseif ($paid_amount > 0) {
-            $status = 'partial';
+            // Cash-like: deferred amount is what goes to supplier payable
+            $paid_amount = $grand - $deferred_amount;
+            if ($deferred_amount <= 0) {
+                $status = 'paid';
+            } else {
+                $status = 'partial';
+            }
+        } elseif ($payment_method === 'credit' || $payment_method === 'under_collection') {
+            // Credit-like: paid_amount is what's paid now, rest goes to supplier payable
+            if ($paid_amount >= $grand) {
+                $status = 'paid';
+            } elseif ($paid_amount > 0) {
+                $status = 'partial';
+            } else {
+                $status = 'open';
+            }
         }
         $db->prepare("INSERT INTO purchase_invoices (invoice_number, supplier_id, store_id, invoice_date, due_date, status, subtotal, vat_percent, vat_amount, grand_total, paid_amount, extra_discount_pct, extra_discount_val, payment_method, supplier_invoice_no, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")
            ->execute([$inv_number, $supplier_id, $store_id ?: null, $invoice_date, $due_date, $status, $subtotal, 0, $total_vat, $grand, $paid_amount, $extra_discount_pct, $extra_discount_val, $payment_method, $supplier_inv_no ?: null, $notes, $_SESSION['user_id']]);
@@ -71,8 +87,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 else { $db->prepare("INSERT INTO inventory_items (store_id, product_id, quantity, unit_cost, is_active, created_at) VALUES (?, ?, ?, ?, 1, NOW())")->execute([$store_id, $pid, $qty + $bonus, $cost]); }
             }
         }
-        if ($paid_amount > 0 && $status !== 'paid') {
-            $db->prepare("INSERT INTO supplier_payments (payment_number, supplier_id, invoice_id, amount, payment_date, payment_method, created_by) VALUES (?, ?, ?, ?, NOW(), 'cash', ?)")->execute(['PAY' . time(), $supplier_id, $inv_id, $paid_amount, $_SESSION['user_id']]);
+        // Record payment if applicable
+        if ($paid_amount > 0) {
+            $db->prepare("INSERT INTO supplier_payments (payment_number, supplier_id, invoice_id, amount, payment_date, payment_method, notes, created_by) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)")
+               ->execute(['PAY' . time(), $supplier_id, $inv_id, $paid_amount, $payment_method, 'دفعة من فاتورة ' . $inv_number, $_SESSION['user_id']]);
+        }
+        // Record supplier payable (deferred amount) if any
+        if ($status !== 'paid' && ($grand - $paid_amount) > 0) {
+            $db->prepare("INSERT INTO supplier_transactions (supplier_id, invoice_id, transaction_type, amount, notes, created_by, created_at) VALUES (?, ?, 'invoice_deferred', ?, ?, ?, NOW())")
+               ->execute([$supplier_id, $inv_id, $grand - $paid_amount, 'مبلغ مؤجل من فاتورة ' . $inv_number, $_SESSION['user_id']]);
         }
         logActivity('purchase_invoice_create', 'purchase_invoices', $inv_id); $db->commit();
         $_SESSION['success'] = 'تم إنشاء فاتورة الشراء ' . $inv_number . ' بنجاح';
@@ -94,12 +117,12 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 <style>
 :root{--primary:#667eea;--secondary:#764ba2;--sidebar-bg:#1a1a2e;--green:#198754;--red:#dc3545;--orange:#ff9800;}
-*{box-sizing:border-box}body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0;overflow-y:auto}
+*{box-sizing:border-box}
+body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;margin:0;padding:0;overflow:auto;min-width:1400px}
 .main-content{padding:0;margin-right:0 !important}
 .top-header{background:var(--sidebar-bg);color:#fff;padding:8px 20px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:100}
 .top-header .menu-item{color:rgba(255,255,255,0.8);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;transition:all .2s;text-decoration:none;white-space:nowrap}
 .top-header .menu-item:hover,.top-header .menu-item.active{background:rgba(255,255,255,0.15);color:#fff}
-.top-header .menu-item i{margin-left:6px}
 .sub-menu-bar{background:#f8f9fa;border-bottom:1px solid #ddd;padding:5px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .sub-menu-bar .btn-icon{width:36px;height:36px;border-radius:8px;border:1px solid #ccc;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;font-size:16px}
 .sub-menu-bar .btn-icon:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
@@ -144,8 +167,9 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 .bottom-bar .grand{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;padding:8px 20px;border-radius:10px;font-size:16px;font-weight:700}
 .bottom-bar .item input,.bottom-bar .item select{height:26px;padding:2px 5px;font-size:12px;width:80px;border:1px solid #ccc;border-radius:4px}
 .supplier-section{background:#fff3cd;padding:10px 20px;border-top:1px solid #ffc107}
+.d-none{display:none !important}
 @media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon{display:none!important}}
-@media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}}
+@media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}body{min-width:auto}}
 </style>
 </head>
 <body>
@@ -173,7 +197,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 </div>
 <!-- Invoice Header -->
 <div class="invoice-header">
-<form method="POST" id="invForm">
+<form method="POST" id="invForm" autocomplete="off">
 <div class="row g-2">
     <div class="col-lg-2 col-md-3">
         <label class="form-label small text-muted">المورد <span class="text-danger">*</span></label>
@@ -200,8 +224,8 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <div class="col-lg-2 col-md-3">
         <label class="form-label small text-muted">طريقة الدفع</label>
         <select name="payment_method" id="payMethod" class="form-select form-select-sm" onchange="onPayMethodChange()">
-            <option value="credit">آجل</option>
             <option value="cash">كاش</option>
+            <option value="credit" selected>آجل</option>
             <option value="under_collection">تحت التصريف</option>
             <option value="bank_transfer">تحويل بنكي</option>
             <option value="wallet_transfer">تحويل محفظة</option>
@@ -221,13 +245,19 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
             <?php foreach($stores as $st){ ?><option value="<?= $st['id'] ?>" data-branch="<?= $st['branch_id'] ?? '' ?>"><?= $st['store_name'] ?></option><?php } ?>
         </select>
     </div>
+    <!-- Credit payment fields -->
     <div class="col-lg-1 col-md-2" id="dueDateWrap">
         <label class="form-label small text-muted">تاريخ الاستحقاق</label>
         <input type="date" name="due_date" class="form-control form-control-sm">
     </div>
-    <div class="col-lg-1 col-md-2" id="paidNowWrap">
-        <label class="form-label small text-muted">مدفوع الآن</label>
-        <input type="number" name="paid_amount" id="paid_amount" class="form-control form-control-sm" value="0" step="0.01" oninput="onPaidInput()">
+    <div class="col-lg-1 col-md-2" id="paidFromWrap">
+        <label class="form-label small text-muted">المدفوع منه</label>
+        <input type="number" name="paid_amount" id="paid_amount" class="form-control form-control-sm" value="0" step="0.01" oninput="recalc()">
+    </div>
+    <!-- Cash-like payment fields -->
+    <div class="col-lg-1 col-md-2 d-none" id="deferredWrap">
+        <label class="form-label small text-muted">المؤجل منه</label>
+        <input type="number" name="deferred_amount" id="deferred_amount" class="form-control form-control-sm" value="0" step="0.01" oninput="recalc()">
     </div>
 </div>
 </div>
@@ -260,7 +290,6 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
     <div class="item ro"><label>ربح %:</label><strong id="t_profit_pct">0%</strong></div>
     <div class="item"><label>خصم إضافي %:</label><input type="number" name="extra_discount_pct" id="xdisc_pct" value="0" step="0.01" oninput="recalc()"></div>
     <div class="item"><label>خصم إضافي ق:</label><input type="number" name="extra_discount_val" id="xdisc_val" value="0" step="0.01" oninput="recalc()"></div>
-    <div class="item" id="paidNowItem"><label>مدفوع الآن:</label><input type="number" name="paid_amount" id="paid_amount2" value="0" step="0.01" oninput="onPaidInput()"></div>
     <div class="ms-auto grand">الصافي: <span id="t_grand">0.00</span> ج</div>
 </div>
 </div>
@@ -302,166 +331,92 @@ const colDefs=[
     {key:'delete',label:'',width:'24px',fixed:true}
 ];
 
-function buildRowHTML(id,d){
-    const data=d||{};
-    let uo='<option value="">--</option>';
-    units.forEach(u=>uo+='<option value="'+u.id+'">'+u.unit_name_ar+'</option>');
-    let html='<tr id="r_'+id+'" data-rid="'+id+'">';
-    const order=ColOrder.getOrder();
-    order.filter(c=>c.visible).forEach(c=>{
-        switch(c.key){
-            case 'rownum':
-                html+='<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(data.product_id||'')+'"></td>';
-                break;
-            case 'print':
-                html+='<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="togglePrint('+id+')"></i><input type="hidden" name="items['+id+'][has_barcode_print]" id="prv_'+id+'" value="0"></td>';
-                break;
-            case 'barcode':
-                html+='<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(data.barcode||'')+'" placeholder="باركود" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2row('+id+')">F2</button></div></td>';
-                break;
-            case 'code':
-                html+='<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(data.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>';
-                break;
-            case 'name':
-                html+='<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(data.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>';
-                break;
-            case 'unit':
-                html+='<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+uo+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value=""></td>';
-                break;
-            case 'qty':
-                html+='<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(data.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>';
-                break;
-            case 'sell':
-                html+='<td><input type="number" name="items['+id+'][sell_price]" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(data.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>';
-                break;
-            case 'bonus':
-                html+='<td><input type="number" name="items['+id+'][bonus]" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>';
-                break;
-            case 'expiry':
-                html+='<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>';
-                break;
-            case 'disc_pct':
-                html+='<td><input type="number" name="items['+id+'][discount_percent]" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>';
-                break;
-            case 'disc_val':
-                html+='<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>';
-                break;
-            case 'cost':
-                html+='<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(data.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>';
-                break;
-            case 'vat_pct':
-                html+='<td><input type="number" name="items['+id+'][vat_percent]" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>';
-                break;
-            case 'vat_val':
-                html+='<td><input type="number" name="items['+id+'][vat_value]" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>';
-                break;
-            case 'total':
-                html+='<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>';
-                break;
-            case 'profit_v':
-                html+='<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>';
-                break;
-            case 'profit_p':
-                html+='<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>';
-                break;
-            case 'company':
-                html+='<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(data.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>';
-                break;
-            case 'location':
-                html+='<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(data.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>';
-                break;
-            case 'batch':
-                html+='<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>';
-                break;
-            case 'delete':
-                html+='<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>';
-                break;
-        }
-    });
-    html+='</tr>';return html;
-}
-
-let R=0; const units=<?= json_encode($units) ?>; const suppliers=<?= json_encode($suppliers) ?>;
-
-function onSupplierChange(){
-    const sel=document.getElementById('supplier_id');
-    const opt=sel.options[sel.selectedIndex];
-    document.getElementById('supplier_code_display').value=opt.dataset.code||'';
-    autoGenInvNo();
-}
-function onSupCodeInput(){
-    const code=document.getElementById('supplier_code_display').value.trim();
-    const sel=document.getElementById('supplier_id');
-    for(let i=0;i<sel.options.length;i++){
-        if(sel.options[i].dataset.code===code){sel.selectedIndex=i;onSupplierChange();return;}
-    }
-}
-function autoGenInvNo(){
-    const sid=document.getElementById('supplier_id').value;
-    if(!sid)return;
-    const s=suppliers.find(x=>x.id==sid);
-    if(s) document.getElementById('supInvNo').value=s.supplier_code+'-'+Date.now().toString().slice(-4);
-}
+/* ===== Payment System ===== */
 function onPayMethodChange(){
     const m=document.getElementById('payMethod').value;
     const dueWrap=document.getElementById('dueDateWrap');
-    const paidWrap=document.getElementById('paidNowWrap');
-    const paidItem=document.getElementById('paidNowItem');
-    const grand=parseFloat(document.getElementById('t_grand').textContent)||0;
+    const paidWrap=document.getElementById('paidFromWrap');
+    const defWrap=document.getElementById('deferredWrap');
+    // Cash-like: show deferred, hide paid
     if(m==='cash'||m==='bank_transfer'||m==='wallet_transfer'){
         dueWrap.classList.add('d-none');
         paidWrap.classList.add('d-none');
-        if(paidItem)paidItem.classList.add('d-none');
-        document.getElementById('paid_amount').value=grand.toFixed(2);
-        if(paidItem)document.getElementById('paid_amount2').value=grand.toFixed(2);
-    }else if(m==='credit'){
+        defWrap.classList.remove('d-none');
+    }
+    // Credit-like: show paid, hide deferred
+    else if(m==='credit'||m==='under_collection'){
         dueWrap.classList.remove('d-none');
         paidWrap.classList.remove('d-none');
-        if(paidItem)paidItem.classList.remove('d-none');
-    }else{
-        dueWrap.classList.add('d-none');
-        paidWrap.classList.remove('d-none');
-        if(paidItem)paidItem.classList.remove('d-none');
+        defWrap.classList.add('d-none');
     }
+    recalc();
 }
-function onPaidInput(){
-    const v=parseFloat(document.getElementById('paid_amount').value)||0;
-    const pm=document.getElementById('payMethod');
-    const grand=parseFloat(document.getElementById('t_grand').textContent)||0;
-    if(v>0&&v<grand&&(pm.value==='cash'||pm.value==='bank_transfer'||pm.value==='wallet_transfer')){
-        pm.value='credit';onPayMethodChange();
-    }
-    if(v>=grand){pm.value='cash';onPayMethodChange();}
-    if(document.getElementById('paid_amount2'))document.getElementById('paid_amount2').value=v;
-}
-function filterStores(){
-    const bid=document.getElementById('branchSelect').value;
-    const sel=document.getElementById('store_id');
-    for(let i=0;i<sel.options.length;i++){const o=sel.options[i];if(!o.value)continue;o.style.display=!bid||o.dataset.branch===bid?'':'none';}
+
+/* ===== Row Building - Hardcoded with visibility check ===== */
+let R=0;
+const allUnits=<?= json_encode($units) ?>;
+const suppliers=<?= json_encode($suppliers) ?>;
+
+function getUnitOptions(selUnitId){
+    let h='<option value="">--</option>';
+    allUnits.forEach(u=>{
+        h+='<option value="'+u.id+'"'+(u.id==selUnitId?' selected':'')+'>'+u.unit_name_ar+'</option>';
+    });
+    return h;
 }
 
 function addRow(data){
     R++;const id=R;
-    const html=buildRowHTML(id,data);
-    const temp=document.createElement('tbody');
-    temp.innerHTML=html;
-    const tr=temp.firstElementChild;
+    const d=data||{};
+    const V=function(k){return ColOrder.isVisible(k);};
+    const vis=function(k,html){return V(k)?html:'';};
+    let h='';
+    h+=vis('rownum','<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" value="'+(d.product_id||'')+'"></td>');
+    h+=vis('print','<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="togglePrint('+id+')"></i><input type="hidden" name="items['+id+'][has_barcode_print]" id="prv_'+id+'" value="0"></td>');
+    h+=vis('barcode','<td><div class="barcode-w"><input type="text" name="items['+id+'][barcode]" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'" placeholder="باركود" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2row('+id+')">F2</button></div></td>');
+    h+=vis('code','<td><input type="text" name="items['+id+'][product_code]" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>');
+    h+=vis('name','<td><input type="text" name="items['+id+'][product_name]" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>');
+    h+=vis('unit','<td><select name="items['+id+'][unit_id]" id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+getUnitOptions(d.unit_id)+'</select><input type="hidden" name="items['+id+'][unit_name]" id="unm_'+id+'" value="'+(d.unit_name||'')+'"></td>');
+    h+=vis('qty','<td><input type="number" name="items['+id+'][quantity]" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(d.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>');
+    h+=vis('sell','<td><input type="number" name="items['+id+'][sell_price]" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(d.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>');
+    h+=vis('bonus','<td><input type="number" name="items['+id+'][bonus]" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>');
+    h+=vis('expiry','<td><input type="month" name="items['+id+'][expiry_date]" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>');
+    h+=vis('disc_pct','<td><input type="number" name="items['+id+'][discount_percent]" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>');
+    h+=vis('disc_val','<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>');
+    h+=vis('cost','<td><input type="number" name="items['+id+'][unit_cost]" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>');
+    h+=vis('vat_pct','<td><input type="number" name="items['+id+'][vat_percent]" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>');
+    h+=vis('vat_val','<td><input type="number" name="items['+id+'][vat_value]" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>');
+    h+=vis('total','<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>');
+    h+=vis('profit_v','<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
+    h+=vis('profit_p','<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
+    h+=vis('company','<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(d.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
+    h+=vis('location','<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(d.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
+    h+=vis('batch','<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>');
+    h+=vis('delete','<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>');
+    const tr=document.createElement('tr');
+    tr.id='r_'+id;tr.dataset.rid=id;
+    tr.innerHTML=h;
     document.getElementById('itemsBody').appendChild(tr);
-    document.getElementById('bc_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2row(id);}});
-    document.getElementById('nm_'+id).addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2row(id);}});
-    if(data)calc(id);
+    // Attach F2 listeners
+    const bc=document.getElementById('bc_'+id);
+    const nm=document.getElementById('nm_'+id);
+    if(bc)bc.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2row(id);}});
+    if(nm)nm.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2row(id);}});
+    if(d)calc(id);
     recalc();
-    setTimeout(()=>document.getElementById('bc_'+id).focus(),50);
+    setTimeout(()=>{const el=document.getElementById('bc_'+id);if(el)el.focus();},50);
     return id;
 }
 
+/* ===== Calculations ===== */
 function onDiscPct(id){
     const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
     const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
     const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
     const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
     const base=(qt+bn)*cs;
-    document.getElementById('dv_'+id).value=(base*dp/100).toFixed(2);
+    const dvEl=document.getElementById('dv_'+id);
+    if(dvEl)dvEl.value=(base*dp/100).toFixed(2);
     calc(id);
 }
 function onDiscVal(id){
@@ -499,7 +454,7 @@ function calc(id){
     const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
     const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
     const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-    const sp=parseFloat(document.getElementById('sp_'+id).value)||0;
+    const sp=parseFloat(document.getElementById('sp_'+id)?.value)||0;
     const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
     const vv=parseFloat(document.getElementById('vv_'+id).value)||0;
     const tq=qt+bn;
@@ -510,8 +465,10 @@ function calc(id){
     const profitVal=(sp-cs)*qt;
     const profitPct=cs>0?(((sp-cs)/cs)*100):0;
     document.getElementById('tl_'+id).value=totalCost.toFixed(2);
-    document.getElementById('pv_'+id).value=profitVal.toFixed(2);
-    document.getElementById('pp_'+id).value=profitPct.toFixed(1);
+    const pvEl=document.getElementById('pv_'+id);
+    const ppEl=document.getElementById('pp_'+id);
+    if(pvEl)pvEl.value=profitVal.toFixed(2);
+    if(ppEl)ppEl.value=profitPct.toFixed(1);
     recalc();
 }
 function recalc(){
@@ -521,13 +478,13 @@ function recalc(){
         const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
         const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
         const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-        const sp=parseFloat(document.getElementById('sp_'+id).value)||0;
+        const sp=parseFloat(document.getElementById('sp_'+id)?.value)||0;
         n++;
         if(document.getElementById('bc_'+id).value)bc++;
         tc+=cs*(qt+bn);
         tv+=(parseFloat(document.getElementById('vv_'+id).value)||0);
         ts+=sp*qt;
-        tp+=(parseFloat(document.getElementById('pv_'+id).value)||0);
+        tp+=(parseFloat(document.getElementById('pv_'+id)?.value)||0);
     });
     const xdp=parseFloat(document.getElementById('xdisc_pct').value)||0;
     const xdv=parseFloat(document.getElementById('xdisc_val').value)||0;
@@ -543,12 +500,9 @@ function recalc(){
     document.getElementById('t_profit_val').textContent=tp.toFixed(2);
     document.getElementById('t_profit_pct').textContent=tc>0?((tp/tc)*100).toFixed(1)+'%':'0%';
     document.getElementById('t_grand').textContent=grand.toFixed(2);
-    const pm=document.getElementById('payMethod').value;
-    if(pm==='cash'||pm==='bank_transfer'||pm==='wallet_transfer'){
-        document.getElementById('paid_amount').value=grand.toFixed(2);
-    }
 }
 
+/* ===== Navigation ===== */
 const fieldMap=['bc','co','nm','un','qt','sp','bn','ex','dp','dv','cs','vp','vv','ba'];
 function handleEnter(e,id,fieldIdx){
     if(e.key==='Enter'){
@@ -561,15 +515,38 @@ function handleEnter(e,id,fieldIdx){
     }
 }
 
+/* ===== Helpers ===== */
 function togglePrint(id){
-    const ico=document.getElementById('pr_'+id);
-    const inp=document.getElementById('prv_'+id);
+    const ico=document.getElementById('pr_'+id);const inp=document.getElementById('prv_'+id);
     if(inp.value==='1'){inp.value='0';ico.classList.remove('print-on');ico.classList.add('print-off');}
     else{inp.value='1';ico.classList.remove('print-off');ico.classList.add('print-on');}
 }
 function delRow(id){const r=document.getElementById('r_'+id);if(r)r.remove();recalc();}
 function clearAll(){if(!confirm('مسح كل الأصناف؟'))return;document.getElementById('itemsBody').innerHTML='';R=0;recalc();}
-
+function onSupplierChange(){
+    const sel=document.getElementById('supplier_id');
+    const opt=sel.options[sel.selectedIndex];
+    document.getElementById('supplier_code_display').value=opt.dataset.code||'';
+    autoGenInvNo();
+}
+function onSupCodeInput(){
+    const code=document.getElementById('supplier_code_display').value.trim();
+    const sel=document.getElementById('supplier_id');
+    for(let i=0;i<sel.options.length;i++){
+        if(sel.options[i].dataset.code===code){sel.selectedIndex=i;onSupplierChange();return;}
+    }
+}
+function autoGenInvNo(){
+    const sid=document.getElementById('supplier_id').value;
+    if(!sid)return;
+    const s=suppliers.find(x=>x.id==sid);
+    if(s)document.getElementById('supInvNo').value=s.supplier_code+'-'+Date.now().toString().slice(-4);
+}
+function filterStores(){
+    const bid=document.getElementById('branchSelect').value;
+    const sel=document.getElementById('store_id');
+    for(let i=0;i<sel.options.length;i++){const o=sel.options[i];if(!o.value)continue;o.style.display=!bid||o.dataset.branch===bid?'':'none';}
+}
 function f2row(id){
     const sid=document.getElementById('store_id').value;
     if(!sid){alert('اختر المخزن أولاً');return;}
@@ -588,6 +565,20 @@ function fill(id,p){
     document.getElementById('sp_'+id).value=p.sell_price||0;
     document.getElementById('cy_'+id).value=p.company_name||'';
     document.getElementById('lc_'+id).value=p.location||'';
+    // Set unit if product has one
+    if(p.unit_id){document.getElementById('un_'+id).value=p.unit_id;}
+    if(p.unit_name){document.getElementById('unm_'+id).value=p.unit_name;}
+    // Set product units (big/medium/small) if available
+    if(p.units && p.units.length>0){
+        const sel=document.getElementById('un_'+id);
+        sel.innerHTML='';
+        p.units.forEach(u=>{
+            const opt=document.createElement('option');
+            opt.value=u.id;opt.textContent=u.name;
+            if(u.is_default)opt.selected=true;
+            sel.appendChild(opt);
+        });
+    }
     const pi=document.querySelector('#r_'+id+' input[name*="[product_id]"]');
     if(pi)pi.value=p.product_id||p.id||'';
     calc(id);
@@ -598,8 +589,9 @@ document.addEventListener('keydown',function(e){
     if(e.key==='F3'){e.preventDefault();addRow();}
 });
 
-// Initialize column order
-ColOrder.init(colDefs,'purchase_invoice_cols','headerRow',buildRowHTML);
+// Initialize
+ColOrder.init(colDefs,'purchase_invoice_cols','headerRow');
+onPayMethodChange();
 addRow();
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
 </script>
