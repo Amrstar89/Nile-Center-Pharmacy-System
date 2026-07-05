@@ -139,6 +139,8 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 </div>
 <div class="invoice-header">
 <form method="POST" id="poForm" autocomplete="off">
+<!-- Hidden dummy to ensure items array always exists in POST -->
+<input type="hidden" name="items[_dummy][product_id]" value="">
 <div class="row g-2">
     <div class="col-lg-2 col-md-3">
         <label class="form-label small text-muted">المورد <span class="text-danger">*</span></label>
@@ -238,7 +240,7 @@ const colDefs=[
     {key:'delete',label:'',width:'24px',fixed:true}
 ];
 
-/* ===== Row Building ===== */
+/* ===== Row Building - insertAdjacentHTML for reliable form submission ===== */
 let R=0;
 const allUnits=<?= json_encode($units) ?>;
 const suppliers=<?= json_encode($suppliers) ?>;
@@ -251,9 +253,7 @@ function getUnitOptions(selUnitId){
     return h;
 }
 
-function addRow(data){
-    R++;const id=R;
-    const d=data||{};
+function buildRowCells(id,d){
     const V=function(k){return ColOrder.isVisible(k);};
     const vis=function(k,html){return V(k)?html:'';};
     let h='';
@@ -279,10 +279,16 @@ function addRow(data){
     h+=vis('location','<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(d.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
     h+=vis('batch','<td><input type="text" name="items['+id+'][batch_number]" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>');
     h+=vis('delete','<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>');
-    const tr=document.createElement('tr');
-    tr.id='r_'+id;tr.dataset.rid=id;
-    tr.innerHTML=h;
-    document.getElementById('itemsBody').appendChild(tr);
+    return h;
+}
+
+function addRow(data){
+    R++;const id=R;
+    const d=data||{};
+    const cells=buildRowCells(id,d);
+    // CRITICAL: Use insertAdjacentHTML on tbody for reliable form submission
+    document.getElementById('itemsBody').insertAdjacentHTML('beforeend','<tr id="r_'+id+'" data-rid="'+id+'">'+cells+'</tr>');
+    // Attach F2 listeners
     const bc=document.getElementById('bc_'+id);
     const nm=document.getElementById('nm_'+id);
     if(bc)bc.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2r(id);}});
