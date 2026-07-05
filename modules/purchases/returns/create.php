@@ -45,7 +45,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($store_id && $pid) {
                 $db->prepare("UPDATE inventory_items SET quantity = GREATEST(quantity - ?, 0), updated_at = NOW() WHERE store_id = ? AND product_id = ?")
                    ->execute([$rqty, $store_id, $pid]);
+                // Record inventory movement for return
+                $db->prepare("INSERT INTO inventory_movements (store_id, product_id, movement_type, reference_type, reference_id, reference_number, quantity, unit_cost, total_cost, notes, created_by) VALUES (?, ?, 'purchase_return', 'purchase_return', ?, ?, ?, ?, ?, ?, ?)")
+                   ->execute([$store_id, $pid, $ret_id, $ret_number, $rqty, $cost, $rqty * $cost, 'مرتجع مشتريات ' . $ret_number, $_SESSION['user_id']]);
             }
+        }
+        // Update supplier balance - credit the return amount
+        if ($subtotal > 0) {
+            $lastBalance = $db->query("SELECT balance_after FROM supplier_transactions WHERE supplier_id = $supplier_id ORDER BY id DESC LIMIT 1")->fetchColumn() ?: 0;
+            $newBalance = floatval($lastBalance) - $subtotal;
+            $db->prepare("INSERT INTO supplier_transactions (supplier_id, transaction_type, reference_type, reference_id, reference_number, debit, credit, balance_after, notes, created_by, created_at) VALUES (?, 'purchase_return', 'purchase_return', ?, ?, 0, ?, ?, ?, ?, NOW())")
+               ->execute([$supplier_id, $ret_id, $ret_number, $subtotal, $newBalance, 'مرتجع مشتريات ' . $ret_number, $_SESSION['user_id']]);
         }
         logActivity('purchase_return_create', 'purchase_returns', $ret_id);
         $db->commit();
