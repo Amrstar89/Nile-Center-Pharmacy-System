@@ -30,7 +30,7 @@ $page_title = 'عرض المخزن: ' . $store['store_name'];
 
 // Get inventory items in this store
 $items = $db->prepare("
-    SELECT ii.*, p.product_name, p.product_code, p.manual_code, p.barcode,
+    SELECT ii.*, p.product_name, p.product_code, p.manual_code,
            p.sell_price, p.cost_price, p.has_expire
     FROM inventory_items ii
     JOIN products p ON ii.product_id = p.id
