@@ -34,14 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db->prepare("INSERT INTO purchase_returns (return_number, invoice_id, supplier_id, store_id, return_date, subtotal, grand_total, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
            ->execute([$ret_number, $invoice_id, $supplier_id, $store_id ?: null, $return_date, $subtotal, $subtotal, $notes, $_SESSION['user_id']]);
         $ret_id = $db->lastInsertId();
-        $itemStmt = $db->prepare("INSERT INTO purchase_return_items (return_id, invoice_item_id, product_id, product_name, barcode, quantity, unit_cost, line_total, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $itemStmt = $db->prepare("INSERT INTO purchase_return_items (return_id, invoice_item_id, product_id, product_name, quantity, unit_cost, line_total, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         foreach ($items as $item) {
             $rqty = floatval($item['return_qty'] ?? 0);
             if ($rqty <= 0) continue;
             $cost = floatval($item['unit_cost'] ?? 0);
             $line = $rqty * $cost;
             $pid = intval($item['product_id'] ?? 0);
-            $itemStmt->execute([$ret_id, $item['invoice_item_id'], $pid ?: null, $item['product_name'], $item['barcode'] ?? '', $rqty, $cost, $line, $item['reason'] ?? '']);
+            $itemStmt->execute([$ret_id, $item['invoice_item_id'], $pid ?: null, $item['product_name'], $rqty, $cost, $line, $item['reason'] ?? '']);
             if ($store_id && $pid) {
                 $db->prepare("UPDATE inventory_items SET quantity = GREATEST(quantity - ?, 0), updated_at = NOW() WHERE store_id = ? AND product_id = ?")
                    ->execute([$rqty, $store_id, $pid]);
@@ -245,7 +245,7 @@ function loadInvoiceItems(){
                 '<td>'+(idx+1)+'<input type="hidden" name="items['+idx+'][invoice_item_id]" value="'+it.invoice_item_id+'"><input type="hidden" name="items['+idx+'][product_id]" value="'+(it.product_id||'')+'"></td>'+
                 '<td class="product-name"><strong>'+it.product_name+'</strong><input type="hidden" name="items['+idx+'][product_name]" value="'+it.product_name+'"></td>'+
                 '<td>'+(it.product_code||'-')+'</td>'+
-                '<td>'+(it.barcode||'-')+'<input type="hidden" name="items['+idx+'][barcode]" value="'+(it.barcode||'')+'"></td>'+
+                '<td>'+(it.barcode||'-')+'</td>'+
                 '<td>'+(it.unit_name||'علبة')+'</td>'+
                 '<td><input type="number" class="form-control form-control-sm num" value="'+it.quantity+'" readonly style="background:#e9ecef"></td>'+
                 '<td><input type="number" class="form-control form-control-sm num" value="'+(it.current_stock||0)+'" readonly style="background:#e9ecef;color:'+(it.current_stock>0?'green':'red')+'"></td>'+
