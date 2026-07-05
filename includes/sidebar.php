@@ -495,6 +495,7 @@ $is_purchase_reports = strpos($current_uri, '/purchases/reports/') !== false;
         const savedState = localStorage.getItem('sidebarAccordionState');
 
         if (savedState) {
+            // User has a saved preference - use it
             const states = JSON.parse(savedState);
             headings.forEach((heading, index) => {
                 if (states[index]) {
@@ -508,11 +509,15 @@ $is_purchase_reports = strpos($current_uri, '/purchases/reports/') !== false;
                 }
             });
         } else {
-            sections.forEach(section => {
-                section.style.maxHeight = section.scrollHeight + 'px';
+            // No saved state: collapse ALL sections by default
+            sections.forEach((section, index) => {
+                headings[index].classList.add('collapsed');
+                section.classList.add('collapsed');
+                section.style.maxHeight = '0';
             });
         }
 
+        // Always expand the section containing the active link
         const activeLink = document.querySelector('.nav-link.active');
         if (activeLink) {
             const activeSection = activeLink.closest('.sidebar-section');
