@@ -7,11 +7,10 @@ $db = getDB();
 $id = intval($_GET['id'] ?? 0);
 if (!$id) { redirect(APP_URL . '/modules/purchases/returns/'); }
 
-$return = $db->prepare("SELECT pr.*, s.supplier_name, s.supplier_code, st.store_name, u.name as created_by_name
+$return = $db->prepare("SELECT pr.*, s.supplier_name, s.supplier_code, st.store_name
     FROM purchase_returns pr
     LEFT JOIN suppliers s ON pr.supplier_id = s.id
     LEFT JOIN stores st ON pr.store_id = st.id
-    LEFT JOIN users u ON pr.created_by = u.id
     WHERE pr.id = ?");
 $return->execute([$id]);
 $ret = $return->fetch();
@@ -115,7 +114,7 @@ body{background:#f8f9fa;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
             <div class="info-row">
                 <div class="info-item">
                     <label>أنشأه</label>
-                    <strong><?= $ret['created_by_name'] ?? '-' ?> | <?= $ret['created_at'] ?></strong>
+                    <strong>مستخدم #<?= $ret['created_by'] ?> | <?= $ret['created_at'] ?></strong>
                 </div>
             </div>
         </div>
