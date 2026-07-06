@@ -338,3 +338,94 @@ Fast-forward
  2 files changed, 72 insertions(+), 106 deletions(-)
  create mode 100644 database/migrations/2026_07_06_purchase_module.sql
 [Mon 07/06/2026  1:42:05.16] Pull completed successfully! 
+[Mon 07/06/2026  1:51:56.18] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   8378c80..8f838af  main       -> origin/main
+[Mon 07/06/2026  1:51:57.54] Found 1 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 8378c80..8f838af
+Fast-forward
+ modules/purchases/returns/create.php | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+[Mon 07/06/2026  1:51:58.41] Pull completed successfully! 
+[Mon 07/06/2026  1:53:44.75] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Mon 07/06/2026  1:53:45.76] No changes. Already up to date. 
+[Mon 07/06/2026  2:05:09.30] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   8f838af..8f23854  main       -> origin/main
+[Mon 07/06/2026  2:05:10.63] Found 2 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 8f838af..8f23854
+Fast-forward
+ modules/purchases/returns/create.php |   6 +-
+ modules/purchases/returns/view.php   | 174 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 177 insertions(+), 3 deletions(-)
+ create mode 100644 modules/purchases/returns/view.php
+[Mon 07/06/2026  2:05:11.47] Pull completed successfully! 
+[Mon 07/06/2026  2:06:38.09] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   8f23854..1ab3147  main       -> origin/main
+[Mon 07/06/2026  2:06:39.34] Found 1 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 8f23854..1ab3147
+Fast-forward
+ modules/purchases/returns/view.php | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+[Mon 07/06/2026  2:06:40.18] Pull completed successfully! 
+[Mon 07/06/2026  2:07:00.28] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Mon 07/06/2026  2:07:01.26] No changes. Already up to date. 
+[Mon 07/06/2026  2:10:03.70] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   1ab3147..7750061  main       -> origin/main
+[Mon 07/06/2026  2:10:04.93] Found 1 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 1ab3147..7750061
+Fast-forward
+ modules/purchases/returns/view.php | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+[Mon 07/06/2026  2:10:05.75] Pull completed successfully! 
+[Mon 07/06/2026  2:17:12.07] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   7750061..be30120  main       -> origin/main
+[Mon 07/06/2026  2:17:13.41] Found 2 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating 7750061..be30120
+Fast-forward
+ modules/purchases/returns/create.php | 8 ++++----
+ modules/purchases/returns/view.php   | 4 ++--
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+[Mon 07/06/2026  2:17:14.23] Pull completed successfully! 
+[Mon 07/06/2026  2:18:03.07] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Mon 07/06/2026  2:18:04.06] No changes. Already up to date. 
+[Mon 07/06/2026  2:41:49.63] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   be30120..4098626  main       -> origin/main
+[Mon 07/06/2026  2:41:50.93] Found 1 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Updating be30120..4098626
+Fast-forward
+ modules/inventory/stores/view.php | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+[Mon 07/06/2026  2:41:51.77] Pull completed successfully! 
+[Mon 07/06/2026  2:44:40.01] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Mon 07/06/2026  2:44:40.98] No changes. Already up to date. 

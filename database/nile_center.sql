@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 06, 2026 at 01:16 AM
+-- Generation Time: Jul 06, 2026 at 02:10 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -172,7 +172,9 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (125, 1, 'System Administrator', 'logout', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-04 17:34:06'),
 (126, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-04 17:34:27'),
 (127, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-05 19:23:34'),
-(128, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-05 19:35:16');
+(128, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-05 19:35:16'),
+(129, 1, 'System Administrator', 'purchase_invoice_create', 'purchase_invoices', 1, NULL, NULL, '26.222.248.213', '2026-07-05 23:46:38'),
+(130, 1, 'System Administrator', 'purchase_return_create', 'purchase_returns', 3, NULL, NULL, '26.222.248.213', '2026-07-05 23:59:20');
 
 -- --------------------------------------------------------
 
@@ -852,7 +854,7 @@ INSERT INTO `inventory_items` (`id`, `store_id`, `product_id`, `batch_id`, `quan
 (13, 3, 28, 13, 95.000, 16.00, 25.00, 0.00, 14.00, 10.000, 300.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (14, 3, 29, 14, 190.000, 11.00, 18.00, 0.00, 14.00, 20.000, 500.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (15, 4, 17, 15, 110.000, 48.00, 75.00, 0.00, 14.00, 12.000, 350.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
-(17, 2, 101, NULL, 5.000, 67.50, 90.00, 25.00, 0.00, 0.000, 0.000, 1, '2026-07-01 22:09:24', '2026-07-01 22:09:24');
+(17, 2, 101, NULL, 105.000, 67.50, 90.00, 25.00, 0.00, 0.000, 0.000, 1, '2026-07-01 22:09:24', '2026-07-05 23:46:38');
 
 -- --------------------------------------------------------
 
@@ -1699,6 +1701,9 @@ CREATE TABLE `purchase_invoices` (
   `shipping_cost` decimal(12,2) DEFAULT 0.00,
   `grand_total` decimal(12,2) NOT NULL DEFAULT 0.00,
   `paid_amount` decimal(12,2) DEFAULT 0.00,
+  `extra_discount_pct` decimal(5,2) DEFAULT 0.00,
+  `extra_discount_val` decimal(12,2) DEFAULT 0.00,
+  `payment_method` varchar(30) DEFAULT 'credit',
   `remaining_amount` decimal(12,2) GENERATED ALWAYS AS (`grand_total` - `paid_amount`) STORED,
   `supplier_invoice_no` varchar(50) DEFAULT NULL,
   `notes` text DEFAULT NULL,
@@ -1706,6 +1711,13 @@ CREATE TABLE `purchase_invoices` (
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `purchase_invoices`
+--
+
+INSERT INTO `purchase_invoices` (`id`, `invoice_number`, `po_id`, `supplier_id`, `branch_id`, `store_id`, `invoice_date`, `due_date`, `status`, `subtotal`, `discount_type`, `discount_value`, `vat_percent`, `vat_amount`, `shipping_cost`, `grand_total`, `paid_amount`, `extra_discount_pct`, `extra_discount_val`, `payment_method`, `supplier_invoice_no`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 'PINV-2026-0001', NULL, 11, NULL, 2, '2026-07-06', NULL, 'partial', 6750.00, NULL, 0.00, 0.00, 0.00, 0.00, 6750.00, 6650.00, 0.00, 0.00, 'cash', '11-9482', '', 1, '2026-07-06 01:46:38', '2026-07-06 01:46:38');
 
 -- --------------------------------------------------------
 
@@ -1723,14 +1735,23 @@ CREATE TABLE `purchase_invoice_items` (
   `unit_id` int(11) DEFAULT NULL,
   `unit_name` varchar(50) DEFAULT 'علبة',
   `quantity` decimal(12,3) NOT NULL DEFAULT 0.000,
+  `bonus_qty` decimal(10,3) DEFAULT 0.000,
   `unit_cost` decimal(12,2) NOT NULL DEFAULT 0.00,
   `sell_price` decimal(12,2) DEFAULT 0.00,
   `discount_percent` decimal(5,2) DEFAULT 0.00,
   `vat_percent` decimal(5,2) DEFAULT 0.00,
+  `vat_value` decimal(12,2) DEFAULT 0.00,
   `expiry_date` date DEFAULT NULL,
   `batch_number` varchar(50) DEFAULT NULL,
   `line_total` decimal(12,2) NOT NULL DEFAULT 0.00
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `purchase_invoice_items`
+--
+
+INSERT INTO `purchase_invoice_items` (`id`, `invoice_id`, `product_id`, `product_name`, `product_code`, `barcode`, `unit_id`, `unit_name`, `quantity`, `bonus_qty`, `unit_cost`, `sell_price`, `discount_percent`, `vat_percent`, `vat_value`, `expiry_date`, `batch_number`, `line_total`) VALUES
+(1, 1, 101, 'تيبونيا فورت 40مجم', '', '', NULL, '', 100.000, 0.000, 67.50, 90.00, 0.00, 0.00, 0.00, NULL, '', 6750.00);
 
 -- --------------------------------------------------------
 
@@ -1777,11 +1798,13 @@ CREATE TABLE `purchase_order_items` (
   `unit_id` int(11) DEFAULT NULL,
   `unit_name` varchar(50) DEFAULT 'علبة',
   `quantity` decimal(12,3) NOT NULL DEFAULT 0.000,
+  `bonus_qty` decimal(10,3) DEFAULT 0.000,
   `received_qty` decimal(12,3) DEFAULT 0.000,
   `unit_cost` decimal(12,2) NOT NULL DEFAULT 0.00,
   `sell_price` decimal(12,2) DEFAULT 0.00,
   `discount_percent` decimal(5,2) DEFAULT 0.00,
   `vat_percent` decimal(5,2) DEFAULT 0.00,
+  `vat_value` decimal(12,2) DEFAULT 0.00,
   `line_total` decimal(12,2) NOT NULL DEFAULT 0.00,
   `notes` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1802,10 +1825,18 @@ CREATE TABLE `purchase_returns` (
   `status` enum('open','processed','cancelled') NOT NULL DEFAULT 'open',
   `subtotal` decimal(12,2) NOT NULL DEFAULT 0.00,
   `grand_total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `payment_method` varchar(30) DEFAULT 'credit',
   `notes` text DEFAULT NULL,
   `created_by` int(11) NOT NULL,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `purchase_returns`
+--
+
+INSERT INTO `purchase_returns` (`id`, `return_number`, `invoice_id`, `supplier_id`, `store_id`, `return_date`, `status`, `subtotal`, `grand_total`, `payment_method`, `notes`, `created_by`, `created_at`) VALUES
+(3, 'PRET-2026-0001', 1, 11, NULL, '2026-07-06', 'open', 3375.00, 3375.00, 'credit', '', 1, '2026-07-06 01:59:20');
 
 -- --------------------------------------------------------
 
@@ -1819,11 +1850,22 @@ CREATE TABLE `purchase_return_items` (
   `invoice_item_id` int(11) NOT NULL,
   `product_id` int(11) DEFAULT NULL,
   `product_name` varchar(255) NOT NULL,
+  `product_code` varchar(50) DEFAULT NULL,
+  `barcode` varchar(50) DEFAULT NULL,
+  `unit_id` int(11) DEFAULT NULL,
+  `unit_name` varchar(50) DEFAULT 'علبة',
   `quantity` decimal(12,3) NOT NULL DEFAULT 0.000,
   `unit_cost` decimal(12,2) NOT NULL DEFAULT 0.00,
   `line_total` decimal(12,2) NOT NULL DEFAULT 0.00,
   `reason` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `purchase_return_items`
+--
+
+INSERT INTO `purchase_return_items` (`id`, `return_id`, `invoice_item_id`, `product_id`, `product_name`, `product_code`, `barcode`, `unit_id`, `unit_name`, `quantity`, `unit_cost`, `line_total`, `reason`) VALUES
+(1, 3, 1, 101, 'تيبونيا فورت 40مجم', NULL, '', NULL, 'علبة', 50.000, 67.50, 3375.00, '');
 
 -- --------------------------------------------------------
 
@@ -2264,6 +2306,13 @@ CREATE TABLE `supplier_payments` (
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `supplier_payments`
+--
+
+INSERT INTO `supplier_payments` (`id`, `payment_number`, `supplier_id`, `invoice_id`, `po_id`, `amount`, `payment_date`, `payment_method`, `reference_no`, `notes`, `created_by`, `created_at`) VALUES
+(1, 'PAY1783295198', 11, 1, NULL, 6650.00, '2026-07-06', 'cash', NULL, 'دفعة من فاتورة PINV-2026-0001', 1, '2026-07-06 01:46:38');
+
 -- --------------------------------------------------------
 
 --
@@ -2450,7 +2499,8 @@ INSERT INTO `supplier_transactions` (`id`, `supplier_id`, `transaction_type`, `r
 (2, 8, 'payment', 'payment', 1, 'PAY-SUP-001', 0.00, 5000.00, 5000.00, 'دفعة للمورد', 1, '2026-06-21 08:00:00'),
 (3, 9, 'purchase', 'purchase_invoice', 2, 'PUR-20260002', 5000.00, 0.00, 5000.00, 'فاتورة مشتريات', 1, '2026-06-22 08:00:00'),
 (4, 10, 'purchase', 'purchase_invoice', 3, 'PUR-20260003', 8000.00, 0.00, 8000.00, 'فاتورة مشتريات', 1, '2026-06-23 08:00:00'),
-(5, 11, 'purchase', 'purchase_invoice', 4, 'PUR-20260004', 12000.00, 0.00, 12000.00, 'فاتورة مشتريات', 1, '2026-06-24 08:00:00');
+(5, 11, 'purchase', 'purchase_invoice', 4, 'PUR-20260004', 12000.00, 0.00, 12000.00, 'فاتورة مشتريات', 1, '2026-06-24 08:00:00'),
+(6, 11, 'purchase', 'purchase_invoice', 1, 'PINV-2026-0001', 100.00, 0.00, 12100.00, 'مبلغ مؤجل من فاتورة PINV-2026-0001', 1, '2026-07-05 23:46:38');
 
 -- --------------------------------------------------------
 
@@ -3051,7 +3101,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=129;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=131;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -3243,13 +3293,13 @@ ALTER TABLE `purchased_items`
 -- AUTO_INCREMENT for table `purchase_invoices`
 --
 ALTER TABLE `purchase_invoices`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `purchase_invoice_items`
 --
 ALTER TABLE `purchase_invoice_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `purchase_orders`
@@ -3267,13 +3317,13 @@ ALTER TABLE `purchase_order_items`
 -- AUTO_INCREMENT for table `purchase_returns`
 --
 ALTER TABLE `purchase_returns`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `purchase_return_items`
 --
 ALTER TABLE `purchase_return_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `shift_handovers`
@@ -3345,7 +3395,7 @@ ALTER TABLE `supplier_due_payments`
 -- AUTO_INCREMENT for table `supplier_payments`
 --
 ALTER TABLE `supplier_payments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `supplier_phones`
@@ -3381,7 +3431,7 @@ ALTER TABLE `supplier_quotations`
 -- AUTO_INCREMENT for table `supplier_transactions`
 --
 ALTER TABLE `supplier_transactions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `users`
