@@ -6,7 +6,6 @@ $db = getDB();
 $page_title = 'مرتجع بفاتورة';
 
 $suppliers = $db->query("SELECT id, supplier_name, supplier_code FROM suppliers WHERE is_active = 1 ORDER BY supplier_name")->fetchAll();
-$stores = $db->query("SELECT s.id, s.store_name, s.branch_id, b.branch_name FROM stores s LEFT JOIN branches b ON s.branch_id = b.id WHERE s.is_active = 1 ORDER BY s.store_name")->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -21,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ret_number = 'PRET-' . $year . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
         $invoice_id = intval($_POST['invoice_id']);
         $store_id = intval($_POST['store_id'] ?? 0);
+        if (!$store_id) { throw new Exception('لم يتم تحديد المخزن - المخزن مطلوب'); }
         $supplier_id = intval($_POST['supplier_id']);
         $return_date = $_POST['return_date'] ?: date('Y-m-d');
         $notes = $_POST['notes'] ?? '';
@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $subtotal += $rqty * $cost;
         }
         $db->prepare("INSERT INTO purchase_returns (return_number, invoice_id, supplier_id, store_id, return_date, subtotal, grand_total, notes, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-           ->execute([$ret_number, $invoice_id, $supplier_id, $store_id ?: null, $return_date, $subtotal, $subtotal, $notes, $_SESSION['user_id']]);
+           ->execute([$ret_number, $invoice_id, $supplier_id, $store_id, $return_date, $subtotal, $subtotal, $notes, $_SESSION['user_id']]);
         $ret_id = $db->lastInsertId();
         $itemStmt = $db->prepare("INSERT INTO purchase_return_items (return_id, invoice_item_id, product_id, product_name, product_code, barcode, quantity, unit_cost, line_total, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         foreach ($items as $item) {
@@ -42,10 +42,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $line = $rqty * $cost;
             $pid = intval($item['product_id'] ?? 0);
             $itemStmt->execute([$ret_id, $item['invoice_item_id'], $pid ?: null, $item['product_name'], $item['product_code'] ?? '', $item['barcode'] ?? '', $rqty, $cost, $line, $item['reason'] ?? '']);
-            if ($store_id && $pid) {
+            if ($pid) {
+                // Deduct from inventory
                 $db->prepare("UPDATE inventory_items SET quantity = GREATEST(quantity - ?, 0), updated_at = NOW() WHERE store_id = ? AND product_id = ?")
                    ->execute([$rqty, $store_id, $pid]);
-                // Record inventory movement for return
+                // Record inventory movement
                 $db->prepare("INSERT INTO inventory_movements (store_id, product_id, movement_type, reference_type, reference_id, reference_number, quantity, unit_cost, total_cost, notes, created_by) VALUES (?, ?, 'purchase_return', 'purchase_return', ?, ?, ?, ?, ?, ?, ?)")
                    ->execute([$store_id, $pid, $ret_id, $ret_number, $rqty, $cost, $rqty * $cost, 'مرتجع مشتريات ' . $ret_number, $_SESSION['user_id']]);
             }
@@ -112,6 +113,7 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 .bottom-bar .grand{background:linear-gradient(135deg,#e74c3c,var(--ret-red));color:#fff;padding:8px 20px;border-radius:10px;font-size:16px;font-weight:700}
 .supplier-section{background:#fff3cd;padding:10px 20px;border-top:1px solid #ffc107}
 .select-section{background:#fff;padding:15px 20px;border-bottom:1px solid #ddd}
+.store-display{background:#e8f5e9;border:1px solid #90caf9;border-radius:6px;padding:4px 10px;font-weight:600;color:#1565c0;font-size:13px;display:inline-block}
 @media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon{display:none!important}}
 @media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}}
 </style>
@@ -153,11 +155,10 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
         </select>
     </div>
     <div class="col-md-2">
-        <label class="form-label small text-muted">المخزن</label>
-        <select name="store_id" id="store_id" class="form-select form-select-sm">
-            <option value="">-- اختر --</option>
-            <?php foreach($stores as $st){ ?><option value="<?= $st['id'] ?>"><?= $st['store_name'] ?></option><?php } ?>
-        </select>
+        <label class="form-label small text-muted">المخزن <span class="text-danger">*</span></label>
+        <input type="hidden" name="store_id" id="store_id" value="">
+        <div id="storeDisplay" class="store-display" style="display:none"><i class="bi bi-building"></i> <span id="storeName"></span></div>
+        <div id="storeEmpty" class="text-muted small">سيُحدد تلقائياً من الفاتورة</div>
     </div>
     <div class="col-md-2">
         <label class="form-label small text-muted">تاريخ المرتجع</label>
@@ -227,13 +228,16 @@ require_once __DIR__ . '/../../../includes/sidebar.php';
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../../../js/product-search.js"></script>
 <script>
-let invData={};
+let invData=[];
 function loadSupplierInvoices(){
     const sid=document.getElementById('supplierSelect').value;
     const sel=document.getElementById('invoiceSelect');
     document.getElementById('formSupplierId').value=sid;
     sel.innerHTML='<option value="">-- جاري التحميل --</option>';
     sel.disabled=true;
+    document.getElementById('store_id').value='';
+    document.getElementById('storeDisplay').style.display='none';
+    document.getElementById('storeEmpty').style.display='block';
     if(!sid){sel.innerHTML='<option value="">-- اختر الفاتورة --</option>';document.getElementById('itemsBody').innerHTML='<tr><td colspan="14" class="text-center text-muted py-5"><i class="bi bi-inbox" style="font-size:48px"></i><br>اختر المورد ثم الفاتورة</td></tr>';return;}
     fetch('ajax_get_invoices.php?supplier_id='+sid).then(r=>r.json()).then(data=>{
         let h='<option value="">-- اختر الفاتورة --</option>';
@@ -247,9 +251,20 @@ function loadInvoiceItems(){
     const tbody=document.getElementById('itemsBody');
     if(!invId){tbody.innerHTML='<tr><td colspan="14" class="text-center text-muted py-5"><i class="bi bi-inbox" style="font-size:48px"></i><br>اختر الفاتورة</td></tr>';recalc();return;}
     fetch('ajax_get_invoice_items.php?invoice_id='+invId).then(r=>r.json()).then(data=>{
-        invData=data;
+        // Set store_id automatically from invoice
+        if(data.store_id){
+            document.getElementById('store_id').value=data.store_id;
+            document.getElementById('storeName').textContent=data.store_name||('مخزن #'+data.store_id);
+            document.getElementById('storeDisplay').style.display='inline-block';
+            document.getElementById('storeEmpty').style.display='none';
+        }else{
+            document.getElementById('store_id').value='';
+            document.getElementById('storeDisplay').style.display='none';
+            document.getElementById('storeEmpty').style.display='block';
+        }
+        invData=data.items||[];
         let h='';
-        data.forEach((it,idx)=>{
+        invData.forEach((it,idx)=>{
             h+='<tr id="row_'+idx+'" data-idx="'+idx+'">'+
                 '<td><input type="checkbox" class="row-check" id="chk_'+idx+'" onchange="toggleRow('+idx+')"></td>'+
                 '<td>'+(idx+1)+'<input type="hidden" name="items['+idx+'][invoice_item_id]" value="'+it.invoice_item_id+'"><input type="hidden" name="items['+idx+'][product_id]" value="'+(it.product_id||'')+'"></td>'+
