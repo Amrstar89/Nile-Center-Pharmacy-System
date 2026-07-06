@@ -80,6 +80,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $existing->execute([$store_id, $pid]); $existingData = $existing->fetch();
                 if ($existingData) { $db->prepare("UPDATE inventory_items SET quantity = quantity + ?, unit_cost = ?, updated_at = NOW() WHERE id = ?")->execute([$qty + $bonus, $cost, $existingData['id']]); }
                 else { $db->prepare("INSERT INTO inventory_items (store_id, product_id, quantity, unit_cost, is_active, created_at) VALUES (?, ?, ?, ?, 1, NOW())")->execute([$store_id, $pid, $qty + $bonus, $cost]); }
+                // Record inventory movement for purchase
+                $movementQty = $qty + $bonus;
+                $db->prepare("INSERT INTO inventory_movements (store_id, product_id, movement_type, reference_type, reference_id, reference_number, quantity, unit_cost, total_cost, notes, created_by) VALUES (?, ?, 'purchase', 'purchase_invoice', ?, ?, ?, ?, ?, ?, ?)")
+                   ->execute([$store_id, $pid, $inv_id, $inv_number, $movementQty, $cost, $movementQty * $cost, 'فاتورة شراء ' . $inv_number, $_SESSION['user_id']]);
             }
         }
         if ($paid_amount > 0) {
