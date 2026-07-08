@@ -1,186 +1,117 @@
 /**
- * Column Order Manager - Shared Library
- * Allows users to reorder and show/hide table columns
- * Saves preferences to localStorage per page
- * 
- * Usage:
- *   const colDefs = [
- *     {key:'barcode', label:'الباركود', width:'100px'},
- *     {key:'name', label:'اسم الصنف', width:'170px'},
- *     // ...
- *   ];
- *   ColOrder.init(colDefs, 'my_page_cols', 'headerRowId', buildRowHTML);
- *   // Add a button to open: ColOrder.openModal();
+ * Column Order & Visibility Manager
+ * Handles customizable table columns with localStorage persistence
  */
-const ColOrder = (function(){
-    let _defs=[], _order=[], _storageKey='', _headerId='', _buildFn=null;
-    let _dragSrc=null;
+const ColOrder = (function() {
+    let defs = [];
+    let storageKey = '';
+    let headerRowId = '';
+    let visibleMap = {};
 
-    function init(colDefs, storageKey, headerRowId, buildRowHTMLFn){
-        _defs=colDefs;
-        _storageKey=storageKey;
-        _headerId=headerRowId;
-        _buildFn=buildRowHTMLFn;
-        const saved=localStorage.getItem(_storageKey);
-        _order=saved?JSON.parse(saved):_defs.map(c=>({key:c.key,visible:c.hidden!==true}));
-        renderHeader();
+    function init(columnDefs, sKey, hrId) {
+        defs = columnDefs;
+        storageKey = sKey;
+        headerRowId = hrId;
+
+        // Load saved visibility from localStorage
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                visibleMap = JSON.parse(saved);
+            } catch(e) {
+                visibleMap = {};
+            }
+        }
+
+        // Default: all visible except those explicitly hidden
+        defs.forEach(function(d) {
+            if (!(d.key in visibleMap)) {
+                visibleMap[d.key] = true;
+            }
+        });
+
+        renderHeaders();
     }
 
-    function getDef(key){return _defs.find(c=>c.key===key)||{label:'',width:''};}
-
-    function renderHeader(){
-        const hr=document.getElementById(_headerId);
-        if(!hr)return;
-        hr.innerHTML=_order.filter(c=>c.visible).map(c=>{
-            const d=getDef(c.key);
-            const style=d.width?' style="min-width:'+d.width+'"':'';
-            return '<th'+style+'>'+(d.label||'')+'</th>';
-        }).join('');
+    function isVisible(key) {
+        return visibleMap[key] !== false;
     }
 
-    function getOrder(){return _order;}
-
-    function isVisible(key){const o=_order.find(x=>x.key===key);return o?o.visible:true;}
-
-    /* ===== Modal ===== */
-    function openModal(){
-        let modal=document.getElementById('colOrderModal');
-        if(!modal){modal=createModalElement();}
-        renderModalList();
-        modal.style.display='flex';
-    }
-    function closeModal(){
-        const m=document.getElementById('colOrderModal');
-        if(m)m.style.display='none';
+    function renderHeaders() {
+        const row = document.getElementById(headerRowId);
+        if (!row) return;
+        let html = '';
+        defs.forEach(function(d) {
+            if (d.fixed || visibleMap[d.key] !== false) {
+                const style = d.width ? ' style="width:' + d.width + '"' : '';
+                html += '<th' + style + '>' + d.label + '</th>';
+            }
+        });
+        row.innerHTML = html;
     }
 
-    function createModalElement(){
-        const div=document.createElement('div');
-        div.id='colOrderModal';
-        div.style.cssText='display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;';
-        div.innerHTML=
-            '<div id="colOrderBox" style="background:#fff;border-radius:12px;padding:20px;width:380px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">'
-            +'  <h5 style="margin:0 0 12px;font-size:16px;"><i class="bi bi-layout-three-columns"></i> تخصيص الأعمدة</h5>'
-            +'  <p style="font-size:12px;color:#666;margin:0 0 12px;">اسحب للترتيب - أزل التحديد للإخفاء</p>'
-            +'  <ul id="colOrderList" style="list-style:none;padding:0;margin:0;"></ul>'
-            +'  <div style="display:flex;gap:8px;margin-top:15px;justify-content:flex-end;">'
-            +'    <button type="button" class="btn btn-sm btn-secondary" onclick="ColOrder.resetOrder()">إعادة ضبط</button>'
-            +'    <button type="button" class="btn btn-sm btn-primary" onclick="ColOrder.saveOrder()">حفظ</button>'
-            +'    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="ColOrder.closeModal()">إغلاق</button>'
-            +'  </div>'
-            +'</div>';
+    function openModal() {
+        const existing = document.getElementById('colOrderModal');
+        if (existing) existing.remove();
+
+        let html = '<div class="modal fade show" id="colOrderModal" tabindex="-1" style="display:block;z-index:9999;background:rgba(0,0,0,0.5)">'
+            + '<div class="modal-dialog modal-sm" style="margin-top:100px">'
+            + '<div class="modal-content">'
+            + '<div class="modal-header"><h5 class="modal-title"><i class="bi bi-layout-three-columns"></i> تخصيص الأعمدة</h5>'
+            + '<button type="button" class="btn-close" onclick="ColOrder.closeModal()"></button></div>'
+            + '<div class="modal-body">';
+
+        defs.forEach(function(d, i) {
+            if (d.fixed) return;
+            const checked = visibleMap[d.key] !== false ? 'checked' : '';
+            html += '<div class="form-check mb-2">'
+                + '<input class="form-check-input" type="checkbox" id="col_chk_' + i + '" ' + checked
+                + ' onchange="ColOrder.toggleCol(\'' + d.key + '\', this.checked)">'
+                + '<label class="form-check-label" for="col_chk_' + i + '">' + d.label + '</label>'
+                + '</div>';
+        });
+
+        html += '</div><div class="modal-footer">'
+            + '<button type="button" class="btn btn-sm btn-secondary" onclick="ColOrder.resetDefaults()">الافتراضي</button>'
+            + '<button type="button" class="btn btn-sm btn-primary" onclick="ColOrder.closeModal()">إغلاق</button>'
+            + '</div></div></div></div>';
+
+        const div = document.createElement('div');
+        div.innerHTML = html;
         document.body.appendChild(div);
-        div.addEventListener('click',function(e){if(e.target===div)closeModal();});
-        return div;
-    }
 
-    function renderModalList(){
-        const list=document.getElementById('colOrderList');
-        if(!list)return;
-        list.innerHTML='';
-        _order.forEach((c,idx)=>{
-            const def=getDef(c.key);
-            if(c.key==='rownum'||c.key==='delete'||def.fixed)return;
-            const li=document.createElement('li');
-            li.draggable=true;
-            li.dataset.index=idx;
-            li.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #e9ecef;border-radius:6px;margin-bottom:6px;background:#fff;cursor:move;transition:all .2s;';
-            li.innerHTML='<span style="color:#999;font-size:14px;cursor:move;"><i class="bi bi-grip-vertical"></i></span>'
-                +'<input type="checkbox" '+(c.visible?'checked':'')+' style="cursor:pointer;" onchange="ColOrder.toggleVisible('+idx+',this.checked)">'
-                +'<label style="flex:1;margin:0;font-size:13px;cursor:pointer;">'+(def.label||c.key)+'</label>';
-            li.addEventListener('dragstart',dragStart);
-            li.addEventListener('dragover',dragOver);
-            li.addEventListener('drop',drop);
-            li.addEventListener('dragend',dragEnd);
-            list.appendChild(li);
+        document.getElementById('colOrderModal').addEventListener('click', function(e) {
+            if (e.target === this) ColOrder.closeModal();
         });
     }
 
-    function toggleVisible(idx,visible){_order[idx].visible=visible;}
+    function closeModal() {
+        const m = document.getElementById('colOrderModal');
+        if (m) m.remove();
+    }
 
-    function saveOrder(){
-        localStorage.setItem(_storageKey,JSON.stringify(_order));
-        renderHeader();
+    function toggleCol(key, visible) {
+        visibleMap[key] = visible;
+        localStorage.setItem(storageKey, JSON.stringify(visibleMap));
+        renderHeaders();
+        location.reload();
+    }
+
+    function resetDefaults() {
+        localStorage.removeItem(storageKey);
+        visibleMap = {};
+        defs.forEach(function(d) { visibleMap[d.key] = true; });
+        renderHeaders();
         closeModal();
-        // Refresh existing rows
-        refreshExistingRows();
+        location.reload();
     }
 
-    function resetOrder(){
-        _order=_defs.map(c=>({key:c.key,visible:c.hidden!==true}));
-        localStorage.setItem(_storageKey,JSON.stringify(_order));
-        renderHeader();
-        closeModal();
-        refreshExistingRows();
-    }
-
-    function refreshExistingRows(){
-        if(!_buildFn)return;
-        const tbody=document.getElementById('itemsBody');
-        if(!tbody)return;
-        const rows=[];
-        tbody.querySelectorAll('tr').forEach(tr=>{
-            const id=tr.dataset.rid;
-            if(!id)return;
-            const d={};
-            tr.querySelectorAll('input,select').forEach(inp=>{
-                if(inp.name){
-                    const m=inp.name.match(/\[([^\]]+)\]$/);
-                    if(m)d[m[1]]=inp.value;
-                }
-                if(inp.id&&!inp.name){
-                    const shortId=inp.id.replace(/^[a-z]+_/,'');
-                    if(shortId===id)d[inp.id.split('_')[0]]=inp.value;
-                }
-            });
-            // Extract special fields
-            const pidInput=tr.querySelector('input[name*="[product_id]"]');
-            d.product_id=pidInput?pidInput.value:'';
-            const stockInput=tr.querySelector('input[id^="st_"]');
-            if(stockInput)d.stock_qty=stockInput.value;
-            const companyInput=tr.querySelector('input[id^="cy_"]');
-            if(companyInput)d.company_name=companyInput.value;
-            const locInput=tr.querySelector('input[id^="lc_"]');
-            if(locInput)d.location=locInput.value;
-            const sellInput=tr.querySelector('input[name*="[sell_price]"],input[id^="sp_"]');
-            if(sellInput)d.sell_price=sellInput.value;
-            rows.push({id:id,data:d});
-        });
-        tbody.innerHTML='';
-        rows.forEach(r=>{
-            const html=_buildFn(parseInt(r.id),r.data);
-            const temp=document.createElement('tbody');
-            temp.innerHTML=html;
-            const newRow=temp.firstElementChild;
-            if(newRow)tbody.appendChild(newRow);
-        });
-        // Re-attach F2 listeners and recalc
-        if(typeof recalc==='function')recalc();
-        rows.forEach(r=>{
-            const rid=r.id;
-            const bc=document.getElementById('bc_'+rid);
-            const nm=document.getElementById('nm_'+rid);
-            if(bc)bc.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();if(typeof f2row==='function')f2row(rid);else if(typeof f2r==='function')f2r(rid);}});
-            if(nm)nm.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();if(typeof f2row==='function')f2row(rid);else if(typeof f2r==='function')f2r(rid);}});
-        });
-    }
-
-    /* ===== Drag & Drop ===== */
-    function dragStart(e){_dragSrc=this;this.style.opacity='0.5';e.dataTransfer.effectAllowed='move';}
-    function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';return false;}
-    function drop(e){e.stopPropagation();const srcIdx=parseInt(_dragSrc.dataset.index);const tgtIdx=parseInt(this.dataset.index);if(srcIdx!==tgtIdx){const item=_order.splice(srcIdx,1)[0];_order.splice(tgtIdx,0,item);renderModalList();}return false;}
-    function dragEnd(){this.style.opacity='1';}
-
-    // Public API
-    return{
-        init:init,
-        openModal:openModal,
-        closeModal:closeModal,
-        toggleVisible:toggleVisible,
-        saveOrder:saveOrder,
-        resetOrder:resetOrder,
-        getOrder:getOrder,
-        isVisible:isVisible,
-        renderHeader:renderHeader
+    return {
+        init: init,
+        isVisible: isVisible,
+        openModal: openModal,
+        closeModal: closeModal,
+        toggleCol: toggleCol,
+        resetDefaults: resetDefaults
     };
 })();
