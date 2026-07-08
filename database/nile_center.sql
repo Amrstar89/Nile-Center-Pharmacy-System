@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 06, 2026 at 02:10 AM
+-- Generation Time: Jul 08, 2026 at 03:02 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -174,7 +174,18 @@ INSERT INTO `activity_logs` (`id`, `user_id`, `user_name`, `action`, `table_name
 (127, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.201.9.238', '2026-07-05 19:23:34'),
 (128, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-05 19:35:16'),
 (129, 1, 'System Administrator', 'purchase_invoice_create', 'purchase_invoices', 1, NULL, NULL, '26.222.248.213', '2026-07-05 23:46:38'),
-(130, 1, 'System Administrator', 'purchase_return_create', 'purchase_returns', 3, NULL, NULL, '26.222.248.213', '2026-07-05 23:59:20');
+(130, 1, 'System Administrator', 'purchase_return_create', 'purchase_returns', 3, NULL, NULL, '26.222.248.213', '2026-07-05 23:59:20'),
+(131, 1, 'System Administrator', 'purchase_invoice_create', 'purchase_invoices', 2, NULL, NULL, '26.222.248.213', '2026-07-06 00:43:55'),
+(132, 1, 'System Administrator', 'purchase_invoice_create', 'purchase_invoices', 3, NULL, NULL, '26.222.248.213', '2026-07-06 01:02:47'),
+(133, 1, 'System Administrator', 'purchase_return_create', 'purchase_returns', 4, NULL, NULL, '26.222.248.213', '2026-07-06 01:04:05'),
+(134, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-06 01:20:07'),
+(135, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-06 01:20:52'),
+(136, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-06 01:20:54'),
+(137, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-06 16:17:07'),
+(138, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-07 16:48:36'),
+(139, 1, 'System Administrator', 'shift_acknowledge', 'shift_handovers', 2, NULL, NULL, '26.222.248.213', '2026-07-07 16:48:48'),
+(140, 1, 'System Administrator', 'shift_handover', 'shift_handovers', 3, NULL, NULL, '26.222.248.213', '2026-07-07 16:48:58'),
+(141, 1, 'System Administrator', 'login', 'users', 1, NULL, NULL, '26.222.248.213', '2026-07-08 12:49:46');
 
 -- --------------------------------------------------------
 
@@ -854,7 +865,38 @@ INSERT INTO `inventory_items` (`id`, `store_id`, `product_id`, `batch_id`, `quan
 (13, 3, 28, 13, 95.000, 16.00, 25.00, 0.00, 14.00, 10.000, 300.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (14, 3, 29, 14, 190.000, 11.00, 18.00, 0.00, 14.00, 20.000, 500.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
 (15, 4, 17, 15, 110.000, 48.00, 75.00, 0.00, 14.00, 12.000, 350.000, 1, '2026-06-20 08:00:00', '2026-06-27 08:00:00'),
-(17, 2, 101, NULL, 105.000, 67.50, 90.00, 25.00, 0.00, 0.000, 0.000, 1, '2026-07-01 22:09:24', '2026-07-05 23:46:38');
+(17, 2, 101, NULL, 105.000, 67.50, 90.00, 25.00, 0.00, 0.000, 0.000, 1, '2026-07-01 22:09:24', '2026-07-05 23:46:38'),
+(18, 2, 60, NULL, 10.000, 60.00, 0.00, 0.00, 0.00, 0.000, 0.000, 1, '2026-07-06 00:43:55', '2026-07-06 00:43:55'),
+(19, 2, 89, NULL, 10.000, 32.00, 0.00, 0.00, 0.00, 0.000, 0.000, 1, '2026-07-06 01:02:47', '2026-07-06 01:02:47');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory_movements`
+--
+
+CREATE TABLE `inventory_movements` (
+  `id` int(11) NOT NULL,
+  `store_id` int(11) NOT NULL,
+  `product_id` int(11) NOT NULL,
+  `movement_type` enum('purchase','purchase_return','sale','sale_return','transfer_in','transfer_out','adjustment','opening_balance') NOT NULL,
+  `reference_type` varchar(50) DEFAULT NULL,
+  `reference_id` int(11) DEFAULT NULL,
+  `reference_number` varchar(50) DEFAULT NULL,
+  `quantity` decimal(12,3) NOT NULL DEFAULT 0.000,
+  `unit_cost` decimal(12,2) DEFAULT 0.00,
+  `total_cost` decimal(12,2) DEFAULT 0.00,
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `inventory_movements`
+--
+
+INSERT INTO `inventory_movements` (`id`, `store_id`, `product_id`, `movement_type`, `reference_type`, `reference_id`, `reference_number`, `quantity`, `unit_cost`, `total_cost`, `notes`, `created_by`, `created_at`) VALUES
+(1, 2, 89, 'purchase', 'purchase_invoice', 3, 'PINV-2026-0003', 10.000, 32.00, 320.00, 'فاتورة شراء PINV-2026-0003', 1, '2026-07-06 01:02:47');
 
 -- --------------------------------------------------------
 
@@ -1717,7 +1759,9 @@ CREATE TABLE `purchase_invoices` (
 --
 
 INSERT INTO `purchase_invoices` (`id`, `invoice_number`, `po_id`, `supplier_id`, `branch_id`, `store_id`, `invoice_date`, `due_date`, `status`, `subtotal`, `discount_type`, `discount_value`, `vat_percent`, `vat_amount`, `shipping_cost`, `grand_total`, `paid_amount`, `extra_discount_pct`, `extra_discount_val`, `payment_method`, `supplier_invoice_no`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'PINV-2026-0001', NULL, 11, NULL, 2, '2026-07-06', NULL, 'partial', 6750.00, NULL, 0.00, 0.00, 0.00, 0.00, 6750.00, 6650.00, 0.00, 0.00, 'cash', '11-9482', '', 1, '2026-07-06 01:46:38', '2026-07-06 01:46:38');
+(1, 'PINV-2026-0001', NULL, 11, NULL, 2, '2026-07-06', NULL, 'partial', 6750.00, NULL, 0.00, 0.00, 0.00, 0.00, 6750.00, 6650.00, 0.00, 0.00, 'cash', '11-9482', '', 1, '2026-07-06 01:46:38', '2026-07-06 01:46:38'),
+(2, 'PINV-2026-0002', NULL, 6, NULL, 2, '2026-07-06', NULL, 'paid', 600.00, NULL, 0.00, 0.00, 0.00, 0.00, 600.00, 600.00, 0.00, 0.00, 'cash', '6-4938', '', 1, '2026-07-06 02:43:55', '2026-07-06 02:43:55'),
+(3, 'PINV-2026-0003', NULL, 8, NULL, 2, '2026-07-06', NULL, 'paid', 320.00, NULL, 0.00, 0.00, 0.00, 0.00, 320.00, 320.00, 0.00, 0.00, 'cash', '8-0849', '', 1, '2026-07-06 03:02:47', '2026-07-06 03:02:47');
 
 -- --------------------------------------------------------
 
@@ -1751,7 +1795,9 @@ CREATE TABLE `purchase_invoice_items` (
 --
 
 INSERT INTO `purchase_invoice_items` (`id`, `invoice_id`, `product_id`, `product_name`, `product_code`, `barcode`, `unit_id`, `unit_name`, `quantity`, `bonus_qty`, `unit_cost`, `sell_price`, `discount_percent`, `vat_percent`, `vat_value`, `expiry_date`, `batch_number`, `line_total`) VALUES
-(1, 1, 101, 'تيبونيا فورت 40مجم', '', '', NULL, '', 100.000, 0.000, 67.50, 90.00, 0.00, 0.00, 0.00, NULL, '', 6750.00);
+(1, 1, 101, 'تيبونيا فورت 40مجم', '', '', NULL, '', 100.000, 0.000, 67.50, 90.00, 0.00, 0.00, 0.00, NULL, '', 6750.00),
+(2, 2, 60, 'إفكسور 75 مجم 14 قرص', 'M-00060', '', NULL, '', 10.000, 0.000, 60.00, 85.00, 0.00, 0.00, 0.00, '0000-00-00', '', 600.00),
+(3, 3, 89, 'إندرال 10 مجم 50 قرص', 'M-00089', '', NULL, '', 10.000, 0.000, 32.00, 45.00, 0.00, 0.00, 0.00, '0000-00-00', '', 320.00);
 
 -- --------------------------------------------------------
 
@@ -1836,7 +1882,8 @@ CREATE TABLE `purchase_returns` (
 --
 
 INSERT INTO `purchase_returns` (`id`, `return_number`, `invoice_id`, `supplier_id`, `store_id`, `return_date`, `status`, `subtotal`, `grand_total`, `payment_method`, `notes`, `created_by`, `created_at`) VALUES
-(3, 'PRET-2026-0001', 1, 11, NULL, '2026-07-06', 'open', 3375.00, 3375.00, 'credit', '', 1, '2026-07-06 01:59:20');
+(3, 'PRET-2026-0001', 1, 11, NULL, '2026-07-06', 'open', 3375.00, 3375.00, 'credit', '', 1, '2026-07-06 01:59:20'),
+(4, 'PRET-2026-0002', 3, 8, NULL, '2026-07-06', 'open', 160.00, 160.00, 'credit', '', 1, '2026-07-06 03:04:05');
 
 -- --------------------------------------------------------
 
@@ -1865,7 +1912,8 @@ CREATE TABLE `purchase_return_items` (
 --
 
 INSERT INTO `purchase_return_items` (`id`, `return_id`, `invoice_item_id`, `product_id`, `product_name`, `product_code`, `barcode`, `unit_id`, `unit_name`, `quantity`, `unit_cost`, `line_total`, `reason`) VALUES
-(1, 3, 1, 101, 'تيبونيا فورت 40مجم', NULL, '', NULL, 'علبة', 50.000, 67.50, 3375.00, '');
+(1, 3, 1, 101, 'تيبونيا فورت 40مجم', NULL, '', NULL, 'علبة', 50.000, 67.50, 3375.00, ''),
+(2, 4, 3, 89, 'إندرال 10 مجم 50 قرص', 'M-00089', '', NULL, 'علبة', 5.000, 32.00, 160.00, '');
 
 -- --------------------------------------------------------
 
@@ -1893,7 +1941,8 @@ CREATE TABLE `shift_handovers` (
 
 INSERT INTO `shift_handovers` (`id`, `shift_date`, `from_user`, `to_user`, `open_orders_count`, `urgent_orders_count`, `critical_notes`, `general_notes`, `is_acknowledged`, `acknowledged_at`, `created_at`) VALUES
 (1, '2026-06-27', 1, 2, 5, 2, 'طلبات عاجلة تحتاج متابعة', 'التسليمات المعلقة', 1, '2026-06-27 08:00:00', '2026-06-27 05:00:00'),
-(2, '2026-06-27', 2, 1, 3, 1, 'متابعة طلب مستشفى النور', 'الوردية المسائية', 0, NULL, '2026-06-27 13:00:00');
+(2, '2026-06-27', 2, 1, 3, 1, 'متابعة طلب مستشفى النور', 'الوردية المسائية', 1, '2026-07-07 18:48:48', '2026-06-27 13:00:00'),
+(3, '2026-07-07', 1, 2, 11, 2, '', '', 0, NULL, '2026-07-07 16:48:58');
 
 -- --------------------------------------------------------
 
@@ -2311,7 +2360,9 @@ CREATE TABLE `supplier_payments` (
 --
 
 INSERT INTO `supplier_payments` (`id`, `payment_number`, `supplier_id`, `invoice_id`, `po_id`, `amount`, `payment_date`, `payment_method`, `reference_no`, `notes`, `created_by`, `created_at`) VALUES
-(1, 'PAY1783295198', 11, 1, NULL, 6650.00, '2026-07-06', 'cash', NULL, 'دفعة من فاتورة PINV-2026-0001', 1, '2026-07-06 01:46:38');
+(1, 'PAY1783295198', 11, 1, NULL, 6650.00, '2026-07-06', 'cash', NULL, 'دفعة من فاتورة PINV-2026-0001', 1, '2026-07-06 01:46:38'),
+(2, 'PAY1783298635', 6, 2, NULL, 600.00, '2026-07-06', 'cash', NULL, 'دفعة من فاتورة PINV-2026-0002', 1, '2026-07-06 02:43:55'),
+(3, 'PAY1783299767', 8, 3, NULL, 320.00, '2026-07-06', 'cash', NULL, 'دفعة من فاتورة PINV-2026-0003', 1, '2026-07-06 03:02:47');
 
 -- --------------------------------------------------------
 
@@ -2500,7 +2551,8 @@ INSERT INTO `supplier_transactions` (`id`, `supplier_id`, `transaction_type`, `r
 (3, 9, 'purchase', 'purchase_invoice', 2, 'PUR-20260002', 5000.00, 0.00, 5000.00, 'فاتورة مشتريات', 1, '2026-06-22 08:00:00'),
 (4, 10, 'purchase', 'purchase_invoice', 3, 'PUR-20260003', 8000.00, 0.00, 8000.00, 'فاتورة مشتريات', 1, '2026-06-23 08:00:00'),
 (5, 11, 'purchase', 'purchase_invoice', 4, 'PUR-20260004', 12000.00, 0.00, 12000.00, 'فاتورة مشتريات', 1, '2026-06-24 08:00:00'),
-(6, 11, 'purchase', 'purchase_invoice', 1, 'PINV-2026-0001', 100.00, 0.00, 12100.00, 'مبلغ مؤجل من فاتورة PINV-2026-0001', 1, '2026-07-05 23:46:38');
+(6, 11, 'purchase', 'purchase_invoice', 1, 'PINV-2026-0001', 100.00, 0.00, 12100.00, 'مبلغ مؤجل من فاتورة PINV-2026-0001', 1, '2026-07-05 23:46:38'),
+(7, 8, '', '', 4, 'PRET-2026-0002', 0.00, 160.00, 4840.00, 'مرتجع مشتريات PRET-2026-0002', 1, '2026-07-06 01:04:05');
 
 -- --------------------------------------------------------
 
@@ -2527,7 +2579,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `role`, `branch_code`, `phone`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-07-05 21:35:16', '2026-06-15 16:53:16', '2026-07-05 19:35:16'),
+(1, 'admin', '$2b$10$BWUBpgWGlNUigwPale.wlOfuBvh8Y4nPXu556/ECJ.hxp4ye5kZ46', 'System Administrator', 'admin', NULL, NULL, 1, '2026-07-08 14:49:46', '2026-06-15 16:53:16', '2026-07-08 12:49:46'),
 (2, 'Zain', '$2y$10$334KBKCnb3ilFu1UH91sU.Rvva4LuD6os7celKfZFwdXZFVsvWVvG', 'Ahmed Zain', 'purchaser', '', '01003065048', 1, '2026-06-17 01:45:16', '2026-06-16 23:45:07', '2026-06-16 23:45:16');
 
 --
@@ -2684,6 +2736,16 @@ ALTER TABLE `inventory_items`
   ADD KEY `idx_inv_item_store` (`store_id`),
   ADD KEY `idx_inv_item_product` (`product_id`),
   ADD KEY `idx_inv_item_batch` (`batch_id`);
+
+--
+-- Indexes for table `inventory_movements`
+--
+ALTER TABLE `inventory_movements`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_store_product` (`store_id`,`product_id`),
+  ADD KEY `idx_movement_type` (`movement_type`),
+  ADD KEY `idx_reference` (`reference_type`,`reference_id`),
+  ADD KEY `idx_created_at` (`created_at`);
 
 --
 -- Indexes for table `inventory_transactions`
@@ -3101,7 +3163,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=131;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=142;
 
 --
 -- AUTO_INCREMENT for table `areas`
@@ -3185,7 +3247,13 @@ ALTER TABLE `inventory_batches`
 -- AUTO_INCREMENT for table `inventory_items`
 --
 ALTER TABLE `inventory_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+
+--
+-- AUTO_INCREMENT for table `inventory_movements`
+--
+ALTER TABLE `inventory_movements`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `inventory_transactions`
@@ -3293,13 +3361,13 @@ ALTER TABLE `purchased_items`
 -- AUTO_INCREMENT for table `purchase_invoices`
 --
 ALTER TABLE `purchase_invoices`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `purchase_invoice_items`
 --
 ALTER TABLE `purchase_invoice_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `purchase_orders`
@@ -3317,19 +3385,19 @@ ALTER TABLE `purchase_order_items`
 -- AUTO_INCREMENT for table `purchase_returns`
 --
 ALTER TABLE `purchase_returns`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `purchase_return_items`
 --
 ALTER TABLE `purchase_return_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `shift_handovers`
 --
 ALTER TABLE `shift_handovers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `stock_adjustments`
@@ -3395,7 +3463,7 @@ ALTER TABLE `supplier_due_payments`
 -- AUTO_INCREMENT for table `supplier_payments`
 --
 ALTER TABLE `supplier_payments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `supplier_phones`
@@ -3431,7 +3499,7 @@ ALTER TABLE `supplier_quotations`
 -- AUTO_INCREMENT for table `supplier_transactions`
 --
 ALTER TABLE `supplier_transactions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `users`

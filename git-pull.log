@@ -429,3 +429,110 @@ Fast-forward
 From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
  * branch            main       -> FETCH_HEAD
 [Mon 07/06/2026  2:44:40.98] No changes. Already up to date. 
+[Mon 07/06/2026  2:59:38.41] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   4098626..523bebb  main       -> origin/main
+[Mon 07/06/2026  2:59:39.86] Found 6 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'database/nile_center.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'git-pull.log', LF will be replaced by CRLF the next time Git touches it
+Merge made by the 'ort' strategy.
+ .../migrations/2026_07_06_inventory_movements.sql  |  53 +++
+ modules/inventory/movements/index.php              | 218 +++++++++++++
+ modules/purchases/invoices/create.php              |   4 +
+ modules/purchases/returns/create.php               |  10 +
+ modules/suppliers/view.php                         | 360 +++++++++++----------
+ 5 files changed, 476 insertions(+), 169 deletions(-)
+ create mode 100644 database/migrations/2026_07_06_inventory_movements.sql
+ create mode 100644 modules/inventory/movements/index.php
+[Mon 07/06/2026  2:59:40.84] Pull completed successfully! 
+[Mon 07/06/2026  3:01:04.86] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Mon 07/06/2026  3:01:05.90] Found 2 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[Mon 07/06/2026  3:01:06.68] Pull completed successfully! 
+[Mon 07/06/2026  3:08:29.99] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   523bebb..e7ba65f  main       -> origin/main
+[Mon 07/06/2026  3:08:31.30] Found 4 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'database/nile_center.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'git-pull.log', LF will be replaced by CRLF the next time Git touches it
+Merge made by the 'ort' strategy.
+ .../purchases/returns/ajax_get_invoice_items.php   | 18 +++++++---
+ modules/purchases/returns/create.php               | 39 +++++++++++++++-------
+ 2 files changed, 40 insertions(+), 17 deletions(-)
+[Mon 07/06/2026  3:08:32.29] Pull completed successfully! 
+[Mon 07/06/2026  3:19:08.87] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   e7ba65f..2a6e6f5  main       -> origin/main
+[Mon 07/06/2026  3:19:10.13] Found 4 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'database/nile_center.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'git-pull.log', LF will be replaced by CRLF the next time Git touches it
+Merge made by the 'ort' strategy.
+ modules/purchases/returns/create.php | 27 ++++++++-------------------
+ 1 file changed, 8 insertions(+), 19 deletions(-)
+[Mon 07/06/2026  3:19:11.10] Pull completed successfully! 
+[Mon 07/06/2026  3:21:15.19] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Mon 07/06/2026  3:21:16.22] Found 4 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[Mon 07/06/2026  3:21:17.03] Pull completed successfully! 
+[Wed 07/08/2026 16:32:02.21] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+   2a6e6f5..3001ce7  main       -> origin/main
+[Wed 07/08/2026 16:32:04.13] Found 14 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+warning: in the working copy of 'database/nile_center.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'git-pull.log', LF will be replaced by CRLF the next time Git touches it
+Merge made by the 'ort' strategy.
+ database/migrations/2026_07_08_sales_module.sql  | 158 ++++++
+ includes/sidebar.php                             |  12 +-
+ modules/customers/view.php                       | 207 +++++++-
+ modules/sales/create.php                         | 595 ++++++++++++++++++++++-
+ modules/sales/invoices.php                       | 143 ++++++
+ modules/sales/returns/ajax_get_invoice_items.php |  90 ++++
+ modules/sales/returns/ajax_get_invoices.php      |  41 ++
+ modules/sales/returns/create.php                 | 258 ++++++++++
+ modules/sales/returns/index.php                  |  74 +++
+ modules/sales/view.php                           | 191 ++++++++
+ 10 files changed, 1753 insertions(+), 16 deletions(-)
+ create mode 100644 database/migrations/2026_07_08_sales_module.sql
+ create mode 100644 modules/sales/invoices.php
+ create mode 100644 modules/sales/returns/ajax_get_invoice_items.php
+ create mode 100644 modules/sales/returns/ajax_get_invoices.php
+ create mode 100644 modules/sales/returns/create.php
+ create mode 100644 modules/sales/returns/index.php
+ create mode 100644 modules/sales/view.php
+[Wed 07/08/2026 16:32:05.17] Pull completed successfully! 
+[Wed 07/08/2026 16:33:25.27] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Wed 07/08/2026 16:33:26.38] Found 5 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[Wed 07/08/2026 16:33:27.22] Pull completed successfully! 
+[Wed 07/08/2026 16:35:54.95] Starting auto-pull... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+[Wed 07/08/2026 16:35:56.04] Found 5 new commit(s). Pulling... 
+From https://github.com/Amrstar89/Nile-Center-Pharmacy-System
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+[Wed 07/08/2026 16:35:56.89] Pull completed successfully! 
