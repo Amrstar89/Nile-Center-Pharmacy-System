@@ -11,6 +11,15 @@ $customers = $db->query("SELECT id, customer_name, customer_code, phone, balance
 $users = $db->query("SELECT id, full_name FROM users WHERE is_active = 1 ORDER BY full_name")->fetchAll();
 $units = $db->query("SELECT id, unit_name_ar FROM product_units WHERE is_active = 1 ORDER BY unit_name_ar")->fetchAll();
 
+// Pre-selected customer from URL
+$pre_customer_id = intval($_GET['customer_id'] ?? 0);
+$pre_customer = null;
+if ($pre_customer_id) {
+    foreach ($customers as $c) {
+        if ($c['id'] == $pre_customer_id) { $pre_customer = $c; break; }
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $items = [];
@@ -537,7 +546,7 @@ function searchCustomers(){
     const matches=allCustomers.filter(c=>(c.customer_name&&c.customer_name.toLowerCase().includes(q))||(c.customer_code&&c.customer_code.toLowerCase().includes(q))||(c.phone&&c.phone.includes(q)));
     if(matches.length===0){res.style.display='none';return;}
     let h='';
-    matches.forEach(c=>{h+='<a href="#" class="list-group-item list-group-item-action" onclick="selectCustomer('+c.id+',\''+c.customer_name+'\','+(c.balance||0)+');return false;"><strong>'+c.customer_name+'</strong> <span class="text-muted">('+c.customer_code+')</span> <span class="badge bg-'+(c.balance>0?'danger':'success')+'">'+(c.balance||0)+'</span></a>';});
+    matches.forEach(c=>{h+='<a href="#" class="list-group-item list-group-item-action" onclick="selectCustomer('+c.id+','\''+c.customer_name+'\','+(c.balance||0)+');return false;"><strong>'+c.customer_name+'</strong> <span class="text-muted">('+c.customer_code+')</span> <span class="badge bg-'+(c.balance>0?'danger':'success')+'">'+(c.balance||0)+'</span></a>';});
     res.innerHTML=h;res.style.display='block';
 }
 function selectCustomer(id,name,balance){
@@ -585,6 +594,7 @@ document.addEventListener('keydown',function(e){
 ColOrder.init(colDefs,'sale_invoice_cols','headerRow');
 setPaymentType('cash');addRow();
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
+<?php if($pre_customer): ?>selectCustomer(<?= $pre_customer['id'] ?>,'<?= addslashes($pre_customer['customer_name']) ?>',<?= floatval($pre_customer['balance'] ?? 0) ?>);<?php endif; ?>
 </script>
 </body>
 </html>
