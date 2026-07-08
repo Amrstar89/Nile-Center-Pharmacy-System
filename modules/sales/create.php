@@ -7,7 +7,7 @@ $db = getDB();
 $page_title = 'فاتورة بيع جديدة';
 
 $stores = $db->query("SELECT s.id, s.store_name FROM stores s WHERE s.is_active = 1 ORDER BY s.store_name")->fetchAll();
-$customers = $db->query("SELECT id, customer_name, customer_code, phone, balance FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 200")->fetchAll();
+$customers = $db->query("SELECT id, customer_name, customer_code, phone FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 200")->fetchAll();
 $users = $db->query("SELECT id, full_name FROM users WHERE is_active = 1 ORDER BY full_name")->fetchAll();
 $units = $db->query("SELECT id, unit_name_ar FROM product_units WHERE is_active = 1 ORDER BY unit_name_ar")->fetchAll();
 
@@ -358,7 +358,7 @@ function setPaymentType(type){
     recalc();
 }
 
-let R=0;const allUnits=<?= json_encode($units) ?>;
+let R=0;const allCustomers=<?= json_encode($customers) ?>;
 function getUnitOptions(selUnitId){
     let h='<option value="">--</option>';
     allUnits.forEach(u=>{h+='<option value="'+u.id+'"'+(u.id==selUnitId?' selected':'')+'>'+u.unit_name_ar+'</option>';});
@@ -538,7 +538,6 @@ function newInvoice(){if(confirm('فاتورة جديدة؟ سيتم مسح ال
 function suspendInv(){alert('سيتم حفظ الفاتورة كمعلقة');}
 function openPendingInvoices(){alert('فواتير معلقة - قريباً');}
 
-const allCustomers=<?= json_encode($customers) ?>;
 function searchCustomers(){
     const q=document.getElementById('customerSearch').value.trim().toLowerCase();
     const res=document.getElementById('customerResults');
@@ -546,13 +545,12 @@ function searchCustomers(){
     const matches=allCustomers.filter(c=>(c.customer_name&&c.customer_name.toLowerCase().includes(q))||(c.customer_code&&c.customer_code.toLowerCase().includes(q))||(c.phone&&c.phone.includes(q)));
     if(matches.length===0){res.style.display='none';return;}
     let h='';
-    matches.forEach(c=>{h+='<a href="#" class="list-group-item list-group-item-action" onclick="selectCustomer('+c.id+','\''+c.customer_name+'\','+(c.balance||0)+');return false;"><strong>'+c.customer_name+'</strong> <span class="text-muted">('+c.customer_code+')</span> <span class="badge bg-'+(c.balance>0?'danger':'success')+'">'+(c.balance||0)+'</span></a>';});
+    matches.forEach(c=>{h+='<a href="#" class="list-group-item list-group-item-action" onclick="selectCustomer('+c.id+',\''+c.customer_name+'\');return false;"><strong>'+c.customer_name+'</strong> <span class="text-muted">('+c.customer_code+')</span></a>';});
     res.innerHTML=h;res.style.display='block';
 }
-function selectCustomer(id,name,balance){
+function selectCustomer(id,name){
     document.getElementById('customer_id').value=id;
     document.getElementById('custName').textContent=name;
-    document.getElementById('custBalance').textContent='رصيد: '+balance.toFixed(2)+' ج';
     document.getElementById('customerDisplay').classList.add('show');
     document.getElementById('customerResults').style.display='none';
     document.getElementById('customerSearch').value='';
@@ -594,7 +592,7 @@ document.addEventListener('keydown',function(e){
 ColOrder.init(colDefs,'sale_invoice_cols','headerRow');
 setPaymentType('cash');addRow();
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
-<?php if($pre_customer): ?>selectCustomer(<?= $pre_customer['id'] ?>,'<?= addslashes($pre_customer['customer_name']) ?>',<?= floatval($pre_customer['balance'] ?? 0) ?>);<?php endif; ?>
+<?php if($pre_customer): ?>selectCustomer(<?= $pre_customer['id'] ?>,'<?= addslashes($pre_customer['customer_name']) ?>');<?php endif; ?>
 </script>
 </body>
 </html>
