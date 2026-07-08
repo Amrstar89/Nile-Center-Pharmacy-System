@@ -3,17 +3,6 @@
  * ============================================
  * API البحث المتقدم عن الأصناف
  * ============================================
- * Parameters:
- *   - store_id (required): معرف المخزن
- *   - type: نوع البحث (name|barcode|code|scientific|company)
- *   - q: نص البحث
- *   - category: فلتر التصنيف
- *   - company: فلتر الشركة
- *   - price_from: الحد الأدنى للسعر
- *   - price_to: الحد الأقصى للسعر
- *   - show_no_stock: إظهار الأصناف بدون رصيد (1/0)
- *   - page: رقم الصفحة
- *   - limit: عدد النتائج (default: 50, max: 100)
  */
 require_once __DIR__ . '/../core/config.php';
 
@@ -42,7 +31,6 @@ try {
     $where = ["p.is_active = 1"];
     $params = [];
     
-    // Search type filter
     if ($query) {
         switch ($type) {
             case 'barcode':
@@ -76,32 +64,14 @@ try {
         }
     }
     
-    // Category filter
-    if ($category > 0) {
-        $where[] = "p.category_id = ?";
-        $params[] = $category;
-    }
+    if ($category > 0) { $where[] = "p.category_id = ?"; $params[] = $category; }
+    if ($company > 0) { $where[] = "p.company_id = ?"; $params[] = $company; }
+    if ($price_from > 0) { $where[] = "p.sell_price >= ?"; $params[] = $price_from; }
+    if ($price_to > 0) { $where[] = "p.sell_price <= ?"; $params[] = $price_to; }
     
-    // Company filter
-    if ($company > 0) {
-        $where[] = "p.company_id = ?";
-        $params[] = $company;
-    }
-    
-    // Price filter
-    if ($price_from > 0) {
-        $where[] = "p.sell_price >= ?";
-        $params[] = $price_from;
-    }
-    if ($price_to > 0) {
-        $where[] = "p.sell_price <= ?";
-        $params[] = $price_to;
-    }
-    
-    // Build WHERE string
     $where_str = implode(' AND ', $where);
     
-    // Get total count
+    // For counting, we need the same join but without HAVING
     $count_sql = "SELECT COUNT(DISTINCT p.id) as total FROM products p 
         LEFT JOIN product_companies pco ON p.company_id = pco.id 
         LEFT JOIN product_categories pca ON p.category_id = pca.id
@@ -110,8 +80,10 @@ try {
     $count_stmt->execute($params);
     $total = intval($count_stmt->fetch()['total'] ?? 0);
     
-    // Get products with stock info
     $offset = ($page - 1) * $limit;
+    
+    // Build the query - use the full expression in HAVING, not the alias
+    $having_clause = $show_no_stock ? "" : "HAVING COALESCE(SUM(ii.quantity), 0) > 0";
     
     $sql = "SELECT 
         p.id,
@@ -138,10 +110,8 @@ try {
     LEFT JOIN inventory_items ii ON ii.product_id = p.id AND ii.store_id = ? AND ii.is_active = 1
     WHERE $where_str
     GROUP BY p.id
-    " . ($show_no_stock ? "" : "HAVING stock_qty > 0") . "
-    ORDER BY 
-        CASE WHEN stock_qty > 0 THEN 0 ELSE 1 END,
-        p.product_name
+    $having_clause
+    ORDER BY p.product_name ASC
     LIMIT ? OFFSET ?";
     
     $stmt = $db->prepare($sql);
@@ -149,22 +119,17 @@ try {
     $stmt->execute($all_params);
     $products = $stmt->fetchAll();
     
-    // Get batches for each product
     foreach ($products as &$p) {
         $p['stock_qty'] = floatval($p['stock_qty']);
         $p['cost_price'] = floatval($p['cost_price']);
         $p['sell_price'] = floatval($p['sell_price']);
         $p['unit_cost'] = floatval($p['unit_cost'] ?? $p['cost_price']);
         
-        // Get batches for this product in this store
         if ($p['has_expire']) {
-            $batch_sql = "SELECT 
-                id, batch_number, exp_date, 
-                remaining_qty, unit_cost, sell_price
-            FROM inventory_batches
-            WHERE product_id = ? AND store_id = ? AND remaining_qty > 0
-            ORDER BY exp_date ASC
-            LIMIT 10";
+            $batch_sql = "SELECT id, batch_number, exp_date, remaining_qty, unit_cost, sell_price
+                FROM inventory_batches
+                WHERE product_id = ? AND store_id = ? AND remaining_qty > 0
+                ORDER BY exp_date ASC LIMIT 10";
             $batch_stmt = $db->prepare($batch_sql);
             $batch_stmt->execute([$p['id'], $store_id]);
             $p['batches'] = $batch_stmt->fetchAll();
