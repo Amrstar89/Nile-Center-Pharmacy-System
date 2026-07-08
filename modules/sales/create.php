@@ -6,6 +6,13 @@ requireAuth();
 $db = getDB();
 $page_title = 'فاتورة بيع جديدة';
 
+// Auto-add invoice_time column if missing (for backward compatibility)
+try {
+    $db->exec("ALTER TABLE sale_invoices ADD COLUMN invoice_time TIME NULL AFTER invoice_date");
+} catch (PDOException $e) {
+    // Column already exists or other error - ignore
+}
+
 $stores = $db->query("SELECT s.id, s.store_name FROM stores s WHERE s.is_active = 1 ORDER BY s.store_name")->fetchAll();
 $customers = $db->query("SELECT id, customer_name, customer_code, phone FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 200")->fetchAll();
 $users = $db->query("SELECT id, full_name FROM users WHERE is_active = 1 ORDER BY full_name")->fetchAll();
@@ -197,8 +204,12 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .customer-display.show{display:flex;align-items:center;gap:10px}
 .customer-display .cust-name{font-weight:700;color:#1565c0}
 .customer-display .cust-balance{font-size:12px;color:#666}
+.save-section{background:#fff;border-top:3px solid var(--green);padding:15px 20px;text-align:center}
+.save-section .btn-save{background:linear-gradient(135deg,var(--green),#2e7d32);color:#fff;border:none;padding:14px 50px;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;transition:all .2s;box-shadow:0 4px 15px rgba(25,135,84,0.3)}
+.save-section .btn-save:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(25,135,84,0.4)}
+.save-section .btn-save i{font-size:22px;margin-left:8px}
 .d-none{display:none !important}
-@media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon{display:none!important}}
+@media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon,.save-section{display:none!important}}
 @media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}body{min-width:auto}}
 </style>
 </head>
@@ -331,6 +342,14 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <div class="ms-auto grand">الصافي: <span id="t_grand">0.00</span> ج</div>
 </div>
 </div>
+
+<!-- زر حفظ واضح كبير -->
+<div class="save-section">
+    <button type="button" class="btn-save" onclick="saveInv()">
+        <i class="bi bi-save-fill"></i> حفظ الفاتورة
+    </button>
+</div>
+
 </form>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
