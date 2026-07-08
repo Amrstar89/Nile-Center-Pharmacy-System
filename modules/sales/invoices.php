@@ -11,6 +11,7 @@ $payment_filter = $_GET['payment_method'] ?? '';
 $date_from = $_GET['date_from'] ?? '';
 $date_to = $_GET['date_to'] ?? '';
 $search = $_GET['search'] ?? '';
+$customer_id_filter = intval($_GET['customer_id'] ?? 0);
 
 $where = ['1=1']; $params = [];
 if ($status_filter) { $where[] = 'si.status = ?'; $params[] = $status_filter; }
@@ -18,6 +19,7 @@ if ($payment_filter) { $where[] = 'si.payment_method = ?'; $params[] = $payment_
 if ($date_from) { $where[] = 'si.invoice_date >= ?'; $params[] = $date_from; }
 if ($date_to) { $where[] = 'si.invoice_date <= ?'; $params[] = $date_to; }
 if ($search) { $where[] = '(si.invoice_number LIKE ? OR c.customer_name LIKE ?)'; $params[] = "%$search%"; $params[] = "%$search%"; }
+if ($customer_id_filter) { $where[] = 'si.customer_id = ?'; $params[] = $customer_id_filter; }
 $whereSql = implode(' AND ', $where);
 
 $totalInv = $db->query("SELECT COUNT(*) FROM sale_invoices WHERE $whereSql", $params)->fetchColumn();
@@ -84,7 +86,16 @@ body{background:#f8f9fa;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
         <div class="col-md-3"><div class="stat-card"><i class="bi bi-wallet text-danger"></i><div class="val text-danger"><?= number_format($totalAmount-$totalPaid,2) ?></div><div class="lbl">المتبقي</div></div></div>
     </div>
     <div class="filter-bar">
+        <?php if($customer_id_filter): 
+            $cInfo = $db->prepare("SELECT customer_name FROM customers WHERE id = ?"); $cInfo->execute([$customer_id_filter]); $cName = $cInfo->fetchColumn();
+        ?>
+        <div class="alert alert-info py-2 mb-2 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-person"></i> فواتير العميل: <strong><?= htmlspecialchars($cName) ?></strong></span>
+            <a href="invoices.php" class="btn btn-sm btn-outline-dark">عرض الكل</a>
+        </div>
+        <?php endif; ?>
         <form method="GET" class="row g-2 align-items-end">
+            <?php if($customer_id_filter): ?><input type="hidden" name="customer_id" value="<?= $customer_id_filter ?>"><?php endif; ?>
             <div class="col-md-2"><input type="text" name="search" class="form-control form-control-sm" placeholder="رقم أو عميل..." value="<?= htmlspecialchars($search) ?>"></div>
             <div class="col-md-2">
                 <select name="status" class="form-select form-select-sm"><option value="">الحالة</option>
