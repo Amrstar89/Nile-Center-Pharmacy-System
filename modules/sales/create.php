@@ -332,8 +332,8 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 </form>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../js/product-search.js"></script>
-<script src="../js/col-order.js"></script>
+<script src="../../js/col-order.js"></script>
+<script src="../../js/product-search.js"></script>
 <script>
 const colDefs=[
     {key:'rownum',label:'#',width:'30px',fixed:true},{key:'print',label:'ط',width:'24px'},
