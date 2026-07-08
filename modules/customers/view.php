@@ -87,6 +87,45 @@ $stats = $db->prepare("
 $stats->execute([$customer_id]);
 $stats = $stats->fetch();
 
+// Get sale invoices from new sales module
+$sale_invoices = $db->prepare("
+    SELECT si.*, s.store_name, u.full_name as seller_name
+    FROM sale_invoices si
+    LEFT JOIN stores s ON si.store_id = s.id
+    LEFT JOIN users u ON si.user_id = u.id
+    WHERE si.customer_id = ?
+    ORDER BY si.created_at DESC
+    LIMIT 10
+");
+$sale_invoices->execute([$customer_id]);
+$sale_invoices = $sale_invoices->fetchAll();
+
+// Get customer transactions
+$transactions = $db->prepare("
+    SELECT ct.*, u.full_name as created_by_name
+    FROM customer_transactions ct
+    LEFT JOIN users u ON ct.created_by = u.id
+    WHERE ct.customer_id = ?
+    ORDER BY ct.created_at DESC
+    LIMIT 20
+");
+$transactions->execute([$customer_id]);
+$transactions = $transactions->fetchAll();
+
+// Calculate total sales and remaining from new module
+$sale_stats = $db->prepare("
+    SELECT 
+        COUNT(*) as total_sale_invoices,
+        COALESCE(SUM(grand_total), 0) as total_sales_amount,
+        COALESCE(SUM(paid_amount), 0) as total_paid,
+        COALESCE(SUM(remaining_amount), 0) as total_remaining,
+        COALESCE(SUM(profit_amount), 0) as total_profit
+    FROM sale_invoices
+    WHERE customer_id = ? AND status != 'cancelled'
+");
+$sale_stats->execute([$customer_id]);
+$sale_stats = $sale_stats->fetch();
+
 require_once __DIR__ . '/../../includes/sidebar.php';
 ?>
 <!DOCTYPE html>
@@ -215,8 +254,164 @@ require_once __DIR__ . '/../../includes/sidebar.php';
             <div class="row mb-4">
                 <div class="col-12">
                     <a href="statement.php?id=<?= $customer_id ?>" class="btn btn-info btn-lg w-100">
-                        <i class="bi bi-file-text"></i> كشف حساب العميل
+                        <i class="bi bi-file-text"></i> كشف حساب العميل (الطلبات)
                     </a>
+                </div>
+            </div>
+
+            <!-- Sale Invoices Stats -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-cash-register"></i> إحصائيات فواتير البيع</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-3">
+                                    <div class="stat-number text-primary"><?= number_format($sale_stats['total_sale_invoices'] ?? 0) ?></div>
+                                    <div class="stat-label">عدد الفواتير</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="stat-number text-success"><?= number_format($sale_stats['total_sales_amount'] ?? 0, 2) ?> ج</div>
+                                    <div class="stat-label">إجمالي المبيعات</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="stat-number text-warning"><?= number_format($sale_stats['total_remaining'] ?? 0, 2) ?> ج</div>
+                                    <div class="stat-label">المبلغ المتبقي</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="stat-number text-info"><?= number_format($sale_stats['total_profit'] ?? 0, 2) ?> ج</div>
+                                    <div class="stat-label">إجمالي الربح</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Sale Invoices -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-receipt text-primary"></i> فواتير البيع الأخيرة</h5>
+                            <a href="../sales/invoices.php?customer_id=<?= $customer_id ?>" class="btn btn-sm btn-outline-primary">الكل</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (!empty($sale_invoices)): ?>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>رقم الفاتورة</th>
+                                                <th>التاريخ</th>
+                                                <th>المخزن</th>
+                                                <th>طريقة الدفع</th>
+                                                <th>الإجمالي</th>
+                                                <th>المدفوع</th>
+                                                <th>المتبقي</th>
+                                                <th>الحالة</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($sale_invoices as $inv): ?>
+                                                <tr>
+                                                    <td><strong><?= htmlspecialchars($inv['invoice_number']) ?></strong></td>
+                                                    <td><?= date('Y-m-d', strtotime($inv['invoice_date'])) ?></td>
+                                                    <td><?= htmlspecialchars($inv['store_name'] ?? '-') ?></td>
+                                                    <td>
+                                                        <?php
+                                                        $pm_labels = ['cash' => 'كاش', 'visa' => 'فيزا', 'credit' => 'آجل', 'pending' => 'معلقة', 'delivery' => 'توصيل'];
+                                                        $pm_badge = ['cash' => 'success', 'visa' => 'info', 'credit' => 'warning', 'pending' => 'secondary', 'delivery' => 'primary'];
+                                                        $pm = $inv['payment_method'];
+                                                        ?>
+                                                        <span class="badge bg-<?= $pm_badge[$pm] ?? 'secondary' ?>"><?= $pm_labels[$pm] ?? $pm ?></span>
+                                                    </td>
+                                                    <td class="fw-bold"><?= number_format($inv['grand_total'] ?? 0, 2) ?> ج</td>
+                                                    <td class="text-success"><?= number_format($inv['paid_amount'] ?? 0, 2) ?> ج</td>
+                                                    <td class="text-danger"><?= number_format($inv['remaining_amount'] ?? 0, 2) ?> ج</td>
+                                                    <td>
+                                                        <?php
+                                                        $st_labels = ['open' => 'مفتوحة', 'paid' => 'مدفوعة', 'partial' => 'جزئي', 'cancelled' => 'ملغاة'];
+                                                        $st_badge = ['open' => 'warning', 'paid' => 'success', 'partial' => 'info', 'cancelled' => 'danger'];
+                                                        $st = $inv['status'];
+                                                        ?>
+                                                        <span class="badge bg-<?= $st_badge[$st] ?? 'secondary' ?>"><?= $st_labels[$st] ?? $st ?></span>
+                                                    </td>
+                                                    <td>
+                                                        <a href="../sales/view.php?id=<?= $inv['id'] ?>" class="btn btn-sm btn-outline-primary">
+                                                            <i class="bi bi-eye"></i> عرض
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php else: ?>
+                                <div class="text-center text-muted py-4">
+                                    <i class="bi bi-receipt" style="font-size: 32px;"></i>
+                                    <p class="mt-2">لا توجد فواتير بيع مسجلة</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer Transactions -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0"><i class="bi bi-arrow-left-right text-info"></i> حركات حساب العميل</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (!empty($transactions)): ?>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>التاريخ</th>
+                                                <th>النوع</th>
+                                                <th>المرجع</th>
+                                                <th class="text-danger">مدين (عليه)</th>
+                                                <th class="text-success">دائن (له)</th>
+                                                <th>الرصيد بعد</th>
+                                                <th>ملاحظات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($transactions as $tx): ?>
+                                                <tr>
+                                                    <td><small><?= date('Y-m-d H:i', strtotime($tx['created_at'])) ?></small></td>
+                                                    <td>
+                                                        <?php
+                                                        $tt_labels = ['sale' => 'بيع', 'sale_return' => 'مرتجع بيع', 'payment' => 'دفعة', 'opening_balance' => 'رصيد افتتاحي'];
+                                                        $tt_badge = ['sale' => 'danger', 'sale_return' => 'warning', 'payment' => 'success', 'opening_balance' => 'info'];
+                                                        ?>
+                                                        <span class="badge bg-<?= $tt_badge[$tx['transaction_type']] ?? 'secondary' ?>"><?= $tt_labels[$tx['transaction_type']] ?? $tx['transaction_type'] ?></span>
+                                                    </td>
+                                                    <td><small><?= htmlspecialchars($tx['reference_number'] ?? '-') ?></small></td>
+                                                    <td class="text-danger fw-bold"><?= $tx['debit'] > 0 ? number_format($tx['debit'], 2) . ' ج' : '-' ?></td>
+                                                    <td class="text-success fw-bold"><?= $tx['credit'] > 0 ? number_format($tx['credit'], 2) . ' ج' : '-' ?></td>
+                                                    <td class="fw-bold"><?= number_format($tx['balance_after'] ?? 0, 2) ?> ج</td>
+                                                    <td><small class="text-muted"><?= htmlspecialchars($tx['notes'] ?? '') ?></small></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php else: ?>
+                                <div class="text-center text-muted py-4">
+                                    <i class="bi bi-arrow-left-right" style="font-size: 32px;"></i>
+                                    <p class="mt-2">لا توجد حركات مسجلة</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -562,9 +757,15 @@ require_once __DIR__ . '/../../includes/sidebar.php';
                         </div>
                     </div>
 
-                    <!-- Actions -->
-                    <div class="card">
+                    <!-- Quick Actions -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-lightning text-warning"></i> إجراءات سريعة</h6>
+                        </div>
                         <div class="card-body">
+                            <a href="../sales/create.php?customer_id=<?= $customer_id ?>" class="btn btn-primary w-100 mb-2">
+                                <i class="bi bi-plus-circle"></i> فاتورة بيع جديدة
+                            </a>
                             <a href="edit.php?id=<?= $customer_id ?>" class="btn btn-warning w-100 mb-2">
                                 <i class="bi bi-pencil"></i> تعديل بيانات العميل
                             </a>

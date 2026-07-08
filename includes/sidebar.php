@@ -242,6 +242,16 @@ $is_purchase_reports = strpos($current_uri, '/purchases/reports/') !== false;
                     <i class="bi bi-cart-check"></i><span class="link-text">نقطة البيع (POS)</span><span class="tip">POS</span>
                 </a>
             </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/sales/invoices.php" class="nav-link <?= $is_sales && $current_page === 'invoices.php' ? 'active' : '' ?>">
+                    <i class="bi bi-file-earmark-text"></i><span class="link-text">فواتير البيع</span><span class="tip">فواتير البيع</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="<?= $base_url ?>/modules/sales/returns/" class="nav-link <?= $is_sales && strpos($current_uri, '/sales/returns/') !== false ? 'active' : '' ?>">
+                    <i class="bi bi-arrow-return-left"></i><span class="link-text">مرتجعات المبيعات</span><span class="tip">مرتجعات البيع</span>
+                </a>
+            </div>
         </div>
 
         <!-- المشتريات -->
