@@ -18,9 +18,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $decoded = json_decode($_POST['items_data'], true);
             if (is_array($decoded)) $items = $decoded;
         }
-        if (empty($items)) {
-            $items = $_POST['items'] ?? [];
-        }
         if (empty($items)) { throw new Exception('يجب إضافة صنف واحد على الأقل'); }
         $db->beginTransaction();
         $supplier_id = intval($_POST['supplier_id']);
@@ -176,14 +173,13 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <a href="../invoices/" class="menu-item"><i class="bi bi-receipt"></i> فواتير الشراء</a>
     <a href="../orders/" class="menu-item"><i class="bi bi-file-earmark-text"></i> أوامر الشراء</a>
     <a href="../../dashboard/" class="menu-item"><i class="bi bi-speedometer2"></i> الرئيسية</a>
-    <div class="ms-auto" style="font-size:12px;opacity:.7"><?= $_SESSION['user_name'] ?? '' ?> | <?= arabicDate(date('Y-m-d')) ?></div>
+    <div class="ms-auto" style="font-size:12px;opacity:.7"><?= $_SESSION['user_name'] ?? '' ?> | <?= date('Y-m-d') ?></div>
 </div>
 <div class="sub-menu-bar">
     <div class="btn-icon" onclick="addRow()" title="إضافة صنف (F3)"><i class="bi bi-plus-lg"></i></div>
     <div class="btn-icon" onclick="openF2Search()" title="بحث F2"><i class="bi bi-search"></i></div>
     <div class="btn-icon" onclick="clearAll()" title="مسح الكل"><i class="bi bi-trash"></i></div>
     <div class="divider"></div>
-    <div class="btn-icon" onclick="ColOrder.openModal()" title="ترتيب الأعمدة"><i class="bi bi-layout-three-columns"></i></div>
     <div class="btn-icon" onclick="window.print()" title="طباعة"><i class="bi bi-printer"></i></div>
     <div class="btn-icon" onclick="saveInv()" title="حفظ Ctrl+S"><i class="bi bi-save"></i></div>
     <div class="divider"></div>
@@ -257,7 +253,6 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 <div class="toolbar-right">
     <button type="button" class="tool-btn" onclick="addRow()"><i class="bi bi-plus-lg"></i><span class="tooltip">إضافة صنف</span></button>
     <button type="button" class="tool-btn" onclick="openF2Search()"><i class="bi bi-search"></i><span class="tooltip">بحث F2</span></button>
-    <button type="button" class="tool-btn" onclick="ColOrder.openModal()"><i class="bi bi-layout-three-columns"></i><span class="tooltip">الأعمدة</span></button>
     <button type="button" class="tool-btn" onclick="window.print()"><i class="bi bi-printer"></i><span class="tooltip">طباعة</span></button>
     <div style="height:1px;background:rgba(255,255,255,0.3);margin:4px 0"></div>
     <button type="button" class="tool-btn" onclick="clearAll()" style="color:var(--red)"><i class="bi bi-trash"></i><span class="tooltip">مسح</span></button>
@@ -292,12 +287,61 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 </form>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="../../../js/col-order.js"></script>
-<script src="../../../js/product-search.js"></script>
 <script>
-// ============ COLUMN ORDER (drag-drop reordering) ============
+// ==================== INLINE ColOrder (no external file needed) ====================
+var ColOrder = (function(){
+    var defs=[], order=[], storageKey='', headerId='';
+    function init(d, sk, hid){
+        defs=d; storageKey=sk; headerId=hid;
+        var saved=localStorage.getItem(storageKey);
+        if(saved){ try{ order=JSON.parse(saved); }catch(e){ order=defs.map(function(c){return {key:c.key}}); } }
+        else{ order=defs.map(function(c){return {key:c.key}}); }
+        renderHeader();
+    }
+    function renderHeader(){
+        var hr=document.getElementById(headerId); if(!hr) return;
+        hr.innerHTML=order.map(function(c){
+            var d=defs.find(function(x){return x.key===c.key})||{label:'',width:''};
+            var style=d.width?' style="min-width:'+d.width+'"':'';
+            return '<th'+style+'>'+(d.label||'')+'</th>';
+        }).join('');
+    }
+    function isVisible(key){ return true; }
+    return { init:init, isVisible:isVisible, renderHeader:renderHeader };
+})();
+
+// ==================== INLINE ProductSearch (no external file needed) ====================
+var ProductSearch = (function(){
+    var popupWin=null, onSelectCb=null;
+    window.onProductSelected = function(product){
+        if(onSelectCb) onSelectCb(product);
+        if(popupWin && !popupWin.closed) popupWin.close();
+        popupWin=null;
+    };
+    function getBaseUrl(){
+        var path=window.location.pathname;
+        var idx=path.indexOf('/modules/');
+        return idx>0 ? path.substring(0,idx) : '';
+    }
+    return {
+        open: function(options){
+            if(!options.storeId){ alert('معرف المخزن مطلوب'); return; }
+            if(!options.onSelect){ alert('callback مطلوب'); return; }
+            onSelectCb=options.onSelect;
+            var base=getBaseUrl();
+            var mode=options.mode||'purchase';
+            if(popupWin && !popupWin.closed) popupWin.close();
+            var w=950, h=750, left=(screen.width-w)/2, top=(screen.height-h)/2;
+            var url=base+'/includes/product-search-popup-new.php?store_id='+options.storeId+'&mode='+mode+'&callback=onProductSelected';
+            popupWin=window.open(url,'productSearchPopup','width='+w+',height='+h+',top='+top+',left='+left+',resizable=yes,scrollbars=yes');
+            if(popupWin) popupWin.focus();
+        }
+    };
+})();
+
+// ==================== COLUMN DEFS ====================
 var colDefs=[
-    {key:'rownum',label:'#',width:'30px',fixed:true},{key:'print',label:'ط',width:'24px'},
+    {key:'rownum',label:'#',width:'30px'},{key:'print',label:'ط',width:'24px'},
     {key:'barcode',label:'الباركود',width:'100px'},{key:'code',label:'كود الصنف',width:'80px'},
     {key:'name',label:'اسم الصنف',width:'170px'},{key:'unit',label:'الوحدة',width:'60px'},
     {key:'qty',label:'الكمية',width:'60px'},{key:'sell',label:'سعر البيع',width:'60px'},
@@ -307,22 +351,14 @@ var colDefs=[
     {key:'vat_val',label:'ق الضريبة',width:'60px'},{key:'total',label:'إجمالي تكلفة',width:'75px'},
     {key:'profit_v',label:'ربح ص',width:'55px'},{key:'profit_p',label:'ربح %',width:'55px'},
     {key:'company',label:'الشركة',width:'90px'},{key:'location',label:'الموقع',width:'70px'},
-    {key:'batch',label:'الباتش',width:'55px'},{key:'delete',label:'',width:'24px',fixed:true}
+    {key:'batch',label:'الباتش',width:'55px'},{key:'delete',label:'',width:'24px'}
 ];
 
-// ============ PRODUCT SEARCH (popup with mode='purchase') ============
-function openF2Search(){
-    var sid=document.getElementById('store_id').value;
-    if(!sid){alert('اختر المخزن أولاً');document.getElementById('store_id').focus();return;}
-    ProductSearch.open({storeId:parseInt(sid),mode:'purchase',onSelect:function(p){addRow(p);}});
-}
-function f2ForRow(id){
-    var sid=document.getElementById('store_id').value;
-    if(!sid){alert('اختر المخزن أولاً');return;}
-    ProductSearch.open({storeId:parseInt(sid),mode:'purchase',onSelect:function(p){fillRow(id,p);}});
-}
+// ==================== DATA ====================
+var allUnits=<?= json_encode($units) ?>;
+var suppliers=<?= json_encode($suppliers) ?>;
 
-// ============ INVOICE LOGIC ============
+// ==================== FUNCTIONS ====================
 function onPayMethodChange(){
     var m=document.getElementById('payMethod').value;
     var dueWrap=document.getElementById('dueDateWrap');
@@ -332,14 +368,12 @@ function onPayMethodChange(){
     else if(m==='credit'||m==='under_collection'){dueWrap.classList.remove('d-none');paidWrap.classList.remove('d-none');defWrap.classList.add('d-none');}
     recalc();
 }
-var R=0;var allUnits=<?= json_encode($units) ?>;var suppliers=<?= json_encode($suppliers) ?>;
+var R=0;
 function getUnitOptions(selUnitId){
     var h='<option value="">--</option>';
     allUnits.forEach(function(u){h+='<option value="'+u.id+'"'+(u.id==selUnitId?' selected':'')+'>'+u.unit_name_ar+'</option>';});
     return h;
 }
-
-// Build row cells using ColOrder for consistent rendering
 function visCell(k,html){return ColOrder.isVisible(k)?html:'';}
 
 function buildRowCells(id,d){
@@ -513,6 +547,16 @@ function filterStores(){
     for(var i=0;i<sel.options.length;i++){var o=sel.options[i];if(!o.value)continue;o.style.display=!bid||o.dataset.branch===bid?'':'none';}
 }
 
+function openF2Search(){
+    var sid=document.getElementById('store_id').value;
+    if(!sid){alert('اختر المخزن أولاً');document.getElementById('store_id').focus();return;}
+    ProductSearch.open({storeId:parseInt(sid),mode:'purchase',onSelect:function(p){addRow(p);}});
+}
+function f2ForRow(id){
+    var sid=document.getElementById('store_id').value;
+    if(!sid){alert('اختر المخزن أولاً');return;}
+    ProductSearch.open({storeId:parseInt(sid),mode:'purchase',onSelect:function(p){fillRow(id,p);}});
+}
 function fillRow(id,p){
     var hip=document.getElementById('hip_'+id);
     if(hip)hip.value=p.product_id||p.id||'';
@@ -536,7 +580,7 @@ document.addEventListener('keydown',function(e){
     if(e.key==='F3'){e.preventDefault();addRow();}
 });
 
-// Initialize
+// ==================== INIT ====================
 ColOrder.init(colDefs,'purchase_invoice_cols','headerRow');
 onPayMethodChange();
 addRow();
