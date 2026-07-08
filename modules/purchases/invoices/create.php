@@ -165,19 +165,6 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .bottom-bar .item input,.bottom-bar .item select{height:26px;padding:2px 5px;font-size:12px;width:80px;border:1px solid #ccc;border-radius:4px}
 .supplier-section{background:#fff3cd;padding:10px 20px;border-top:1px solid #ffc107}
 .d-none{display:none !important}
-/* Product Search Modal */
-.ps-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:none;align-items:center;justify-content:center}
-.ps-modal.show{display:flex}
-.ps-dialog{background:#fff;border-radius:12px;width:800px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.3)}
-.ps-header{background:var(--primary);color:#fff;padding:12px 20px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center}
-.ps-body{padding:15px;overflow-y:auto;flex:1}
-.ps-footer{padding:10px 20px;border-top:1px solid #eee}
-.ps-row{cursor:pointer;transition:background .15s}
-.ps-row:hover{background:#e3f2fd}
-/* Column order modal */
-.col-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:none;align-items:center;justify-content:center}
-.col-modal.show{display:flex}
-.col-dialog{background:#fff;border-radius:12px;width:350px;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,0.3)}
 @media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon{display:none!important}}
 @media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}body{min-width:auto}}
 </style>
@@ -196,7 +183,7 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <div class="btn-icon" onclick="openF2Search()" title="بحث F2"><i class="bi bi-search"></i></div>
     <div class="btn-icon" onclick="clearAll()" title="مسح الكل"><i class="bi bi-trash"></i></div>
     <div class="divider"></div>
-    <div class="btn-icon" onclick="openColModal()" title="تخصيص الأعمدة"><i class="bi bi-layout-three-columns"></i></div>
+    <div class="btn-icon" onclick="ColOrder.openModal()" title="ترتيب الأعمدة"><i class="bi bi-layout-three-columns"></i></div>
     <div class="btn-icon" onclick="window.print()" title="طباعة"><i class="bi bi-printer"></i></div>
     <div class="btn-icon" onclick="saveInv()" title="حفظ Ctrl+S"><i class="bi bi-save"></i></div>
     <div class="divider"></div>
@@ -270,7 +257,7 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 <div class="toolbar-right">
     <button type="button" class="tool-btn" onclick="addRow()"><i class="bi bi-plus-lg"></i><span class="tooltip">إضافة صنف</span></button>
     <button type="button" class="tool-btn" onclick="openF2Search()"><i class="bi bi-search"></i><span class="tooltip">بحث F2</span></button>
-    <button type="button" class="tool-btn" onclick="openColModal()"><i class="bi bi-layout-three-columns"></i><span class="tooltip">الأعمدة</span></button>
+    <button type="button" class="tool-btn" onclick="ColOrder.openModal()"><i class="bi bi-layout-three-columns"></i><span class="tooltip">الأعمدة</span></button>
     <button type="button" class="tool-btn" onclick="window.print()"><i class="bi bi-printer"></i><span class="tooltip">طباعة</span></button>
     <div style="height:1px;background:rgba(255,255,255,0.3);margin:4px 0"></div>
     <button type="button" class="tool-btn" onclick="clearAll()" style="color:var(--red)"><i class="bi bi-trash"></i><span class="tooltip">مسح</span></button>
@@ -304,47 +291,11 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 </div>
 </form>
 
-<!-- Product Search Modal -->
-<div class="ps-modal" id="psModal">
-<div class="ps-dialog">
-    <div class="ps-header">
-        <h5 class="mb-0"><i class="bi bi-search"></i> بحث الأصناف</h5>
-        <button type="button" class="btn-close btn-close-white" onclick="closePsModal()"></button>
-    </div>
-    <div class="ps-body">
-        <div class="row g-2 mb-3">
-            <div class="col-5"><input type="text" id="psName" class="form-control form-control-sm" placeholder="اسم الصنف..." oninput="filterPs()"></div>
-            <div class="col-3"><input type="text" id="psCode" class="form-control form-control-sm" placeholder="كود..." oninput="filterPs()"></div>
-            <div class="col-3"><input type="text" id="psBarcode" class="form-control form-control-sm" placeholder="باركود..." oninput="filterPs()"></div>
-            <div class="col-1"><button class="btn btn-sm btn-outline-secondary w-100" onclick="clearPsFilter()">&#10005;</button></div>
-        </div>
-        <table class="table table-hover table-sm">
-            <thead class="table-dark"><tr><th>كود</th><th>باركود</th><th style="min-width:200px">اسم الصنف</th><th>الوحدة</th><th>التكلفة</th><th>سعر البيع</th><th>الرصيد</th><th></th></tr></thead>
-            <tbody id="psTbody"><tr><td colspan="8" class="text-center text-muted py-4">اختر المخزن أولاً</td></tr></tbody>
-        </table>
-    </div>
-    <div class="ps-footer"><small class="text-muted" id="psCount">0 صنف</small></div>
-</div>
-</div>
-
-<!-- Column Order Modal -->
-<div class="col-modal" id="colModal">
-<div class="col-dialog">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0"><i class="bi bi-layout-three-columns"></i> تخصيص الأعمدة</h5>
-        <button type="button" class="btn-close" onclick="closeColModal()"></button>
-    </div>
-    <div id="colList"></div>
-    <div class="mt-3 text-end">
-        <button type="button" class="btn btn-sm btn-secondary" onclick="resetCols()">الافتراضي</button>
-        <button type="button" class="btn btn-sm btn-primary" onclick="closeColModal()">إغلاق</button>
-    </div>
-</div>
-</div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../../../js/col-order.js"></script>
+<script src="../../../js/product-search.js"></script>
 <script>
-// ============ COLUMN ORDER (built-in) ============
+// ============ COLUMN ORDER (drag-drop reordering) ============
 var colDefs=[
     {key:'rownum',label:'#',width:'30px',fixed:true},{key:'print',label:'ط',width:'24px'},
     {key:'barcode',label:'الباركود',width:'100px'},{key:'code',label:'كود الصنف',width:'80px'},
@@ -358,82 +309,17 @@ var colDefs=[
     {key:'company',label:'الشركة',width:'90px'},{key:'location',label:'الموقع',width:'70px'},
     {key:'batch',label:'الباتش',width:'55px'},{key:'delete',label:'',width:'24px',fixed:true}
 ];
-var colVis={};
-var colKey='purchase_invoice_cols';
-function loadColVis(){
-    var s=localStorage.getItem(colKey);
-    if(s){try{colVis=JSON.parse(s);}catch(e){}}
-}
-function isColVisible(k){return colVis[k]!==false;}
-function renderHeaders(){
-    var row=document.getElementById('headerRow');if(!row)return;
-    var h='';
-    colDefs.forEach(function(d){if(d.fixed||colVis[d.key]!==false){var s=d.width?' style="width:'+d.width+'"':'';h+='<th'+s+'>'+d.label+'</th>';}});
-    row.innerHTML=h;
-}
-function openColModal(){
-    var list=document.getElementById('colList');
-    var h='';
-    colDefs.forEach(function(d,i){if(d.fixed)return;var chk=colVis[d.key]!==false?'checked':'';h+='<div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="cc_'+i+'" '+chk+' onchange="toggleCol(\''+d.key+'\',this.checked)"><label class="form-check-label" for="cc_'+i+'">'+d.label+'</label></div>';});
-    list.innerHTML=h;
-    document.getElementById('colModal').classList.add('show');
-}
-function closeColModal(){document.getElementById('colModal').classList.remove('show');}
-function toggleCol(key,vis){colVis[key]=vis;localStorage.setItem(colKey,JSON.stringify(colVis));renderHeaders();location.reload();}
-function resetCols(){localStorage.removeItem(colKey);colVis={};colDefs.forEach(function(d){colVis[d.key]=true;});renderHeaders();closeColModal();location.reload();}
 
-// ============ PRODUCT SEARCH (built-in) ============
-var psCallback=null;var psStoreId=0;var psProducts=[];
+// ============ PRODUCT SEARCH (popup with mode='purchase') ============
 function openF2Search(){
     var sid=document.getElementById('store_id').value;
     if(!sid){alert('اختر المخزن أولاً');document.getElementById('store_id').focus();return;}
-    psStoreId=parseInt(sid);
-    document.getElementById('psModal').classList.add('show');
-    loadPsProducts();
+    ProductSearch.open({storeId:parseInt(sid),mode:'purchase',onSelect:function(p){addRow(p);}});
 }
-function closePsModal(){document.getElementById('psModal').classList.remove('show');}
-function loadPsProducts(){
-    var paths=['../../inventory/ajax_get_products.php?store_id=','../inventory/ajax_get_products.php?store_id=','ajax_get_products.php?store_id='];
-    var idx=0;
-    function tryNext(){
-        if(idx>=paths.length){document.getElementById('psTbody').innerHTML='<tr><td colspan="8" class="text-center text-muted py-4">لا توجد أصناف</td></tr>';return;}
-        fetch(paths[idx]+psStoreId).then(function(r){if(!r.ok)throw new Error();return r.json();}).then(function(data){psProducts=data||[];renderPs();}).catch(function(){idx++;tryNext();});
-    }
-    tryNext();
-}
-function renderPs(filtered){
-    var list=filtered||psProducts;
-    var tb=document.getElementById('psTbody');
-    if(!list||list.length===0){tb.innerHTML='<tr><td colspan="8" class="text-center text-muted py-4">لا توجد أصناف</td></tr>';document.getElementById('psCount').textContent='0 صنف';return;}
-    var h='';
-    list.forEach(function(p){
-        var stock=parseFloat(p.current_stock||p.quantity||0);
-        var sc=stock<=0?'text-danger':(stock<10?'text-warning':'text-success');
-        h+='<tr class="ps-row" onclick="selectPs('+p.id+')"><td>'+(p.product_code||'-')+'</td><td>'+(p.barcode||'-')+'</td><td><strong>'+(p.product_name||p.name||'')+'</strong></td>';
-        h+='<td>'+(p.unit_name||p.unit||'علبة')+'</td><td>'+parseFloat(p.unit_cost||p.cost||0).toFixed(2)+'</td><td>'+parseFloat(p.sell_price||p.price||0).toFixed(2)+'</td>';
-        h+='<td class="'+sc+' fw-bold">'+stock.toFixed(2)+'</td><td><button type="button" class="btn btn-sm btn-primary" onclick="event.stopPropagation();selectPs('+p.id+')"><i class="bi bi-plus-lg"></i></button></td></tr>';
-    });
-    tb.innerHTML=h;
-    document.getElementById('psCount').textContent=list.length+' صنف';
-}
-function filterPs(){
-    var n=document.getElementById('psName').value.trim().toLowerCase();
-    var c=document.getElementById('psCode').value.trim().toLowerCase();
-    var b=document.getElementById('psBarcode').value.trim().toLowerCase();
-    var f=psProducts.filter(function(p){
-        var pn=(p.product_name||p.name||'').toLowerCase();
-        var pc=(p.product_code||'').toLowerCase();
-        var pb=(p.barcode||'').toLowerCase();
-        return (!n||pn.includes(n))&&(!c||pc.includes(c))&&(!b||pb.includes(b));
-    });
-    renderPs(f);
-}
-function clearPsFilter(){document.getElementById('psName').value='';document.getElementById('psCode').value='';document.getElementById('psBarcode').value='';renderPs();}
-function selectPs(pid){
-    var p=psProducts.find(function(x){return x.id==pid;});
-    if(!p)return;
-    closePsModal();
-    if(psCallback)psCallback({product_id:p.product_id||p.id,product_name:p.product_name||p.name||'',product_code:p.product_code||'',barcode:p.barcode||'',unit_cost:parseFloat(p.unit_cost||p.cost||0),sell_price:parseFloat(p.sell_price||p.price||0),company_name:p.company_name||'',location:p.location||'',unit_id:p.unit_id||'',units:p.units||[]});
+function f2ForRow(id){
+    var sid=document.getElementById('store_id').value;
+    if(!sid){alert('اختر المخزن أولاً');return;}
+    ProductSearch.open({storeId:parseInt(sid),mode:'purchase',onSelect:function(p){fillRow(id,p);}});
 }
 
 // ============ INVOICE LOGIC ============
@@ -452,7 +338,10 @@ function getUnitOptions(selUnitId){
     allUnits.forEach(function(u){h+='<option value="'+u.id+'"'+(u.id==selUnitId?' selected':'')+'>'+u.unit_name_ar+'</option>';});
     return h;
 }
-function visCell(k,html){return isColVisible(k)?html:'';}
+
+// Build row cells using ColOrder for consistent rendering
+function visCell(k,html){return ColOrder.isVisible(k)?html:'';}
+
 function buildRowCells(id,d){
     var h='';
     h+=visCell('rownum','<td>'+id+'<input type="hidden" id="hip_'+id+'" value="'+(d.product_id||'')+'"></td>');
@@ -623,22 +512,7 @@ function filterStores(){
     var sel=document.getElementById('store_id');
     for(var i=0;i<sel.options.length;i++){var o=sel.options[i];if(!o.value)continue;o.style.display=!bid||o.dataset.branch===bid?'':'none';}
 }
-function f2ForRow(id){
-    var sid=document.getElementById('store_id').value;
-    if(!sid){alert('اختر المخزن أولاً');return;}
-    psCallback=function(p){fillRow(id,p);};
-    psStoreId=parseInt(sid);
-    document.getElementById('psModal').classList.add('show');
-    loadPsProducts();
-}
-function openF2Search(){
-    var sid=document.getElementById('store_id').value;
-    if(!sid){alert('اختر المخزن أولاً');document.getElementById('store_id').focus();return;}
-    psCallback=function(p){addRow(p);};
-    psStoreId=parseInt(sid);
-    document.getElementById('psModal').classList.add('show');
-    loadPsProducts();
-}
+
 function fillRow(id,p){
     var hip=document.getElementById('hip_'+id);
     if(hip)hip.value=p.product_id||p.id||'';
@@ -661,9 +535,9 @@ document.addEventListener('keydown',function(e){
     if(e.ctrlKey&&e.key==='s'){e.preventDefault();saveInv();}
     if(e.key==='F3'){e.preventDefault();addRow();}
 });
+
 // Initialize
-loadColVis();
-renderHeaders();
+ColOrder.init(colDefs,'purchase_invoice_cols','headerRow');
 onPayMethodChange();
 addRow();
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
