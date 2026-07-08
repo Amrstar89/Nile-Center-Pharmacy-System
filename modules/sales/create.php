@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user_id = intval($_POST['user_id'] ?? ($_SESSION['user_id'] ?? 0));
         $payment_method = $_POST['payment_method'] ?? 'cash';
         $invoice_date = $_POST['invoice_date'] ?: date('Y-m-d');
+        $invoice_time = $_POST['invoice_time'] ?: date('H:i');
         $discount_pct = floatval($_POST['discount_pct'] ?? 0);
         $discount_val = floatval($_POST['discount_val'] ?? 0);
         $extra_discount_pct = floatval($_POST['extra_discount_pct'] ?? 0);
@@ -76,11 +77,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $count = $db->query("SELECT COUNT(*) FROM sale_invoices WHERE YEAR(created_at) = $year")->fetchColumn() + 1;
         $inv_number = 'SINV-' . $year . '-' . str_pad($count, 5, '0', STR_PAD_LEFT);
         
-        $db->prepare("INSERT INTO sale_invoices (invoice_number, customer_id, store_id, user_id, invoice_date, payment_method, subtotal, discount_pct, discount_val, extra_discount_pct, extra_discount_val, vat_amount, grand_total, paid_amount, remaining_amount, profit_amount, cost_amount, status, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")
-           ->execute([$inv_number, $customer_id ?: null, $store_id, $user_id, $invoice_date, $payment_method, $subtotal, $discount_pct, $discount_val, $extra_discount_pct, $extra_discount_val, $total_vat, $grand, $paid_amount, $remaining, $total_profit, $total_cost, $status, $notes, $_SESSION['user_id']]);
+        $db->prepare("INSERT INTO sale_invoices (invoice_number, customer_id, store_id, user_id, invoice_date, invoice_time, payment_method, subtotal, discount_pct, discount_val, extra_discount_pct, extra_discount_val, vat_amount, grand_total, paid_amount, remaining_amount, profit_amount, cost_amount, status, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")
+           ->execute([$inv_number, $customer_id ?: null, $store_id, $user_id, $invoice_date, $invoice_time, $payment_method, $subtotal, $discount_pct, $discount_val, $extra_discount_pct, $extra_discount_val, $total_vat, $grand, $paid_amount, $remaining, $total_profit, $total_cost, $status, $notes, $_SESSION['user_id']]);
         $inv_id = $db->lastInsertId();
         
-        $itemStmt = $db->prepare("INSERT INTO sale_invoice_items (invoice_id, product_id, product_name, product_code, barcode, unit_name, quantity, unit_cost, sell_price, discount_pct, discount_val, vat_pct, vat_val, line_total, profit_val, expiry_date, batch_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $itemStmt = $db->prepare("INSERT INTO sale_invoice_items (invoice_id, product_id, product_name, product_code, barcode, unit_name, quantity, unit_cost, sell_price, discount_pct, discount_val, vat_pct, vat_val, line_total, profit_val, expiry_date, batch_number, batch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         foreach ($items as $item) {
             $pid = intval($item['product_id'] ?? 0);
             $qty = floatval($item['quantity'] ?? 0);
@@ -94,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $line = $afterDisc + $vatVal;
             $profit = ($price - $cost) * $qty;
             
-            $itemStmt->execute([$inv_id, $pid ?: null, $item['product_name'] ?? '', $item['product_code'] ?? '', $item['barcode'] ?? '', $item['unit_name'] ?? 'علبة', $qty, $cost, $price, $discPct, $discVal, $vatPct, $vatVal, $line, $profit, ($item['expiry_date'] ?? null) ?: null, $item['batch_number'] ?? null]);
+            $itemStmt->execute([$inv_id, $pid ?: null, $item['product_name'] ?? '', $item['product_code'] ?? '', $item['barcode'] ?? '', $item['unit_name'] ?? 'علبة', $qty, $cost, $price, $discPct, $discVal, $vatPct, $vatVal, $line, $profit, ($item['expiry_date'] ?? null) ?: null, $item['batch_number'] ?? null, $item['batch_id'] ?? null]);
             
             if ($store_id && $pid) {
                 $db->prepare("UPDATE inventory_items SET quantity = GREATEST(quantity - ?, 0), updated_at = NOW() WHERE store_id = ? AND product_id = ?")
@@ -221,7 +222,7 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <div class="btn-icon" onclick="deleteRow()" title="حذف سطر"><i class="bi bi-trash"></i></div>
     <div class="divider"></div>
     <div class="btn-icon" onclick="window.print()" title="طباعة"><i class="bi bi-printer"></i></div>
-    <div class="btn-icon" onclick="ColOrder.openModal()" title="تخصيص الأعمدة"><i class="bi bi-layout-three-columns"></i></div>
+    <div class="btn-icon" onclick="ColOrder.openModal()" title="ترتيب الأعمدة"><i class="bi bi-layout-three-columns"></i></div>
     <div class="divider"></div>
     <div class="btn-icon" style="color:var(--red)" onclick="window.location='../dashboard/'" title="إغلاق"><i class="bi bi-x-lg"></i></div>
     <div class="ms-auto text-muted" style="font-size:12px"><i class="bi bi-info-circle"></i> F2=بحث | F3=إضافة | Delete=حذف | Ctrl+S=حفظ</div>
@@ -260,10 +261,14 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
         </select>
     </div>
     <div class="col-lg-1 col-md-2">
-        <label class="form-label small text-muted">التاريخ</label>
-        <input type="date" name="invoice_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>">
+        <label class="form-label small text-muted">التاريخ <span class="text-danger">*</span></label>
+        <input type="date" name="invoice_date" id="invoice_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required>
     </div>
-    <div class="col-lg-2 col-md-3">
+    <div class="col-lg-1 col-md-2">
+        <label class="form-label small text-muted">الوقت <span class="text-danger">*</span></label>
+        <input type="time" name="invoice_time" id="invoice_time" class="form-control form-control-sm" value="<?= date('H:i') ?>" required>
+    </div>
+    <div class="col-lg-1 col-md-2">
         <label class="form-label small text-muted">نوع الفاتورة</label>
         <input type="hidden" name="payment_method" id="paymentMethod" value="cash">
         <div class="pay-types">
@@ -349,6 +354,10 @@ const colDefs=[
     {key:'delete',label:'',width:'24px',fixed:true}
 ];
 
+// ALL UNITS - was missing before!
+const allUnits=<?= json_encode($units) ?>;
+const allCustomers=<?= json_encode($customers) ?>;
+
 function setPaymentType(type){
     document.getElementById('paymentMethod').value=type;
     document.querySelectorAll('.pay-btn').forEach(btn=>{
@@ -358,7 +367,6 @@ function setPaymentType(type){
     recalc();
 }
 
-let R=0;const allCustomers=<?= json_encode($customers) ?>;
 function getUnitOptions(selUnitId){
     let h='<option value="">--</option>';
     allUnits.forEach(u=>{h+='<option value="'+u.id+'"'+(u.id==selUnitId?' selected':'')+'>'+u.unit_name_ar+'</option>';});
@@ -369,7 +377,7 @@ function buildRowCells(id,d){
     const V=function(k){return ColOrder.isVisible(k);};
     const vis=function(k,html){return V(k)?html:'';};
     let h='';
-    h+=vis('rownum','<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" id="hip_'+id+'" value="'+(d.product_id||'')+'"></td>');
+    h+=vis('rownum','<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" id="hip_'+id+'" value="'+(d.product_id||'')+'"><input type="hidden" id="hbid_'+id+'" value="'+(d.batch_id||'')+'"></td>');
     h+=vis('print','<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="togglePrint('+id+')"></i></td>');
     h+=vis('barcode','<td><div class="barcode-w"><input type="text" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'" placeholder="باركود" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2row('+id+')">F2</button></div></td>');
     h+=vis('code','<td><input type="text" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>');
@@ -385,13 +393,15 @@ function buildRowCells(id,d){
     h+=vis('total','<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>');
     h+=vis('profit','<td><input type="number" id="pf_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
     h+=vis('cost','<td><input type="number" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||0)+'" step="0.01" readonly style="background:#e9ecef"></td>');
-    h+=vis('expiry','<td><input type="month" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',11)"></td>');
-    h+=vis('stock','<td><input type="number" id="st_'+id+'" class="form-control form-control-sm num" value="0" readonly style="background:#e9ecef"></td>');
-    h+=vis('batch','<td><input type="text" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',12)"></td>');
+    h+=vis('expiry','<td><input type="text" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" value="'+(d.exp_date||'')+'" placeholder="YYYY-MM" readonly onkeydown="handleEnter(event,'+id+',11)"></td>');
+    h+=vis('stock','<td><input type="number" id="st_'+id+'" class="form-control form-control-sm num" value="'+(d.stock_qty||0)+'" readonly style="background:#e9ecef"></td>');
+    h+=vis('batch','<td><input type="text" id="ba_'+id+'" class="form-control form-control-sm num" value="'+(d.batch_id||'')+'" placeholder="باتش" onkeydown="handleEnter(event,'+id+',12)"></td>');
     h+=vis('notes','<td><input type="text" id="no_'+id+'" class="form-control form-control-sm" placeholder="..." onkeydown="handleEnter(event,'+id+',13)"></td>');
     h+=vis('delete','<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>');
     return h;
 }
+
+let R=0;
 
 function addRow(data){
     R++;const id=R;const d=data||{};
@@ -406,17 +416,28 @@ function addRow(data){
 }
 
 function beforeSubmit(){
+    // Validate date and time
+    const invDate=document.getElementById('invoice_date').value;
+    const invTime=document.getElementById('invoice_time').value;
+    if(!invDate){alert('تاريخ الفاتورة مطلوب');document.getElementById('invoice_date').focus();return false;}
+    if(!invTime){alert('وقت الفاتورة مطلوب');document.getElementById('invoice_time').focus();return false;}
+    
+    const storeId=document.getElementById('store_id').value;
+    if(!storeId){alert('المخزن مطلوب');document.getElementById('store_id').focus();return false;}
+    
     const rows=[];
     document.querySelectorAll('#itemsBody tr').forEach(tr=>{
         const id=tr.dataset.rid;if(!id)return;
-        const getVal=function(fid,def){const el=document.getElementById(fid+'_'+id);return el?el.value:(def||'');};
+        const getVal=function(fid){const el=document.getElementById(fid+'_'+id);return el?el.value:'';};
         const getNum=function(fid){const el=document.getElementById(fid+'_'+id);return el?parseFloat(el.value)||0:0;};
         const row={
             product_id:document.getElementById('hip_'+id)?.value||'',
+            batch_id:document.getElementById('hbid_'+id)?.value||document.getElementById('ba_'+id)?.value||'',
             barcode:getVal('bc'),product_code:getVal('co'),product_name:getVal('nm'),
             unit_id:getVal('un'),unit_name:'',quantity:getNum('qt')||1,
             unit_cost:getNum('cs'),sell_price:getNum('sp'),discount_percent:getNum('dp'),
-            vat_percent:getNum('vp'),vat_value:getNum('vv'),expiry_date:getVal('ex'),batch_number:getVal('ba')
+            vat_percent:getNum('vp'),vat_value:getNum('vv'),expiry_date:getVal('ex'),batch_number:getVal('ba'),
+            stock_qty:getNum('st')
         };
         if(row.product_name)rows.push(row);
     });
@@ -545,7 +566,7 @@ function searchCustomers(){
     const matches=allCustomers.filter(c=>(c.customer_name&&c.customer_name.toLowerCase().includes(q))||(c.customer_code&&c.customer_code.toLowerCase().includes(q))||(c.phone&&c.phone.includes(q)));
     if(matches.length===0){res.style.display='none';return;}
     let h='';
-    matches.forEach(c=>{h+='<a href="#" class="list-group-item list-group-item-action" onclick="selectCustomer('+c.id+',\''+c.customer_name+'\');return false;"><strong>'+c.customer_name+'</strong> <span class="text-muted">('+c.customer_code+')</span></a>';});
+    matches.forEach(c=>{h+='<a href="#" class="list-group-item list-group-item-action" onclick="selectCustomer('+c.id+\',\\'\'+c.customer_name+\'\\'\');return false;"><strong>'+c.customer_name+'</strong> <span class="text-muted">('+c.customer_code+')</span></a>';});
     res.innerHTML=h;res.style.display='block';
 }
 function selectCustomer(id,name){
@@ -558,24 +579,33 @@ function selectCustomer(id,name){
 function clearCustomer(){document.getElementById('customer_id').value='';document.getElementById('customerDisplay').classList.remove('show');}
 function openCustomerModal(){const q=document.getElementById('customerSearch').value;window.open('../customers/index.php?search='+q,'_blank');}
 
+// F2 search for existing row
 function f2row(id){
     const sid=document.getElementById('store_id').value;
     if(!sid){alert('اختر المخزن أولاً');return;}
-    ProductSearch.open({storeId:parseInt(sid),onSelect:function(p){fill(id,p);}});
+    ProductSearch.open({storeId:parseInt(sid),mode:'sales',onSelect:function(p){fill(id,p);}});
 }
+
+// F2 search for new row
 function openF2Search(){
     const sid=document.getElementById('store_id').value;
     if(!sid){alert('اختر المخزن أولاً');document.getElementById('store_id').focus();return;}
-    ProductSearch.open({storeId:parseInt(sid),onSelect:function(p){addRow(p);}});
+    ProductSearch.open({storeId:parseInt(sid),mode:'sales',onSelect:function(p){addRow(p);}});
 }
+
+// Fill row with selected product data from popup
 function fill(id,p){
     document.getElementById('hip_'+id).value=p.product_id||p.id||'';
+    document.getElementById('hbid_'+id).value=p.batch_id||'';
     document.getElementById('nm_'+id).value=p.product_name||'';
     document.getElementById('co_'+id).value=p.product_code||'';
     document.getElementById('bc_'+id).value=p.barcode||'';
     document.getElementById('cs_'+id).value=p.unit_cost||0;
     document.getElementById('sp_'+id).value=p.sell_price||0;
-    document.getElementById('st_'+id).value=p.current_stock||0;
+    document.getElementById('st_'+id).value=p.current_stock||p.stock_qty||0;
+    document.getElementById('ex_'+id).value=p.exp_date||'';
+    document.getElementById('ba_'+id).value=p.batch_id||'';
+    
     if(p.unit_id)document.getElementById('un_'+id).value=p.unit_id;
     if(p.units&&p.units.length>0){
         const sel=document.getElementById('un_'+id);sel.innerHTML='';
@@ -583,14 +613,20 @@ function fill(id,p){
     }
     calc(id);
 }
+
 function saveInv(){if(beforeSubmit())document.getElementById('invForm').submit();}
+
 document.addEventListener('keydown',function(e){
     if(e.ctrlKey&&e.key==='s'){e.preventDefault();saveInv();}
     if(e.ctrlKey&&e.key==='n'){e.preventDefault();newInvoice();}
     if(e.key==='F3'){e.preventDefault();addRow();}
 });
+
+// Initialize
 ColOrder.init(colDefs,'sale_invoice_cols','headerRow');
-setPaymentType('cash');addRow();
+setPaymentType('cash');
+addRow();
+
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
 <?php if($pre_customer): ?>selectCustomer(<?= $pre_customer['id'] ?>,'<?= addslashes($pre_customer['customer_name']) ?>');<?php endif; ?>
 </script>
