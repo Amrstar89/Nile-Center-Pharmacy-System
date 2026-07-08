@@ -6,7 +6,7 @@ requireAuth();
 $db = getDB();
 $page_title = 'مرتجع بيع بفاتورة';
 
-$customers = $db->query("SELECT id, customer_name, customer_code, phone, balance FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 200")->fetchAll();
+$customers = $db->query("SELECT id, customer_name, customer_code, phone FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 200")->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
