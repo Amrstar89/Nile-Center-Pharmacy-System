@@ -80,7 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $existing->execute([$store_id, $pid]); $existingData = $existing->fetch();
                 if ($existingData) { $db->prepare("UPDATE inventory_items SET quantity = quantity + ?, unit_cost = ?, updated_at = NOW() WHERE id = ?")->execute([$qty + $bonus, $cost, $existingData['id']]); }
                 else { $db->prepare("INSERT INTO inventory_items (store_id, product_id, quantity, unit_cost, is_active, created_at) VALUES (?, ?, ?, ?, 1, NOW())")->execute([$store_id, $pid, $qty + $bonus, $cost]); }
-                // Record inventory movement for purchase
                 $movementQty = $qty + $bonus;
                 $db->prepare("INSERT INTO inventory_movements (store_id, product_id, movement_type, reference_type, reference_id, reference_number, quantity, unit_cost, total_cost, notes, created_by) VALUES (?, ?, 'purchase', 'purchase_invoice', ?, ?, ?, ?, ?, ?, ?)")
                    ->execute([$store_id, $pid, $inv_id, $inv_number, $movementQty, $cost, $movementQty * $cost, 'فاتورة شراء ' . $inv_number, $_SESSION['user_id']]);
@@ -128,34 +127,29 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .sub-menu-bar .btn-icon:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
 .sub-menu-bar .divider{width:1px;height:28px;background:#ccc;margin:0 5px}
 .invoice-header{background:#fff;padding:15px 20px;border-bottom:1px solid #ddd}
-/* ===== BIGGER TOOLBAR ===== */
-.toolbar-right{position:fixed;right:0;top:110px;width:60px;background:linear-gradient(180deg,#ffc107 0%,#ff9800 100%);border-radius:10px 0 0 10px;padding:10px 6px;display:flex;flex-direction:column;gap:8px;z-index:50;box-shadow:-2px 2px 10px rgba(0,0,0,0.2)}
-.toolbar-right .tool-btn{width:48px;height:48px;border-radius:10px;border:none;background:rgba(255,255,255,0.3);color:#333;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;font-size:20px;position:relative}
+.toolbar-right{position:fixed;right:0;top:110px;width:55px;background:linear-gradient(180deg,#ffc107 0%,#ff9800 100%);border-radius:10px 0 0 10px;padding:8px 4px;display:flex;flex-direction:column;gap:6px;z-index:50;box-shadow:-2px 2px 10px rgba(0,0,0,0.2)}
+.toolbar-right .tool-btn{width:46px;height:46px;border-radius:10px;border:none;background:rgba(255,255,255,0.3);color:#333;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;font-size:18px;position:relative}
 .toolbar-right .tool-btn:hover{background:#fff;transform:scale(1.1)}
-.toolbar-right .tool-btn .tooltip{position:absolute;left:60px;top:50%;transform:translateY(-50%);background:#333;color:#fff;padding:4px 12px;border-radius:6px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s}
+.toolbar-right .tool-btn .tooltip{position:absolute;left:55px;top:50%;transform:translateY(-50%);background:#333;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s}
 .toolbar-right .tool-btn:hover .tooltip{opacity:1}
-/* ===== BIGGER ITEMS SECTION ===== */
-.items-section{overflow-x:auto;padding:15px;background:#fff;margin:0 65px 0 0;position:relative}
-.items-section::-webkit-scrollbar{height:12px}
-.items-section::-webkit-scrollbar-track{background:#f0f0f0}
-.items-section::-webkit-scrollbar-thumb{background:#ccc;border-radius:5px}
-.items-table{width:100%;border-collapse:collapse;font-size:13px;min-width:2600px}
-.items-table th{background:var(--green);color:#fff;padding:8px 6px;text-align:center;font-weight:600;font-size:12px;white-space:nowrap;position:sticky;top:0;z-index:10}
+.items-section{overflow-x:auto;padding:10px;background:#fff;margin:0 55px 0 0;position:relative}
+.items-section::-webkit-scrollbar{height:10px}
+.items-table{width:100%;border-collapse:collapse;font-size:12px;min-width:2400px}
+.items-table th{background:var(--green);color:#fff;padding:6px 4px;text-align:center;font-weight:600;font-size:11px;white-space:nowrap;position:sticky;top:0;z-index:10}
 .items-table th:first-child{width:30px}
-.items-table td{padding:5px 6px;border-bottom:1px solid #e9ecef;text-align:center;background:#fff;vertical-align:middle}
+.items-table td{padding:3px 4px;border-bottom:1px solid #e9ecef;text-align:center;background:#fff;vertical-align:middle}
 .items-table tr:hover td{background:#e3f2fd}
-/* ===== BIGGER INPUTS ===== */
-.items-table td input,.items-table td select{border:1px solid #ddd;border-radius:5px;padding:5px 6px;font-size:13px;text-align:center;height:36px;width:100%}
-.items-table td input:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 2px rgba(102,126,234,0.15)}
-.items-table .product-name{text-align:right;font-weight:600;min-width:200px}
-.items-table .num{text-align:center;min-width:55px}
+.items-table td input,.items-table td select{border:1px solid #ddd;border-radius:4px;padding:2px 4px;font-size:12px;text-align:center;height:28px;width:100%}
+.items-table td input:focus{border-color:var(--primary);outline:none}
+.items-table .product-name{text-align:right;font-weight:600;min-width:170px}
+.items-table .num{text-align:center;min-width:50px}
 .items-table .row-total{font-weight:700;color:var(--primary);background:#e8f5e9 !important}
 .items-table .row-calc{background:#e3f2fd}
-.items-table .btn-del{color:var(--red);cursor:pointer;font-size:16px;padding:0 4px}
+.items-table .btn-del{color:var(--red);cursor:pointer;font-size:15px;padding:0 3px}
 .items-table .btn-del:hover{transform:scale(1.2)}
-.items-table .barcode-w{position:relative;display:flex;align-items:center;min-width:120px}
-.items-table .barcode-w input{flex:1;padding-left:30px}
-.items-table .barcode-w .btn-f2{position:absolute;left:2px;top:2px;bottom:2px;width:26px;border:none;background:#f0f0f0;border-radius:4px;cursor:pointer;font-size:10px;color:#666;display:flex;align-items:center;justify-content:center}
+.items-table .barcode-w{position:relative;display:flex;align-items:center;min-width:100px}
+.items-table .barcode-w input{flex:1;padding-left:28px}
+.items-table .barcode-w .btn-f2{position:absolute;left:2px;top:2px;bottom:2px;width:24px;border:none;background:#f0f0f0;border-radius:3px;cursor:pointer;font-size:10px;color:#666;display:flex;align-items:center;justify-content:center}
 .items-table .barcode-w .btn-f2:hover{background:var(--primary);color:#fff}
 .items-table .print-icon{font-size:16px;cursor:pointer}
 .items-table .print-on{color:var(--green)}
@@ -261,13 +255,13 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 </div>
 </div>
 <div class="toolbar-right">
-    <button type="button" class="tool-btn" onclick="addRow()" title="إضافة صنف (F3)"><i class="bi bi-plus-lg"></i><span class="tooltip">إضافة صنف</span></button>
-    <button type="button" class="tool-btn" onclick="openF2Search()" title="بحث F2"><i class="bi bi-search"></i><span class="tooltip">بحث F2</span></button>
-    <button type="button" class="tool-btn" onclick="ColOrder.openModal()" title="تخصيص الأعمدة"><i class="bi bi-layout-three-columns"></i><span class="tooltip">الأعمدة</span></button>
-    <button type="button" class="tool-btn" onclick="window.print()" title="طباعة"><i class="bi bi-printer"></i><span class="tooltip">طباعة</span></button>
+    <button type="button" class="tool-btn" onclick="addRow()"><i class="bi bi-plus-lg"></i><span class="tooltip">إضافة صنف</span></button>
+    <button type="button" class="tool-btn" onclick="openF2Search()"><i class="bi bi-search"></i><span class="tooltip">بحث F2</span></button>
+    <button type="button" class="tool-btn" onclick="ColOrder.openModal()"><i class="bi bi-layout-three-columns"></i><span class="tooltip">الأعمدة</span></button>
+    <button type="button" class="tool-btn" onclick="window.print()"><i class="bi bi-printer"></i><span class="tooltip">طباعة</span></button>
     <div style="height:1px;background:rgba(255,255,255,0.3);margin:4px 0"></div>
-    <button type="button" class="tool-btn" onclick="clearAll()" style="color:var(--red)" title="مسح الكل"><i class="bi bi-trash"></i><span class="tooltip">مسح</span></button>
-    <button type="button" class="tool-btn" onclick="window.location='../'" style="color:var(--red)" title="خروج"><i class="bi bi-x-lg"></i><span class="tooltip">خروج</span></button>
+    <button type="button" class="tool-btn" onclick="clearAll()" style="color:var(--red)"><i class="bi bi-trash"></i><span class="tooltip">مسح</span></button>
+    <button type="button" class="tool-btn" onclick="window.location='../'" style="color:var(--red)"><i class="bi bi-x-lg"></i><span class="tooltip">خروج</span></button>
 </div>
 <div class="items-section">
 <table class="items-table" id="itemsTable">
