@@ -6,11 +6,14 @@ requireAuth();
 $db = getDB();
 $page_title = 'فاتورة بيع جديدة';
 
-// Auto-add invoice_time column if missing (for backward compatibility)
-try {
-    $db->exec("ALTER TABLE sale_invoices ADD COLUMN invoice_time TIME NULL AFTER invoice_date");
-} catch (PDOException $e) {
-    // Column already exists or other error - ignore
+// ========== AUTO-FIX: Add invoice_time column if missing ==========
+$cols = $db->query("SHOW COLUMNS FROM sale_invoices LIKE 'invoice_time'")->fetchAll();
+if (empty($cols)) {
+    try {
+        $db->exec("ALTER TABLE sale_invoices ADD COLUMN invoice_time TIME NULL AFTER invoice_date");
+    } catch (PDOException $e) {
+        // If ALTER fails, we'll handle gracefully below
+    }
 }
 
 $stores = $db->query("SELECT s.id, s.store_name FROM stores s WHERE s.is_active = 1 ORDER BY s.store_name")->fetchAll();
@@ -83,8 +86,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $count = $db->query("SELECT COUNT(*) FROM sale_invoices WHERE YEAR(created_at) = $year")->fetchColumn() + 1;
         $inv_number = 'SINV-' . $year . '-' . str_pad($count, 5, '0', STR_PAD_LEFT);
         
-        $db->prepare("INSERT INTO sale_invoices (invoice_number, customer_id, store_id, user_id, invoice_date, invoice_time, payment_method, subtotal, discount_pct, discount_val, extra_discount_pct, extra_discount_val, vat_amount, grand_total, paid_amount, remaining_amount, profit_amount, cost_amount, status, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")
-           ->execute([$inv_number, $customer_id ?: null, $store_id, $user_id, $invoice_date, $invoice_time, $payment_method, $subtotal, $discount_pct, $discount_val, $extra_discount_pct, $extra_discount_val, $total_vat, $grand, $paid_amount, $remaining, $total_profit, $total_cost, $status, $notes, $_SESSION['user_id']]);
+        // Check if invoice_time column exists before using it
+        $colsCheck = $db->query("SHOW COLUMNS FROM sale_invoices LIKE 'invoice_time'")->fetchAll();
+        if (!empty($colsCheck)) {
+            // Column exists - use it
+            $db->prepare("INSERT INTO sale_invoices (invoice_number, customer_id, store_id, user_id, invoice_date, invoice_time, payment_method, subtotal, discount_pct, discount_val, extra_discount_pct, extra_discount_val, vat_amount, grand_total, paid_amount, remaining_amount, profit_amount, cost_amount, status, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")
+               ->execute([$inv_number, $customer_id ?: null, $store_id, $user_id, $invoice_date, $invoice_time, $payment_method, $subtotal, $discount_pct, $discount_val, $extra_discount_pct, $extra_discount_val, $total_vat, $grand, $paid_amount, $remaining, $total_profit, $total_cost, $status, $notes, $_SESSION['user_id']]);
+        } else {
+            // Column missing - insert without it
+            $db->prepare("INSERT INTO sale_invoices (invoice_number, customer_id, store_id, user_id, invoice_date, payment_method, subtotal, discount_pct, discount_val, extra_discount_pct, extra_discount_val, vat_amount, grand_total, paid_amount, remaining_amount, profit_amount, cost_amount, status, notes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())")
+               ->execute([$inv_number, $customer_id ?: null, $store_id, $user_id, $invoice_date, $payment_method, $subtotal, $discount_pct, $discount_val, $extra_discount_pct, $extra_discount_val, $total_vat, $grand, $paid_amount, $remaining, $total_profit, $total_cost, $status, $notes, $_SESSION['user_id']]);
+        }
         $inv_id = $db->lastInsertId();
         
         $itemStmt = $db->prepare("INSERT INTO sale_invoice_items (invoice_id, product_id, product_name, product_code, barcode, unit_name, quantity, unit_cost, sell_price, discount_pct, discount_val, vat_pct, vat_val, line_total, profit_val, expiry_date, batch_number, batch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -103,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $itemStmt->execute([$inv_id, $pid ?: null, $item['product_name'] ?? '', $item['product_code'] ?? '', $item['barcode'] ?? '', $item['unit_name'] ?? 'علبة', $qty, $cost, $price, $discPct, $discVal, $vatPct, $vatVal, $line, $profit, ($item['expiry_date'] ?? null) ?: null, $item['batch_number'] ?? null, $item['batch_id'] ?? null]);
             
+            // DEDUCT FROM INVENTORY when selling
             if ($store_id && $pid) {
                 $db->prepare("UPDATE inventory_items SET quantity = GREATEST(quantity - ?, 0), updated_at = NOW() WHERE store_id = ? AND product_id = ?")
                    ->execute([$qty, $store_id, $pid]);
@@ -204,10 +217,12 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .customer-display.show{display:flex;align-items:center;gap:10px}
 .customer-display .cust-name{font-weight:700;color:#1565c0}
 .customer-display .cust-balance{font-size:12px;color:#666}
-.save-section{background:#fff;border-top:3px solid var(--green);padding:15px 20px;text-align:center}
-.save-section .btn-save{background:linear-gradient(135deg,var(--green),#2e7d32);color:#fff;border:none;padding:14px 50px;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;transition:all .2s;box-shadow:0 4px 15px rgba(25,135,84,0.3)}
-.save-section .btn-save:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(25,135,84,0.4)}
-.save-section .btn-save i{font-size:22px;margin-left:8px}
+.save-section{background:linear-gradient(135deg,#f8f9fa,#e9ecef);border-top:3px solid var(--green);padding:20px;text-align:center;display:flex;justify-content:center;align-items:center;gap:20px}
+.save-section .btn-save{background:linear-gradient(135deg,var(--green),#2e7d32);color:#fff;border:none;padding:16px 60px;border-radius:14px;font-size:20px;font-weight:700;cursor:pointer;transition:all .2s;box-shadow:0 6px 20px rgba(25,135,84,0.35);display:inline-flex;align-items:center;gap:10px}
+.save-section .btn-save:hover{transform:translateY(-3px);box-shadow:0 8px 25px rgba(25,135,84,0.5)}
+.save-section .btn-save i{font-size:24px}
+.save-section .btn-cancel{background:#fff;color:#666;border:2px solid #ddd;padding:12px 30px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.save-section .btn-cancel:hover{border-color:var(--red);color:var(--red)}
 .d-none{display:none !important}
 @media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon,.save-section{display:none!important}}
 @media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}body{min-width:auto}}
@@ -223,7 +238,7 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 </div>
 <div class="sub-menu-bar">
     <div class="btn-icon" onclick="newInvoice()" title="جديد (Ctrl+N)"><i class="bi bi-file-earmark-plus"></i></div>
-    <div class="btn-icon" onclick="saveInv()" title="حفظ (Ctrl+S)"><i class="bi bi-save"></i></div>
+    <div class="btn-icon" onclick="saveInv()" title="حفظ (Ctrl+Enter)"><i class="bi bi-save"></i></div>
     <div class="btn-icon" onclick="suspendInv()" title="تعليق الفاتورة"><i class="bi bi-pause-circle"></i></div>
     <div class="btn-icon" onclick="openPendingInvoices()" title="فواتير معلقة"><i class="bi bi-clock-history"></i></div>
     <div class="divider"></div>
@@ -233,7 +248,7 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <div class="divider"></div>
     <div class="btn-icon" onclick="window.print()" title="طباعة"><i class="bi bi-printer"></i></div>
     <div class="btn-icon" onclick="window.location='../dashboard/'" title="إغلاق"><i class="bi bi-x-lg"></i></div>
-    <div class="ms-auto text-muted" style="font-size:12px"><i class="bi bi-info-circle"></i> F2=بحث | F3=إضافة | Delete=حذف | Ctrl+S=حفظ</div>
+    <div class="ms-auto text-muted" style="font-size:12px"><i class="bi bi-info-circle"></i> F2=بحث | F3=إضافة | Ctrl+Enter=حفظ</div>
 </div>
 
 <form method="POST" id="invForm" autocomplete="off" onsubmit="return beforeSubmit()">
@@ -321,7 +336,7 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <button type="button" class="tool-btn" onclick="deleteRow()"><i class="bi bi-trash"></i><span class="tooltip">حذف سطر</span></button>
     <div style="height:1px;background:rgba(255,255,255,0.3);margin:4px 0"></div>
     <button type="button" class="tool-btn" onclick="window.print()"><i class="bi bi-printer"></i><span class="tooltip">طباعة</span></button>
-    <button type="button" class="tool-btn" onclick="saveInv()" style="background:rgba(255,255,255,0.4)"><i class="bi bi-save"></i><span class="tooltip">حفظ Ctrl+S</span></button>
+    <button type="button" class="tool-btn" onclick="saveInv()" style="background:rgba(255,255,255,0.4)"><i class="bi bi-save"></i><span class="tooltip">حفظ</span></button>
     <div style="height:1px;background:rgba(255,255,255,0.3);margin:4px 0"></div>
     <button type="button" class="tool-btn" onclick="newInvoice()" style="color:#fff3cd"><i class="bi bi-file-earmark-plus"></i><span class="tooltip">جديد</span></button>
     <button type="button" class="tool-btn" onclick="window.location='../dashboard/'" style="color:#ffcdd2"><i class="bi bi-x-lg"></i><span class="tooltip">إغلاق</span></button>
@@ -347,6 +362,9 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 <div class="save-section">
     <button type="button" class="btn-save" onclick="saveInv()">
         <i class="bi bi-save-fill"></i> حفظ الفاتورة
+    </button>
+    <button type="button" class="btn-cancel" onclick="window.location='./index.php'">
+        <i class="bi bi-x-lg"></i> إلغاء
     </button>
 </div>
 
@@ -668,7 +686,7 @@ function fill(id,p){
 function saveInv(){ if(beforeSubmit()) document.getElementById('invForm').submit(); }
 
 document.addEventListener('keydown',function(e){
-    if(e.ctrlKey&&e.key==='s'){ e.preventDefault(); saveInv(); }
+    if(e.ctrlKey&&e.key==='Enter'){ e.preventDefault(); saveInv(); }
     if(e.ctrlKey&&e.key==='n'){ e.preventDefault(); newInvoice(); }
     if(e.key==='F3'){ e.preventDefault(); addRow(); }
 });
