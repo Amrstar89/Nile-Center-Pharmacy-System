@@ -391,6 +391,7 @@ const allStores = <?= json_encode($stores) ?>;
 const allCustomers = <?= json_encode($customers) ?>;
 const allUnits = <?= json_encode($units) ?>;
 const CURRENCY = 'ج.م';
+let _currentRowIndex = 0;
 
 // ============ BRANCH → STORE CASCADING ============
 function filterStoresByBranch() {
@@ -529,14 +530,17 @@ function applyColOrder() {
 
 // ============ PRODUCT SEARCH (Popup Window) ============
 function openProductSearch(rowIndex) {
-  const url = '<?= APP_URL ?>/includes/product-search-popup-new.php?mode=sales&row=' + rowIndex;
+  const storeId = document.getElementById('store_id').value;
+  if (!storeId) { alert('اختر المخزن أولاً'); document.getElementById('store_id').focus(); return; }
+  _currentRowIndex = rowIndex;
+  const url = '<?= APP_URL ?>/includes/product-search-popup-new.php?mode=sales&store_id=' + storeId + '&row=' + rowIndex;
   window.productSearchWin = window.open(url, 'productSearch', 'width=1100,height=700,scrollbars=yes,resizable=yes');
 }
-function onProductSelected(rowIndex, product) {
+// Callback from popup - receives product object only (row index stored in global var)
+function onProductSelected(product) {
   const rows = document.querySelectorAll('#itemsBody tr');
-  const row = rows[rowIndex];
+  const row = rows[_currentRowIndex];
   if (!row) return;
-  const ci = cIdx(row);
   const setVal = (col, val) => { const el = row.querySelector('[data-col="'+col+'"]'); if (el) el.value = val || ''; };
   const setText = (col, val) => { const el = row.querySelector('[data-col="'+col+'"]'); if (el) el.textContent = val || ''; };
   setVal('product_id', product.id);
@@ -549,11 +553,11 @@ function onProductSelected(rowIndex, product) {
     for (let o of unitSel.options) { if (o.text === product.unit_name) { o.selected = true; found = true; break; } }
     if (!found) { const opt = document.createElement('option'); opt.value = product.unit_name; opt.textContent = product.unit_name; opt.selected = true; unitSel.appendChild(opt); }
   }
-  setVal('unit_cost', product.avg_cost || product.last_cost || 0);
+  setVal('unit_cost', product.unit_cost || product.avg_cost || product.last_cost || 0);
   setVal('sell_price', product.sell_price || 0);
-  const vatPct = parseFloat(product.vat_percent || 0);
+  const vatPct = parseFloat(product.vat_percent || product.vat_pct || 0);
   setVal('vat_pct', vatPct);
-  setVal('quantity', 1);
+  setVal('quantity', product.quantity || 1);
   const batchInp = row.querySelector('[data-col="batch"]');
   const expSel = row.querySelector('[data-col="expiry"]');
   if (product.batches && product.batches.length > 0) {
@@ -575,16 +579,21 @@ function onProductSelected(rowIndex, product) {
       if (nearestBatchId) { expSel.value = nearestBatchId; }
     }
     if (batchInp && product.batches[0]) batchInp.value = product.batches[0].batch_number || '';
+  } else if (product.exp_date || product.batch_id) {
+    if (expSel) {
+      expSel.innerHTML = '<option value="">-- اختر --</option>';
+      const opt = document.createElement('option');
+      opt.value = product.batch_id || '';
+      opt.textContent = (product.exp_date || '') + ' (' + (product.stock_qty || 0) + ')';
+      if (product.exp_date) opt.dataset.exp = product.exp_date;
+      expSel.appendChild(opt);
+      if (product.batch_id) expSel.value = product.batch_id;
+    }
+    if (batchInp) batchInp.value = product.batch_id || '';
   }
   calc(row);
   recalcAll();
   row.classList.add('selected');
-}
-function cIdx(row) {
-  const headers = row.closest('table').querySelectorAll('thead th');
-  const map = {};
-  headers.forEach((th, i) => { if (th.dataset.col) map[th.dataset.col] = i; });
-  return map;
 }
 
 // ============ ROW MANAGEMENT ============
@@ -676,7 +685,6 @@ function calc(tr) {
     if (el) el.textContent = formatNum(val);
   };
   const qty = getVal('quantity');
-  const bonus = getVal('bonus');
   const cost = getVal('unit_cost');
   const price = getVal('sell_price');
   const discPct = getVal('disc_pct');
@@ -737,10 +745,6 @@ function onDiscPct(el) {
   const valEl = tr.querySelector('[data-col="disc_val"]');
   if (valEl) valEl.value = formatNum(discVal);
   calc(tr);
-  recalcAll();
-}
-function onVatPct(el) {
-  calc(el.closest('tr'));
   recalcAll();
 }
 function formatNum(n) {
@@ -890,9 +894,6 @@ document.addEventListener('keydown', function(e) {
 document.addEventListener('DOMContentLoaded', function() {
   const savedOrder = ColOrder.getOrder();
   if (savedOrder && savedOrder.length > 0) ColOrder.apply(savedOrder);
-  if (document.querySelectorAll('#itemsBody tr').length === 0) {
-    // Start with empty state - user adds rows
-  }
   ['discount_pct','discount_val','extra_discount_pct','extra_discount_val','paid_amount'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', recalcAll);
