@@ -17,7 +17,7 @@ addColIfMissing($db, 'sale_invoice_items', 'batch_id', 'INT NULL AFTER batch_num
 
 $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
 $stores = $db->query("SELECT s.id, s.store_name, s.branch_id FROM stores s WHERE s.is_active = 1 ORDER BY s.store_name")->fetchAll();
-$customers = $db->query("SELECT id, customer_name, customer_code, phone FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 200")->fetchAll();
+$customers = $db->query("SELECT id, customer_name, customer_code, phone FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 500")->fetchAll();
 $users = $db->query("SELECT id, full_name FROM users WHERE is_active = 1 ORDER BY full_name")->fetchAll();
 $units = $db->query("SELECT id, unit_name_ar FROM product_units WHERE is_active = 1 ORDER BY unit_name_ar")->fetchAll();
 
@@ -186,6 +186,15 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .save-section .btn-save i{font-size:24px}
 .save-section .btn-cancel{background:#fff;color:#666;border:2px solid #ddd;padding:12px 30px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
 .save-section .btn-cancel:hover{border-color:var(--red);color:var(--red)}
+/* Inline customer search dropdown */
+.cust-dropdown{position:absolute;top:100%;right:0;left:0;z-index:1000;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.15);max-height:220px;overflow-y:auto;display:none;margin-top:2px}
+.cust-dropdown.show{display:block}
+.cust-dropdown .dd-item{padding:8px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
+.cust-dropdown .dd-item:hover{background:#e8f0fe}
+.cust-dropdown .dd-item b{color:#333}
+.cust-dropdown .dd-item small{color:#888}
+.cust-dropdown .dd-item .dd-code{background:#f0f0f0;padding:1px 6px;border-radius:4px;font-size:11px;font-family:monospace}
+.cust-dropdown .dd-empty{padding:12px;text-align:center;color:#999;font-size:13px}
 .d-none{display:none !important}
 @media print{.toolbar-right,.sub-menu-bar,.top-header .menu-item,.btn-icon,.save-section{display:none!important}}
 @media(max-width:768px){.toolbar-right{position:relative;width:100%;flex-direction:row;border-radius:0;top:0}.items-section{margin-right:0}body{min-width:auto}}
@@ -267,14 +276,16 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 <!-- Customer Section -->
 <div class="info-section">
   <div class="row g-2 align-items-center">
-    <div class="col-md-3">
+    <div class="col-md-4" style="position:relative">
       <div class="input-group">
         <span class="input-group-text"><i class="bi bi-person"></i></span>
-        <input type="text" class="form-control form-control-sm" id="customer_code_input" placeholder="كود العميل - F4 بحث" onkeydown="handleCustomerKey(event)">
+        <input type="text" class="form-control form-control-sm" id="customer_code_input" placeholder="كود/اسم/تليفون العميل - F4 للبحث" oninput="searchCustomerInline(this.value)" onkeydown="handleCustomerKey(event)" onblur="setTimeout(()=>hideCustDropdown(),200)" autocomplete="off">
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openCustomerSearch()"><i class="bi bi-search"></i></button>
       </div>
+      <!-- Inline customer dropdown -->
+      <div class="cust-dropdown" id="custDropdown"></div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-5">
       <div id="customer_display" class="customer-display">
         <i class="bi bi-person-check" style="color:var(--green);font-size:20px"></i>
         <div>
@@ -596,6 +607,44 @@ function onProductSelected(product) {
   row.classList.add('selected');
 }
 
+// ============ INLINE CUSTOMER SEARCH ============
+function searchCustomerInline(q) {
+  const dd = document.getElementById('custDropdown');
+  if (!q || q.length < 1) { dd.classList.remove('show'); return; }
+  const qlower = q.toLowerCase().trim();
+  const matches = allCustomers.filter(c => {
+    const name = (c.customer_name || '').toLowerCase();
+    const code = (c.customer_code || '').toLowerCase();
+    const phone = (c.phone || '').toLowerCase();
+    return name.includes(qlower) || code.includes(qlower) || phone.includes(qlower);
+  }).slice(0, 10);
+  if (matches.length === 0) { dd.classList.remove('show'); return; }
+  let h = '';
+  matches.forEach(c => {
+    h += `<div class="dd-item" onclick="selectInlineCustomer(${c.id})">
+      <i class="bi bi-person" style="color:var(--primary)"></i>
+      <div style="flex:1"><b>${escapeHtml(c.customer_name)}</b>
+      <small>${c.phone || ''}</small></div>
+      <span class="dd-code">${escapeHtml(c.customer_code || '')}</span>
+    </div>`;
+  });
+  dd.innerHTML = h;
+  dd.classList.add('show');
+}
+function hideCustDropdown() {
+  setTimeout(() => document.getElementById('custDropdown').classList.remove('show'), 200);
+}
+function selectInlineCustomer(id) {
+  const c = allCustomers.find(x => x.id == id);
+  if (!c) return;
+  onCustomerSelected(c);
+  document.getElementById('customer_code_input').value = c.customer_code || c.customer_name || '';
+  document.getElementById('custDropdown').classList.remove('show');
+}
+function escapeHtml(t) {
+  const d = document.createElement('div'); d.textContent = t; return d.innerHTML;
+}
+
 // ============ ROW MANAGEMENT ============
 let selectedRowIndex = -1;
 function addNewRow() {
@@ -777,12 +826,13 @@ function setPayType(type, btn) {
 
 // ============ CUSTOMER SEARCH ============
 function openCustomerSearch() {
-  const url = '<?= APP_URL ?>/includes/customer-search-popup.php';
+  const q = document.getElementById('customer_code_input').value;
+  const url = '<?= APP_URL ?>/includes/customer-search-popup.php?q=' + encodeURIComponent(q);
   window.customerSearchWin = window.open(url, 'customerSearch', 'width=900,height=600,scrollbars=yes,resizable=yes');
 }
 function onCustomerSelected(customer) {
   document.getElementById('customer_id').value = customer.id;
-  document.getElementById('customer_code_input').value = customer.customer_code || '';
+  document.getElementById('customer_code_input').value = customer.customer_code || customer.customer_name || '';
   document.getElementById('cust_name').textContent = customer.customer_name || '';
   document.getElementById('cust_info').textContent = (customer.phone || '') + ' | الرصيد: ' + (customer.balance || 0);
   document.getElementById('customer_display').classList.add('show');
@@ -793,14 +843,23 @@ function clearCustomer() {
   document.getElementById('customer_display').classList.remove('show');
 }
 function handleCustomerKey(e) {
-  if (e.key === 'F4') { e.preventDefault(); openCustomerSearch(); }
+  if (e.key === 'F4') { e.preventDefault(); openCustomerSearch(); return; }
   if (e.key === 'Enter') {
     e.preventDefault();
     const code = e.target.value.trim();
     if (!code) return;
+    const dd = document.getElementById('custDropdown');
+    if (dd.classList.contains('show') && dd.children.length > 0) {
+      const first = dd.querySelector('.dd-item');
+      if (first) first.click();
+      return;
+    }
     const found = allCustomers.find(c => (c.customer_code || '') === code || String(c.id) === code);
     if (found) { onCustomerSelected(found); }
-    else { alert('لم يتم العثور على عميل بهذا الكود'); }
+    else { openCustomerSearch(); }
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('custDropdown').classList.remove('show');
   }
 }
 
