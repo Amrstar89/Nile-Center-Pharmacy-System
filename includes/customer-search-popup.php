@@ -6,19 +6,25 @@
 require_once __DIR__ . '/../core/config.php';
 $db = getDB();
 
+// Check which columns exist in customers table
+$cols = $db->query("SHOW COLUMNS FROM customers")->fetchAll(PDO::FETCH_COLUMN);
+$hasBalance = in_array('balance', $cols);
+$hasAddress = in_array('address', $cols);
+
 $q = $_GET['q'] ?? '';
 $customers = [];
 if ($q) {
-    $stmt = $db->prepare("SELECT id, customer_name, customer_code, phone, address, balance, is_active 
+    $sql = "SELECT id, customer_name, customer_code, phone" . ($hasBalance ? ", balance" : "") . ($hasAddress ? ", address" : "") . " 
         FROM customers 
         WHERE (customer_name LIKE ? OR customer_code LIKE ? OR phone LIKE ?) 
         AND is_active = 1 
-        ORDER BY customer_name LIMIT 100");
+        ORDER BY customer_name LIMIT 100";
+    $stmt = $db->prepare($sql);
     $like = '%' . $q . '%';
     $stmt->execute([$like, $like, $like]);
     $customers = $stmt->fetchAll();
 } else {
-    $customers = $db->query("SELECT id, customer_name, customer_code, phone, address, balance, is_active 
+    $customers = $db->query("SELECT id, customer_name, customer_code, phone" . ($hasBalance ? ", balance" : "") . ($hasAddress ? ", address" : "") . " 
         FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 50")->fetchAll();
 }
 ?>
@@ -80,12 +86,12 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                         <th>اسم العميل</th>
                         <th style="width:80px">الكود</th>
                         <th style="width:100px">التليفون</th>
-                        <th style="width:80px">الرصيد</th>
+                        <?php if ($hasBalance): ?><th style="width:80px">الرصيد</th><?php endif; ?>
                     </tr>
                 </thead>
                 <tbody id="resultsBody">
                     <?php if (empty($customers)): ?>
-                    <tr><td colspan="5" class="no-results"><i class="bi bi-inbox" style="font-size:28px"></i><br>لا يوجد عملاء - اكتب للبحث</td></tr>
+                    <tr><td colspan="<?= $hasBalance ? 5 : 4 ?>" class="no-results"><i class="bi bi-inbox" style="font-size:28px"></i><br>لا يوجد عملاء - اكتب للبحث</td></tr>
                     <?php else: ?>
                         <?php foreach ($customers as $i => $c): ?>
                         <tr onclick="selectCustomer(<?= $i ?>)" id="row_<?= $i ?>" data-id="<?= $c['id'] ?>" data-name="<?= htmlspecialchars($c['customer_name']) ?>" data-code="<?= htmlspecialchars($c['customer_code'] ?? '') ?>" data-phone="<?= htmlspecialchars($c['phone'] ?? '') ?>" data-balance="<?= $c['balance'] ?? 0 ?>" data-address="<?= htmlspecialchars($c['address'] ?? '') ?>">
@@ -93,7 +99,7 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                             <td class="customer-name"><?= htmlspecialchars($c['customer_name']) ?></td>
                             <td><span class="customer-code"><?= htmlspecialchars($c['customer_code'] ?? '-') ?></span></td>
                             <td><?= htmlspecialchars($c['phone'] ?? '-') ?></td>
-                            <td><?= number_format($c['balance'] ?? 0, 2) ?></td>
+                            <?php if ($hasBalance): ?><td><?= number_format($c['balance'] ?? 0, 2) ?></td><?php endif; ?>
                         </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -109,7 +115,9 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <div class="row g-2 mb-3">
         <div class="col"><div class="bg-light rounded p-2 text-center"><small class="text-muted d-block">الكود</small><strong id="selCode">-</strong></div></div>
         <div class="col"><div class="bg-light rounded p-2 text-center"><small class="text-muted d-block">التليفون</small><strong id="selPhone">-</strong></div></div>
+        <?php if ($hasBalance): ?>
         <div class="col"><div class="bg-light rounded p-2 text-center"><small class="text-muted d-block">الرصيد</small><strong id="selBalance" class="text-success">-</strong></div></div>
+        <?php endif; ?>
     </div>
     <div class="text-end">
         <button class="btn btn-success btn-lg" onclick="confirmSelect()">
@@ -137,15 +145,17 @@ function selectCustomer(idx) {
         customer_name: row.dataset.name,
         customer_code: row.dataset.code,
         phone: row.dataset.phone,
-        balance: row.dataset.balance,
-        address: row.dataset.address
+        balance: row.dataset.balance || 0,
+        address: row.dataset.address || ''
     };
     
     document.getElementById('detailPanel').classList.add('show');
     document.getElementById('selName').textContent = selectedCustomer.customer_name;
     document.getElementById('selCode').textContent = selectedCustomer.customer_code || '-';
     document.getElementById('selPhone').textContent = selectedCustomer.phone || '-';
+    <?php if ($hasBalance): ?>
     document.getElementById('selBalance').textContent = parseFloat(selectedCustomer.balance || 0).toFixed(2);
+    <?php endif; ?>
 }
 
 function confirmSelect() {
