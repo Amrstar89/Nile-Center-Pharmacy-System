@@ -2,71 +2,219 @@
 /**
  * كارت العميل + كشف حساب - Popup Window
  * Tabs: بيانات العميل | كشف حساب
- * Parameters: customer_id (required)
+ * AUTO-CREATE: any missing tables/columns are created automatically
  */
 require_once __DIR__ . '/../core/config.php';
 $db = getDB();
 
+// ============================================================
+// AUTO-CREATE HELPER FUNCTIONS
+// ============================================================
+function ensureColumn($db, $table, $column, $def) {
+    $exists = $db->query("SHOW COLUMNS FROM `$table` LIKE '$column'")->fetchAll();
+    if (empty($exists)) {
+        try { $db->exec("ALTER TABLE `$table` ADD COLUMN $column $def"); } catch (PDOException $e) {}
+    }
+}
+
+function tableExists($db, $table) {
+    $tables = $db->query("SHOW TABLES LIKE '$table'")->fetchAll();
+    return !empty($tables);
+}
+
+function ensureTable($db, $table, $sql) {
+    if (!tableExists($db, $table)) {
+        try { $db->exec($sql); } catch (PDOException $e) {}
+    }
+}
+
+// ============================================================
+// STEP 1: Ensure customers columns exist
+// ============================================================
+ensureColumn($db, 'customers', 'balance', "DECIMAL(15,2) DEFAULT 0 AFTER phone");
+ensureColumn($db, 'customers', 'address', "VARCHAR(500) NULL AFTER balance");
+ensureColumn($db, 'customers', 'branch_id', "INT NULL AFTER address");
+ensureColumn($db, 'customers', 'email', "VARCHAR(200) NULL AFTER customer_name");
+ensureColumn($db, 'customers', 'tax_number', "VARCHAR(50) NULL AFTER email");
+
+// ============================================================
+// STEP 2: Ensure branches table exists (needed for FK)
+// ============================================================
+if (!tableExists($db, 'branches')) {
+    ensureTable($db, 'branches', "
+        CREATE TABLE IF NOT EXISTS branches (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            branch_name VARCHAR(200) NOT NULL,
+            branch_code VARCHAR(50) NULL,
+            address VARCHAR(500) NULL,
+            phone VARCHAR(50) NULL,
+            is_active TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+}
+
+// ============================================================
+// STEP 3: Ensure customer_payments table exists
+// ============================================================
+ensureTable($db, 'customer_payments', "
+    CREATE TABLE IF NOT EXISTS customer_payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payment_number VARCHAR(50) NOT NULL,
+        customer_id INT NOT NULL,
+        invoice_id INT NULL,
+        amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+        payment_date DATE NOT NULL,
+        payment_method VARCHAR(50) DEFAULT 'cash',
+        notes TEXT NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// ============================================================
+// STEP 4: Ensure sale_return_invoices table exists
+// ============================================================
+ensureTable($db, 'sale_return_invoices', "
+    CREATE TABLE IF NOT EXISTS sale_return_invoices (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_number VARCHAR(50) NOT NULL,
+        customer_id INT NOT NULL,
+        store_id INT NULL,
+        user_id INT NULL,
+        return_date DATE NOT NULL,
+        subtotal DECIMAL(15,2) DEFAULT 0,
+        discount_pct DECIMAL(5,2) DEFAULT 0,
+        discount_val DECIMAL(15,2) DEFAULT 0,
+        vat_amount DECIMAL(15,2) DEFAULT 0,
+        grand_total DECIMAL(15,2) DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'open',
+        notes TEXT NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// ============================================================
+// STEP 5: Ensure sale_return_items table exists
+// ============================================================
+ensureTable($db, 'sale_return_items', "
+    CREATE TABLE IF NOT EXISTS sale_return_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_id INT NOT NULL,
+        product_id INT NULL,
+        product_name VARCHAR(300) NULL,
+        product_code VARCHAR(100) NULL,
+        barcode VARCHAR(100) NULL,
+        unit_name VARCHAR(100) DEFAULT 'علبة',
+        quantity DECIMAL(10,2) DEFAULT 0,
+        sell_price DECIMAL(15,2) DEFAULT 0,
+        line_total DECIMAL(15,2) DEFAULT 0,
+        expiry_date DATE NULL,
+        batch_number VARCHAR(100) NULL,
+        notes TEXT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// ============================================================
+// STEP 6: Ensure customer_transactions table exists
+// ============================================================
+ensureTable($db, 'customer_transactions', "
+    CREATE TABLE IF NOT EXISTS customer_transactions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        customer_id INT NOT NULL,
+        transaction_type VARCHAR(50) NOT NULL,
+        reference_type VARCHAR(50) NULL,
+        reference_id INT NULL,
+        reference_number VARCHAR(50) NULL,
+        debit DECIMAL(15,2) DEFAULT 0,
+        credit DECIMAL(15,2) DEFAULT 0,
+        balance_after DECIMAL(15,2) DEFAULT 0,
+        notes TEXT NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// ============================================================
+// STEP 7: Ensure inventory_movements table exists
+// ============================================================
+ensureTable($db, 'inventory_movements', "
+    CREATE TABLE IF NOT EXISTS inventory_movements (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        store_id INT NULL,
+        product_id INT NULL,
+        movement_type VARCHAR(50) NOT NULL,
+        reference_type VARCHAR(50) NULL,
+        reference_id INT NULL,
+        reference_number VARCHAR(50) NULL,
+        quantity DECIMAL(10,2) DEFAULT 0,
+        unit_cost DECIMAL(15,2) DEFAULT 0,
+        total_cost DECIMAL(15,2) DEFAULT 0,
+        notes TEXT NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// ============================================================
+// STEP 8: Ensure sale_invoices columns exist
+// ============================================================
+ensureColumn($db, 'sale_invoices', 'invoice_time', 'TIME NULL AFTER invoice_date');
+ensureColumn($db, 'sale_invoices', 'profit_amount', 'DECIMAL(15,2) DEFAULT 0 AFTER remaining_amount');
+ensureColumn($db, 'sale_invoices', 'cost_amount', 'DECIMAL(15,2) DEFAULT 0 AFTER profit_amount');
+ensureColumn($db, 'sale_invoices', 'extra_discount_pct', 'DECIMAL(5,2) DEFAULT 0 AFTER discount_val');
+ensureColumn($db, 'sale_invoices', 'extra_discount_val', 'DECIMAL(15,2) DEFAULT 0 AFTER extra_discount_pct');
+
+// ============================================================
+// STEP 9: Ensure sale_invoice_items columns exist
+// ============================================================
+ensureColumn($db, 'sale_invoice_items', 'batch_id', 'INT NULL AFTER batch_number');
+
+// ============================================================
+// NOW FETCH DATA
+// ============================================================
 $customer_id = intval($_GET['customer_id'] ?? 0);
 if ($customer_id <= 0) die('معرف العميل مطلوب');
 
-// Check which columns exist in customers table
-$cols = $db->query("SHOW COLUMNS FROM customers")->fetchAll(PDO::FETCH_COLUMN);
-$hasBalance = in_array('balance', $cols);
-$hasAddress = in_array('address', $cols);
-$hasBranch = in_array('branch_id', $cols);
-$hasEmail = in_array('email', $cols);
-$hasTaxNumber = in_array('tax_number', $cols);
-
-// Check which tables exist
-$tables = $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
-$hasSaleInvoices = in_array('sale_invoices', $tables);
-$hasCustomerPayments = in_array('customer_payments', $tables);
-$hasSaleReturns = in_array('sale_return_invoices', $tables);
-$hasCustTransactions = in_array('customer_transactions', $tables);
-
-// Build select
-$sel = "c.id, c.customer_name, c.customer_code, c.phone, c.is_active, c.created_at";
-$join = "";
-if ($hasBalance) $sel .= ", c.balance";
-if ($hasAddress) $sel .= ", c.address";
-if ($hasBranch) { $sel .= ", c.branch_id, b.branch_name"; $join = " LEFT JOIN branches b ON c.branch_id = b.id"; }
-
-$stmt = $db->prepare("SELECT $sel FROM customers c $join WHERE c.id = ?");
+$stmt = $db->prepare("
+    SELECT c.*, b.branch_name 
+    FROM customers c 
+    LEFT JOIN branches b ON c.branch_id = b.id 
+    WHERE c.id = ?
+");
 $stmt->execute([$customer_id]);
 $customer = $stmt->fetch();
 if (!$customer) die('العميل غير موجود');
 
 // Stats
 $stats = ['inv_count' => 0, 'total_sales' => 0, 'total_paid' => 0];
-if ($hasSaleInvoices) {
-    try {
-        $s = $db->prepare("SELECT COUNT(*) as inv_count, COALESCE(SUM(grand_total),0) as total_sales, COALESCE(SUM(paid_amount),0) as total_paid FROM sale_invoices WHERE customer_id = ?");
-        $s->execute([$customer_id]);
-        $stats = $s->fetch();
-    } catch (PDOException $e) {}
-}
+try {
+    $s = $db->prepare("
+        SELECT COUNT(*) as inv_count, COALESCE(SUM(grand_total),0) as total_sales, COALESCE(SUM(paid_amount),0) as total_paid 
+        FROM sale_invoices WHERE customer_id = ?");
+    $s->execute([$customer_id]);
+    $stats = $s->fetch();
+} catch (PDOException $e) {}
 
-// Get ledger transactions - build UNION dynamically based on existing tables
+// Ledger
 $from_date = $_GET['from_date'] ?? date('Y-m-d', strtotime('-3 months'));
 $to_date = $_GET['to_date'] ?? date('Y-m-d');
-$transactions = [];
 
+$transactions = [];
 $unions = [];
 $params = [];
 
-if ($hasSaleInvoices) {
-    $unions[] = "SELECT 'invoice' as type, si.id as ref_id, si.invoice_number as ref_number, si.invoice_date as trans_date, si.grand_total as debit, si.paid_amount as credit, si.status, 'فاتورة بيع' as trans_type, si.notes FROM sale_invoices si WHERE si.customer_id = ? AND si.invoice_date BETWEEN ? AND ?";
+if (tableExists($db, 'sale_invoices')) {
+    $unions[] = "SELECT 'invoice' as type, id as ref_id, invoice_number as ref_number, invoice_date as trans_date, grand_total as debit, paid_amount as credit, status, 'فاتورة بيع' as trans_type, notes FROM sale_invoices WHERE customer_id = ? AND invoice_date BETWEEN ? AND ?";
     $params = array_merge($params, [$customer_id, $from_date, $to_date]);
 }
-
-if ($hasCustomerPayments) {
-    $unions[] = "SELECT 'payment' as type, cp.id as ref_id, cp.payment_number as ref_number, cp.payment_date as trans_date, 0 as debit, cp.amount as credit, 'completed' as status, 'دفعة' as trans_type, cp.notes FROM customer_payments cp WHERE cp.customer_id = ? AND cp.payment_date BETWEEN ? AND ?";
+if (tableExists($db, 'customer_payments')) {
+    $unions[] = "SELECT 'payment' as type, id as ref_id, payment_number as ref_number, payment_date as trans_date, 0 as debit, amount as credit, 'completed' as status, 'دفعة' as trans_type, notes FROM customer_payments WHERE customer_id = ? AND payment_date BETWEEN ? AND ?";
     $params = array_merge($params, [$customer_id, $from_date, $to_date]);
 }
-
-if ($hasSaleReturns) {
-    $unions[] = "SELECT 'return' as type, sri.id as ref_id, sri.return_number as ref_number, sri.return_date as trans_date, 0 as debit, sri.grand_total as credit, sri.status, 'مرتجع بيع' as trans_type, sri.notes FROM sale_return_invoices sri WHERE sri.customer_id = ? AND sri.return_date BETWEEN ? AND ?";
+if (tableExists($db, 'sale_return_invoices')) {
+    $unions[] = "SELECT 'return' as type, id as ref_id, return_number as ref_number, return_date as trans_date, 0 as debit, grand_total as credit, status, 'مرتجع بيع' as trans_type, notes FROM sale_return_invoices WHERE customer_id = ? AND return_date BETWEEN ? AND ?";
     $params = array_merge($params, [$customer_id, $from_date, $to_date]);
 }
 
@@ -76,15 +224,12 @@ if (!empty($unions)) {
         $ledger = $db->prepare($sql);
         $ledger->execute($params);
         $transactions = $ledger->fetchAll();
-    } catch (PDOException $e) {
-        $transactions = [];
-    }
+    } catch (PDOException $e) { $transactions = []; }
 }
 
-// Calculate running balance
-$runningBalance = 0;
+$runningBal = 0;
 foreach (array_reverse($transactions) as $t) {
-    $runningBalance += floatval($t['debit']) - floatval($t['credit']);
+    $runningBal += floatval($t['debit']) - floatval($t['credit']);
 }
 ?>
 <!DOCTYPE html>
@@ -101,10 +246,10 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .popup-header{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;padding:15px 20px;display:flex;align-items:center;gap:15px;}
 .popup-header h4{margin:0;font-size:18px;}
 .popup-header .cust-code{background:rgba(255,255,255,0.2);padding:3px 12px;border-radius:15px;font-size:12px;}
-.nav-tabs{padding:0 20px;background:#fff;border-bottom:2px solid #e9ecef;margin:0;}
-.nav-tabs .nav-link{border:none;padding:12px 20px;font-weight:600;color:#666;font-size:14px;cursor:pointer;}
+.nav-tabs{padding:0 20px;background:#fff;border-bottom:2px solid #e9ecef;margin:0;list-style:none;display:flex;}
+.nav-tabs .nav-link{border:none;padding:12px 20px;font-weight:600;color:#666;font-size:14px;cursor:pointer;background:transparent;}
 .nav-tabs .nav-link:hover{color:var(--primary);}
-.nav-tabs .nav-link.active{color:var(--primary);border-bottom:3px solid var(--primary);background:transparent;}
+.nav-tabs .nav-link.active{color:var(--primary);border-bottom:3px solid var(--primary);}
 .tab-content{padding:20px;}
 .info-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:15px;}
 .info-card h6{color:var(--primary);font-weight:700;margin-bottom:15px;font-size:14px;border-bottom:2px solid #e9ecef;padding-bottom:8px;}
@@ -113,13 +258,12 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .info-row span{color:#333;font-weight:600;}
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:20px;}
 .stat-box{background:#fff;border-radius:12px;padding:15px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-top:3px solid var(--primary);}
-.stat-box.sales{border-top-color:var(--primary);}
 .stat-box.paid{border-top-color:var(--green);}
 .stat-box.due{border-top-color:var(--red);}
 .stat-box.count{border-top-color:var(--gold);}
 .stat-box .num{font-size:24px;font-weight:700;color:#333;}
 .stat-box .lbl{font-size:12px;color:#888;margin-top:5px;}
-.filter-bar{background:#fff;border-radius:8px;padding:12px 15px;display:flex;gap:10px;align-items:center;margin-bottom:15px;box-shadow:0 1px 4px rgba(0,0,0,0.05);}
+.filter-bar{background:#fff;border-radius:8px;padding:12px 15px;display:flex;gap:10px;align-items:center;margin-bottom:15px;box-shadow:0 1px 4px rgba(0,0,0,0.05);flex-wrap:wrap;}
 .filter-bar input{height:35px;font-size:13px;}
 .filter-bar button{height:35px;font-size:13px;}
 .ledger-table{width:100%;border-collapse:collapse;font-size:12px;}
@@ -131,14 +275,11 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .ledger-table .type-payment{background:#e8f5e9;color:#2e7d32;}
 .ledger-table .type-return{background:#fce4ec;color:#c62828;}
 .ledger-table .amount{font-weight:700;}
-.ledger-table .status-paid{color:var(--green);}
-.ledger-table .status-partial{color:var(--gold);}
-.ledger-table .status-open{color:var(--red);}
-.total-bar{background:linear-gradient(135deg,#f8f9fa,#e9ecef);border-radius:8px;padding:15px;margin-top:15px;display:flex;justify-content:space-around;font-size:14px;}
+.total-bar{background:linear-gradient(135deg,#f8f9fa,#e9ecef);border-radius:8px;padding:15px;margin-top:15px;display:flex;justify-content:space-around;font-size:14px;flex-wrap:wrap;gap:15px;}
 .total-bar .t-item{text-align:center;}
 .total-bar .t-item strong{display:block;font-size:18px;margin-top:5px;}
 .no-data{text-align:center;padding:40px;color:#999;}
-@media print{.filter-bar,.no-print{display:none!important}.tab-content{display:block!important}.tab-pane{display:block!important;opacity:1!important;}}
+@media print{.filter-bar,.no-print{display:none!important}.tab-content{display:block!important}.tab-pane{display:block!important;}}
 </style>
 </head>
 <body>
@@ -171,19 +312,19 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 <div id="tab-profile" class="tab-pane" style="display:block">
     <div class="stats-row">
         <div class="stat-box count">
-            <div class="num"><?= number_format($stats['inv_count'] ?? 0) ?></div>
+            <div class="num"><?= number_format(intval($stats['inv_count'] ?? 0)) ?></div>
             <div class="lbl">عدد الفواتير</div>
         </div>
-        <div class="stat-box sales">
-            <div class="num" style="color:var(--primary)"><?= number_format($stats['total_sales'] ?? 0, 2) ?></div>
+        <div class="stat-box" style="border-top-color:var(--primary)">
+            <div class="num" style="color:var(--primary)"><?= number_format(floatval($stats['total_sales'] ?? 0), 2) ?></div>
             <div class="lbl">إجمالي المبيعات</div>
         </div>
         <div class="stat-box paid">
-            <div class="num" style="color:var(--green)"><?= number_format($stats['total_paid'] ?? 0, 2) ?></div>
+            <div class="num" style="color:var(--green)"><?= number_format(floatval($stats['total_paid'] ?? 0), 2) ?></div>
             <div class="lbl">إجمالي المدفوعات</div>
         </div>
         <div class="stat-box due">
-            <div class="num" style="color:var(--red)"><?= number_format(($stats['total_sales'] - $stats['total_paid']) ?? 0, 2) ?></div>
+            <div class="num" style="color:var(--red)"><?= number_format(floatval($stats['total_sales'] ?? 0) - floatval($stats['total_paid'] ?? 0), 2) ?></div>
             <div class="lbl">المبلغ المستحق</div>
         </div>
     </div>
@@ -194,11 +335,11 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                 <h6><i class="bi bi-info-circle"></i> البيانات الأساسية</h6>
                 <div class="info-row"><label><i class="bi bi-person"></i> الاسم:</label><span><?= htmlspecialchars($customer['customer_name']) ?></span></div>
                 <div class="info-row"><label><i class="bi bi-hash"></i> الكود:</label><span><?= htmlspecialchars($customer['customer_code'] ?? '-') ?></span></div>
-                <?php if ($hasTaxNumber && $customer['tax_number']): ?>
+                <?php if (!empty($customer['tax_number'])): ?>
                 <div class="info-row"><label><i class="bi bi-receipt"></i> الرقم الضريبي:</label><span><?= htmlspecialchars($customer['tax_number']) ?></span></div>
                 <?php endif; ?>
                 <div class="info-row"><label><i class="bi bi-telephone"></i> التليفون:</label><span dir="ltr"><?= htmlspecialchars($customer['phone'] ?? '-') ?></span></div>
-                <?php if ($hasEmail && $customer['email']): ?>
+                <?php if (!empty($customer['email'])): ?>
                 <div class="info-row"><label><i class="bi bi-envelope"></i> البريد:</label><span><?= htmlspecialchars($customer['email']) ?></span></div>
                 <?php endif; ?>
             </div>
@@ -206,18 +347,21 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
         <div class="col-md-6">
             <div class="info-card">
                 <h6><i class="bi bi-geo-alt"></i> العنوان والفرع</h6>
-                <?php if ($hasAddress && $customer['address']): ?>
+                <?php if (!empty($customer['address'])): ?>
                 <div class="info-row"><label><i class="bi bi-geo-alt-fill"></i> العنوان:</label><span><?= htmlspecialchars($customer['address']) ?></span></div>
                 <?php else: ?>
                 <div class="info-row"><label><i class="bi bi-geo-alt-fill"></i> العنوان:</label><span class="text-muted">غير مسجل</span></div>
                 <?php endif; ?>
-                <?php if ($hasBranch && $customer['branch_name']): ?>
+                <?php if (!empty($customer['branch_name'])): ?>
                 <div class="info-row"><label><i class="bi bi-building"></i> الفرع:</label><span><?= htmlspecialchars($customer['branch_name']) ?></span></div>
                 <?php else: ?>
                 <div class="info-row"><label><i class="bi bi-building"></i> الفرع:</label><span class="text-muted">غير محدد</span></div>
                 <?php endif; ?>
-                <div class="info-row"><label><i class="bi bi-calendar"></i> تسجيل:</label><span><?= $customer['created_at'] ? date('Y-m-d', strtotime($customer['created_at'])) : '-' ?></span></div>
-                <div class="info-row"><label><i class="bi bi-shield-check"></i> الحالة:</label><span><?= $customer['is_active'] ? '<span style="color:var(--green)">نشط</span>' : '<span style="color:var(--red)">غير نشط</span>' ?></span></div>
+                <div class="info-row"><label><i class="bi bi-calendar"></i> تسجيل:</label><span><?= !empty($customer['created_at']) ? date('Y-m-d', strtotime($customer['created_at'])) : '-' ?></span></div>
+                <div class="info-row"><label><i class="bi bi-shield-check"></i> الحالة:</label><span><?= !empty($customer['is_active']) ? '<span style="color:var(--green)">نشط</span>' : '<span style="color:var(--red)">غير نشط</span>' ?></span></div>
+                <?php if (isset($customer['balance'])): ?>
+                <div class="info-row"><label><i class="bi bi-wallet2"></i> الرصيد:</label><span style="color:var(--primary);font-weight:700"><?= number_format(floatval($customer['balance']), 2) ?> ج.م</span></div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -227,12 +371,12 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 <div id="tab-ledger" class="tab-pane" style="display:none">
     <form method="GET" class="filter-bar no-print">
         <input type="hidden" name="customer_id" value="<?= $customer_id ?>">
-        <label style="font-size:13px;font-weight:600"><i class="bi bi-funnel"></i> فلتر:</label>
+        <label style="font-size:13px;font-weight:600"><i class="bi bi-funnel"></i> فترة:</label>
         <input type="date" name="from_date" class="form-control" value="<?= $from_date ?>" style="width:140px">
         <span>إلى</span>
         <input type="date" name="to_date" class="form-control" value="<?= $to_date ?>" style="width:140px">
         <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> عرض</button>
-        <button type="button" class="btn btn-outline-secondary" onclick="location.href='?customer_id=<?= $customer_id ?>'"><i class="bi bi-arrow-counterclockwise"></i></button>
+        <button type="button" class="btn btn-outline-secondary" onclick="location.href='?customer_id=<?= $customer_id ?>'"><i class="bi bi-arrow-counterclockwise"></i> إعادة</button>
         <div class="ms-auto" style="font-size:13px">
             <span class="badge bg-primary"><?= count($transactions) ?> حركة</span>
         </div>
@@ -245,12 +389,12 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                     <tr>
                         <th style="width:40px">#</th>
                         <th style="width:100px">التاريخ</th>
-                        <th style="width:100px">النوع</th>
+                        <th style="width:90px">النوع</th>
                         <th>رقم المرجع</th>
-                        <th style="width:80px">مدين</th>
-                        <th style="width:80px">دائن</th>
-                        <th style="width:80px">الرصيد</th>
-                        <th style="width:80px">الحالة</th>
+                        <th style="width:90px">مدين</th>
+                        <th style="width:90px">دائن</th>
+                        <th style="width:90px">الرصيد</th>
+                        <th style="width:70px">الحالة</th>
                         <th>ملاحظات</th>
                     </tr>
                 </thead>
@@ -258,46 +402,29 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                     <?php if (empty($transactions)): ?>
                     <tr><td colspan="9" class="no-data"><i class="bi bi-inbox" style="font-size:32px"></i><br>لا توجد حركات في الفترة المحددة</td></tr>
                     <?php else: 
-                        $runningBal = 0;
-                        foreach (array_reverse($transactions) as $t) {
-                            $runningBal += floatval($t['debit']) - floatval($t['credit']);
-                        }
                         $runningBalForward = 0;
                         foreach ($transactions as $i => $t):
                             $runningBalForward += floatval($t['debit']) - floatval($t['credit']);
-                            $typeClass = match($t['type']) {
-                                'invoice' => 'type-invoice',
-                                'payment' => 'type-payment',
-                                'return' => 'type-return',
-                                default => 'type-invoice'
-                            };
-                            $typeLabel = match($t['type']) {
-                                'invoice' => 'فاتورة',
-                                'payment' => 'دفعة',
-                                'return' => 'مرتجع',
-                                default => $t['type']
-                            };
-                            $statusClass = match($t['status']) {
-                                'paid' => 'status-paid',
-                                'partial' => 'status-partial',
-                                'open' => 'status-open',
-                                default => ''
-                            };
-                            $statusLabel = match($t['status']) {
-                                'paid' => 'مسدد',
-                                'partial' => 'جزئي',
-                                'open' => 'مفتوح',
-                                'completed' => 'تم',
-                                default => $t['status']
-                            };
+                            $tc = $t['type'] ?? 'invoice';
+                            $typeClass = 'type-invoice';
+                            $typeLabel = 'فاتورة';
+                            if ($tc === 'payment') { $typeClass = 'type-payment'; $typeLabel = 'دفعة'; }
+                            elseif ($tc === 'return') { $typeClass = 'type-return'; $typeLabel = 'مرتجع'; }
+                            
+                            $st = $t['status'] ?? 'open';
+                            $statusClass = '';
+                            $statusLabel = $st;
+                            if ($st === 'paid' || $st === 'completed') { $statusClass = 'text-success'; $statusLabel = 'مسدد'; }
+                            elseif ($st === 'partial') { $statusClass = 'text-warning'; $statusLabel = 'جزئي'; }
+                            elseif ($st === 'open') { $statusClass = 'text-danger'; $statusLabel = 'مفتوح'; }
                     ?>
                     <tr>
                         <td><?= $i + 1 ?></td>
-                        <td><?= $t['trans_date'] ?></td>
+                        <td><?= htmlspecialchars($t['trans_date'] ?? '-') ?></td>
                         <td><span class="type-badge <?= $typeClass ?>"><?= $typeLabel ?></span></td>
-                        <td><small class="font-monospace"><?= htmlspecialchars($t['ref_number']) ?></small></td>
-                        <td class="amount text-danger"><?= $t['debit'] > 0 ? number_format($t['debit'], 2) : '-' ?></td>
-                        <td class="amount text-success"><?= $t['credit'] > 0 ? number_format($t['credit'], 2) : '-' ?></td>
+                        <td><small class="font-monospace"><?= htmlspecialchars($t['ref_number'] ?? '-') ?></small></td>
+                        <td class="amount text-danger"><?= floatval($t['debit'] ?? 0) > 0 ? number_format(floatval($t['debit']), 2) : '-' ?></td>
+                        <td class="amount text-success"><?= floatval($t['credit'] ?? 0) > 0 ? number_format(floatval($t['credit']), 2) : '-' ?></td>
                         <td class="amount fw-bold"><?= number_format($runningBalForward, 2) ?></td>
                         <td class="<?= $statusClass ?>"><?= $statusLabel ?></td>
                         <td><small class="text-muted"><?= htmlspecialchars($t['notes'] ?? '') ?></small></td>
@@ -309,8 +436,8 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     </div>
     
     <div class="total-bar">
-        <div class="t-item">إجمالي مدين<strong style="color:var(--red)"><?= number_format(array_sum(array_column($transactions, 'debit')), 2) ?></strong></div>
-        <div class="t-item">إجمالي دائن<strong style="color:var(--green)"><?= number_format(array_sum(array_column($transactions, 'credit')), 2) ?></strong></div>
+        <div class="t-item">إجمالي مدين<strong style="color:var(--red)"><?= number_format(array_sum(array_map(fn($t)=>floatval($t['debit']??0),$transactions)), 2) ?></strong></div>
+        <div class="t-item">إجمالي دائن<strong style="color:var(--green)"><?= number_format(array_sum(array_map(fn($t)=>floatval($t['credit']??0),$transactions)), 2) ?></strong></div>
         <div class="t-item">الرصيد النهائي<strong style="color:var(--primary)"><?= number_format($runningBalForward ?? 0, 2) ?></strong></div>
     </div>
 </div>
@@ -325,14 +452,12 @@ function showTab(tabId, btn) {
     btn.classList.add('active');
 }
 
-// Auto-switch to ledger tab if requested
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('tab') === 'ledger') {
     const ledgerTab = document.querySelector('button[onclick*="tab-ledger"]');
     if (ledgerTab) ledgerTab.click();
 }
 
-// Keyboard shortcuts
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') window.close();
 });
