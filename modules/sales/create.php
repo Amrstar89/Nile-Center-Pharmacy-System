@@ -6,18 +6,141 @@ requireAuth();
 $db = getDB();
 $page_title = 'فاتورة بيع جديدة';
 
+// ============================================================
+// AUTO-CREATE HELPER FUNCTIONS - ALWAYS ADD, NEVER REMOVE
+// ============================================================
 function addColIfMissing($db, $table, $column, $def) {
     $cols = $db->query("SHOW COLUMNS FROM `$table` LIKE '$column'")->fetchAll();
     if (empty($cols)) {
         try { $db->exec("ALTER TABLE `$table` ADD COLUMN $column $def"); } catch (PDOException $e) {}
     }
 }
+function tableExists($db, $table) {
+    return !empty($db->query("SHOW TABLES LIKE '$table'")->fetchAll());
+}
+function ensureTable($db, $table, $sql) {
+    if (!tableExists($db, $table)) {
+        try { $db->exec($sql); } catch (PDOException $e) {}
+    }
+}
+
+// --- customers columns ---
+addColIfMissing($db, 'customers', 'balance', "DECIMAL(15,2) DEFAULT 0 AFTER phone");
+addColIfMissing($db, 'customers', 'address', "VARCHAR(500) NULL AFTER balance");
+addColIfMissing($db, 'customers', 'branch_id', "INT NULL AFTER address");
+addColIfMissing($db, 'customers', 'email', "VARCHAR(200) NULL AFTER customer_name");
+addColIfMissing($db, 'customers', 'tax_number', "VARCHAR(50) NULL AFTER email");
+
+// --- sale_invoices columns ---
 addColIfMissing($db, 'sale_invoices', 'invoice_time', 'TIME NULL AFTER invoice_date');
+addColIfMissing($db, 'sale_invoices', 'profit_amount', 'DECIMAL(15,2) DEFAULT 0 AFTER remaining_amount');
+addColIfMissing($db, 'sale_invoices', 'cost_amount', 'DECIMAL(15,2) DEFAULT 0 AFTER profit_amount');
+addColIfMissing($db, 'sale_invoices', 'extra_discount_pct', 'DECIMAL(5,2) DEFAULT 0 AFTER discount_val');
+addColIfMissing($db, 'sale_invoices', 'extra_discount_val', 'DECIMAL(15,2) DEFAULT 0 AFTER extra_discount_pct');
+
+// --- sale_invoice_items columns ---
 addColIfMissing($db, 'sale_invoice_items', 'batch_id', 'INT NULL AFTER batch_number');
+
+// --- customer_payments table ---
+ensureTable($db, 'customer_payments', "
+    CREATE TABLE IF NOT EXISTS customer_payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payment_number VARCHAR(50) NOT NULL,
+        customer_id INT NOT NULL,
+        invoice_id INT NULL,
+        amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+        payment_date DATE NOT NULL,
+        payment_method VARCHAR(50) DEFAULT 'cash',
+        notes TEXT NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// --- customer_transactions table ---
+ensureTable($db, 'customer_transactions', "
+    CREATE TABLE IF NOT EXISTS customer_transactions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        customer_id INT NOT NULL,
+        transaction_type VARCHAR(50) NOT NULL,
+        reference_type VARCHAR(50) NULL,
+        reference_id INT NULL,
+        reference_number VARCHAR(50) NULL,
+        debit DECIMAL(15,2) DEFAULT 0,
+        credit DECIMAL(15,2) DEFAULT 0,
+        balance_after DECIMAL(15,2) DEFAULT 0,
+        notes TEXT NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// --- inventory_movements table ---
+ensureTable($db, 'inventory_movements', "
+    CREATE TABLE IF NOT EXISTS inventory_movements (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        store_id INT NULL,
+        product_id INT NULL,
+        movement_type VARCHAR(50) NOT NULL,
+        reference_type VARCHAR(50) NULL,
+        reference_id INT NULL,
+        reference_number VARCHAR(50) NULL,
+        quantity DECIMAL(10,2) DEFAULT 0,
+        unit_cost DECIMAL(15,2) DEFAULT 0,
+        total_cost DECIMAL(15,2) DEFAULT 0,
+        notes TEXT NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// --- sale_return_invoices table ---
+ensureTable($db, 'sale_return_invoices', "
+    CREATE TABLE IF NOT EXISTS sale_return_invoices (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_number VARCHAR(50) NOT NULL,
+        customer_id INT NOT NULL,
+        store_id INT NULL,
+        user_id INT NULL,
+        return_date DATE NOT NULL,
+        subtotal DECIMAL(15,2) DEFAULT 0,
+        discount_pct DECIMAL(5,2) DEFAULT 0,
+        discount_val DECIMAL(15,2) DEFAULT 0,
+        vat_amount DECIMAL(15,2) DEFAULT 0,
+        grand_total DECIMAL(15,2) DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'open',
+        notes TEXT NULL,
+        created_by INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// --- sale_return_items table ---
+ensureTable($db, 'sale_return_items', "
+    CREATE TABLE IF NOT EXISTS sale_return_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        return_id INT NOT NULL,
+        product_id INT NULL,
+        product_name VARCHAR(300) NULL,
+        product_code VARCHAR(100) NULL,
+        barcode VARCHAR(100) NULL,
+        unit_name VARCHAR(100) DEFAULT 'علبة',
+        quantity DECIMAL(10,2) DEFAULT 0,
+        sell_price DECIMAL(15,2) DEFAULT 0,
+        line_total DECIMAL(15,2) DEFAULT 0,
+        expiry_date DATE NULL,
+        batch_number VARCHAR(100) NULL,
+        notes TEXT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
+// ============================================================
+// END AUTO-CREATE
+// ============================================================
 
 $branches = $db->query("SELECT id, branch_name FROM branches WHERE is_active = 1 ORDER BY branch_name")->fetchAll();
 $stores = $db->query("SELECT s.id, s.store_name, s.branch_id FROM stores s WHERE s.is_active = 1 ORDER BY s.store_name")->fetchAll();
-$customers = $db->query("SELECT id, customer_name, customer_code, phone FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 500")->fetchAll();
+$customers = $db->query("SELECT id, customer_name, customer_code, phone, balance FROM customers WHERE is_active = 1 ORDER BY customer_name LIMIT 500")->fetchAll();
 $users = $db->query("SELECT id, full_name FROM users WHERE is_active = 1 ORDER BY full_name")->fetchAll();
 $units = $db->query("SELECT id, unit_name_ar FROM product_units WHERE is_active = 1 ORDER BY unit_name_ar")->fetchAll();
 
