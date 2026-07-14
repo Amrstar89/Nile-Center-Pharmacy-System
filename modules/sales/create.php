@@ -176,10 +176,16 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .bottom-bar .item strong{color:#333;font-size:13px;white-space:nowrap}
 .bottom-bar .grand{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;padding:8px 20px;border-radius:10px;font-size:16px;font-weight:700}
 .bottom-bar .item input,.bottom-bar .item select{height:26px;padding:2px 5px;font-size:12px;width:80px;border:1px solid #ccc;border-radius:4px}
-.customer-display{background:#e3f2fd;border:1px solid #90caf9;border-radius:6px;padding:6px 12px;display:none}
-.customer-display.show{display:flex;align-items:center;gap:10px}
+.customer-display{background:#e3f2fd;border:1px solid #90caf9;border-radius:6px;padding:6px 12px;display:none;align-items:center;gap:10px;flex-wrap:wrap}
+.customer-display.show{display:flex}
 .customer-display .cust-name{font-weight:700;color:#1565c0}
 .customer-display .cust-balance{font-size:12px;color:#666}
+.cust-actions{display:flex;gap:6px;margin-right:auto}
+.cust-actions .btn-action{padding:4px 12px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:5px}
+.cust-actions .btn-profile{background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff}
+.cust-actions .btn-profile:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(102,126,234,0.3)}
+.cust-actions .btn-ledger{background:linear-gradient(135deg,var(--green),#2e7d32);color:#fff}
+.cust-actions .btn-ledger:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(25,135,84,0.3)}
 .save-section{background:linear-gradient(135deg,#f8f9fa,#e9ecef);border-top:3px solid var(--green);padding:20px;text-align:center;display:flex;justify-content:center;align-items:center;gap:20px}
 .save-section .btn-save{background:linear-gradient(135deg,var(--green),#2e7d32);color:#fff;border:none;padding:16px 60px;border-radius:14px;font-size:20px;font-weight:700;cursor:pointer;transition:all .2s;box-shadow:0 6px 20px rgba(25,135,84,0.35);display:inline-flex;align-items:center;gap:10px}
 .save-section .btn-save:hover{transform:translateY(-3px);box-shadow:0 8px 25px rgba(25,135,84,0.5)}
@@ -285,14 +291,18 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
       <!-- Inline customer dropdown -->
       <div class="cust-dropdown" id="custDropdown"></div>
     </div>
-    <div class="col-md-5">
+    <div class="col-md-7">
       <div id="customer_display" class="customer-display">
         <i class="bi bi-person-check" style="color:var(--green);font-size:20px"></i>
         <div>
           <div class="cust-name" id="cust_name"></div>
           <div class="cust-balance" id="cust_info"></div>
         </div>
-        <button type="button" class="btn btn-sm btn-link text-danger" onclick="clearCustomer()"><i class="bi bi-x-circle"></i></button>
+        <div class="cust-actions">
+          <button type="button" class="btn-action btn-profile" onclick="openCustomerProfile()"><i class="bi bi-person-vcard"></i> معلومات العميل</button>
+          <button type="button" class="btn-action btn-ledger" onclick="openCustomerLedger()"><i class="bi bi-journal-text"></i> كشف حساب</button>
+        </div>
+        <button type="button" class="btn btn-sm btn-link text-danger" onclick="clearCustomer()" style="margin-right:auto"><i class="bi bi-x-circle"></i></button>
       </div>
     </div>
     <input type="hidden" name="customer_id" id="customer_id" value="0">
@@ -403,6 +413,7 @@ const allCustomers = <?= json_encode($customers) ?>;
 const allUnits = <?= json_encode($units) ?>;
 const CURRENCY = 'ج.م';
 let _currentRowIndex = 0;
+let _currentCustomerId = 0;
 
 // ============ BRANCH → STORE CASCADING ============
 function filterStoresByBranch() {
@@ -824,7 +835,7 @@ function setPayType(type, btn) {
   }
 }
 
-// ============ CUSTOMER SEARCH ============
+// ============ CUSTOMER SEARCH & PROFILE ============
 function openCustomerSearch() {
   const q = document.getElementById('customer_code_input').value;
   const url = '<?= APP_URL ?>/includes/customer-search-popup.php?q=' + encodeURIComponent(q);
@@ -832,6 +843,7 @@ function openCustomerSearch() {
 }
 function onCustomerSelected(customer) {
   document.getElementById('customer_id').value = customer.id;
+  _currentCustomerId = customer.id;
   document.getElementById('customer_code_input').value = customer.customer_code || customer.customer_name || '';
   document.getElementById('cust_name').textContent = customer.customer_name || '';
   document.getElementById('cust_info').textContent = (customer.phone || '') + ' | الرصيد: ' + (customer.balance || 0);
@@ -839,6 +851,7 @@ function onCustomerSelected(customer) {
 }
 function clearCustomer() {
   document.getElementById('customer_id').value = '0';
+  _currentCustomerId = 0;
   document.getElementById('customer_code_input').value = '';
   document.getElementById('customer_display').classList.remove('show');
 }
@@ -861,6 +874,16 @@ function handleCustomerKey(e) {
   if (e.key === 'Escape') {
     document.getElementById('custDropdown').classList.remove('show');
   }
+}
+function openCustomerProfile() {
+  if (!_currentCustomerId) { alert('اختر عميل أولاً'); return; }
+  const url = '<?= APP_URL ?>/includes/customer-profile-popup.php?customer_id=' + _currentCustomerId;
+  window.open(url, 'customerProfile', 'width=1000,height=750,scrollbars=yes,resizable=yes');
+}
+function openCustomerLedger() {
+  if (!_currentCustomerId) { alert('اختر عميل أولاً'); return; }
+  const url = '<?= APP_URL ?>/includes/customer-profile-popup.php?customer_id=' + _currentCustomerId + '&tab=ledger';
+  window.open(url, 'customerLedger', 'width=1000,height=750,scrollbars=yes,resizable=yes');
 }
 
 // ============ SUBMIT ============
