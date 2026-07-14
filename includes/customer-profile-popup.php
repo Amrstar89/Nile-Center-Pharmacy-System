@@ -10,91 +10,76 @@ $db = getDB();
 $customer_id = intval($_GET['customer_id'] ?? 0);
 if ($customer_id <= 0) die('معرف العميل مطلوب');
 
-// Check columns existence
+// Check which columns exist in customers table
 $cols = $db->query("SHOW COLUMNS FROM customers")->fetchAll(PDO::FETCH_COLUMN);
+$hasBalance = in_array('balance', $cols);
 $hasAddress = in_array('address', $cols);
 $hasBranch = in_array('branch_id', $cols);
-$hasBalance = in_array('balance', $cols);
 $hasEmail = in_array('email', $cols);
 $hasTaxNumber = in_array('tax_number', $cols);
 
+// Check which tables exist
+$tables = $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+$hasSaleInvoices = in_array('sale_invoices', $tables);
+$hasCustomerPayments = in_array('customer_payments', $tables);
+$hasSaleReturns = in_array('sale_return_invoices', $tables);
+$hasCustTransactions = in_array('customer_transactions', $tables);
+
 // Build select
 $sel = "c.id, c.customer_name, c.customer_code, c.phone, c.is_active, c.created_at";
-if ($hasAddress) $sel .= ", c.address";
-if ($hasBranch) $sel .= ", c.branch_id";
+$join = "";
 if ($hasBalance) $sel .= ", c.balance";
-if ($hasEmail) $sel .= ", c.email";
-if ($hasTaxNumber) $sel .= ", c.tax_number";
+if ($hasAddress) $sel .= ", c.address";
+if ($hasBranch) { $sel .= ", c.branch_id, b.branch_name"; $join = " LEFT JOIN branches b ON c.branch_id = b.id"; }
 
-$join = '';
-if ($hasBranch) $join = " LEFT JOIN branches b ON c.branch_id = b.id";
-
-$stmt = $db->prepare("SELECT $sel, b.branch_name FROM customers c $join WHERE c.id = ?");
+$stmt = $db->prepare("SELECT $sel FROM customers c $join WHERE c.id = ?");
 $stmt->execute([$customer_id]);
 $customer = $stmt->fetch();
 if (!$customer) die('العميل غير موجود');
 
 // Stats
-$invoiceStats = $db->prepare("SELECT COUNT(*) as inv_count, COALESCE(SUM(grand_total),0) as total_sales, COALESCE(SUM(paid_amount),0) as total_paid FROM sale_invoices WHERE customer_id = ?");
-$invoiceStats->execute([$customer_id]);
-$stats = $invoiceStats->fetch();
+$stats = ['inv_count' => 0, 'total_sales' => 0, 'total_paid' => 0];
+if ($hasSaleInvoices) {
+    try {
+        $s = $db->prepare("SELECT COUNT(*) as inv_count, COALESCE(SUM(grand_total),0) as total_sales, COALESCE(SUM(paid_amount),0) as total_paid FROM sale_invoices WHERE customer_id = ?");
+        $s->execute([$customer_id]);
+        $stats = $s->fetch();
+    } catch (PDOException $e) {}
+}
 
-// Get ledger transactions
+// Get ledger transactions - build UNION dynamically based on existing tables
 $from_date = $_GET['from_date'] ?? date('Y-m-d', strtotime('-3 months'));
 $to_date = $_GET['to_date'] ?? date('Y-m-d');
+$transactions = [];
 
-// Build ledger: invoices + payments + returns
-$ledger = $db->prepare("
-    SELECT 
-        'invoice' as type,
-        si.id as ref_id,
-        si.invoice_number as ref_number,
-        si.invoice_date as trans_date,
-        si.grand_total as debit,
-        si.paid_amount as credit,
-        (si.grand_total - si.paid_amount) as balance,
-        si.status,
-        'فاتورة بيع' as trans_type,
-        si.notes
-    FROM sale_invoices si
-    WHERE si.customer_id = ? AND si.invoice_date BETWEEN ? AND ?
-    
-    UNION ALL
-    
-    SELECT 
-        'payment' as type,
-        cp.id as ref_id,
-        cp.payment_number as ref_number,
-        cp.payment_date as trans_date,
-        0 as debit,
-        cp.amount as credit,
-        0 as balance,
-        'completed' as status,
-        'دفعة' as trans_type,
-        cp.notes
-    FROM customer_payments cp
-    WHERE cp.customer_id = ? AND cp.payment_date BETWEEN ? AND ?
-    
-    UNION ALL
-    
-    SELECT 
-        'return' as type,
-        sri.id as ref_id,
-        sri.return_number as ref_number,
-        sri.return_date as trans_date,
-        0 as debit,
-        sri.grand_total as credit,
-        0 as balance,
-        sri.status,
-        'مرتجع بيع' as trans_type,
-        sri.notes
-    FROM sale_return_invoices sri
-    WHERE sri.customer_id = ? AND sri.return_date BETWEEN ? AND ?
-    
-    ORDER BY trans_date DESC, ref_id DESC
-");
-$ledger->execute([$customer_id, $from_date, $to_date, $customer_id, $from_date, $to_date, $customer_id, $from_date, $to_date]);
-$transactions = $ledger->fetchAll();
+$unions = [];
+$params = [];
+
+if ($hasSaleInvoices) {
+    $unions[] = "SELECT 'invoice' as type, si.id as ref_id, si.invoice_number as ref_number, si.invoice_date as trans_date, si.grand_total as debit, si.paid_amount as credit, si.status, 'فاتورة بيع' as trans_type, si.notes FROM sale_invoices si WHERE si.customer_id = ? AND si.invoice_date BETWEEN ? AND ?";
+    $params = array_merge($params, [$customer_id, $from_date, $to_date]);
+}
+
+if ($hasCustomerPayments) {
+    $unions[] = "SELECT 'payment' as type, cp.id as ref_id, cp.payment_number as ref_number, cp.payment_date as trans_date, 0 as debit, cp.amount as credit, 'completed' as status, 'دفعة' as trans_type, cp.notes FROM customer_payments cp WHERE cp.customer_id = ? AND cp.payment_date BETWEEN ? AND ?";
+    $params = array_merge($params, [$customer_id, $from_date, $to_date]);
+}
+
+if ($hasSaleReturns) {
+    $unions[] = "SELECT 'return' as type, sri.id as ref_id, sri.return_number as ref_number, sri.return_date as trans_date, 0 as debit, sri.grand_total as credit, sri.status, 'مرتجع بيع' as trans_type, sri.notes FROM sale_return_invoices sri WHERE sri.customer_id = ? AND sri.return_date BETWEEN ? AND ?";
+    $params = array_merge($params, [$customer_id, $from_date, $to_date]);
+}
+
+if (!empty($unions)) {
+    try {
+        $sql = implode(" UNION ALL ", $unions) . " ORDER BY trans_date DESC, ref_id DESC";
+        $ledger = $db->prepare($sql);
+        $ledger->execute($params);
+        $transactions = $ledger->fetchAll();
+    } catch (PDOException $e) {
+        $transactions = [];
+    }
+}
 
 // Calculate running balance
 $runningBalance = 0;
@@ -273,13 +258,13 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                     <?php if (empty($transactions)): ?>
                     <tr><td colspan="9" class="no-data"><i class="bi bi-inbox" style="font-size:32px"></i><br>لا توجد حركات في الفترة المحددة</td></tr>
                     <?php else: 
-                        $bal = 0;
-                        foreach (array_reverse($transactions) as $t): 
-                            $bal += floatval($t['debit']) - floatval($t['credit']);
-                        endforeach;
                         $runningBal = 0;
-                        foreach ($transactions as $i => $t): 
+                        foreach (array_reverse($transactions) as $t) {
                             $runningBal += floatval($t['debit']) - floatval($t['credit']);
+                        }
+                        $runningBalForward = 0;
+                        foreach ($transactions as $i => $t):
+                            $runningBalForward += floatval($t['debit']) - floatval($t['credit']);
                             $typeClass = match($t['type']) {
                                 'invoice' => 'type-invoice',
                                 'payment' => 'type-payment',
@@ -313,7 +298,7 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                         <td><small class="font-monospace"><?= htmlspecialchars($t['ref_number']) ?></small></td>
                         <td class="amount text-danger"><?= $t['debit'] > 0 ? number_format($t['debit'], 2) : '-' ?></td>
                         <td class="amount text-success"><?= $t['credit'] > 0 ? number_format($t['credit'], 2) : '-' ?></td>
-                        <td class="amount fw-bold"><?= number_format($runningBal, 2) ?></td>
+                        <td class="amount fw-bold"><?= number_format($runningBalForward, 2) ?></td>
                         <td class="<?= $statusClass ?>"><?= $statusLabel ?></td>
                         <td><small class="text-muted"><?= htmlspecialchars($t['notes'] ?? '') ?></small></td>
                     </tr>
@@ -326,7 +311,7 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <div class="total-bar">
         <div class="t-item">إجمالي مدين<strong style="color:var(--red)"><?= number_format(array_sum(array_column($transactions, 'debit')), 2) ?></strong></div>
         <div class="t-item">إجمالي دائن<strong style="color:var(--green)"><?= number_format(array_sum(array_column($transactions, 'credit')), 2) ?></strong></div>
-        <div class="t-item">الرصيد النهائي<strong style="color:var(--primary)"><?= number_format($runningBal, 2) ?></strong></div>
+        <div class="t-item">الرصيد النهائي<strong style="color:var(--primary)"><?= number_format($runningBalForward ?? 0, 2) ?></strong></div>
     </div>
 </div>
 
@@ -339,6 +324,14 @@ function showTab(tabId, btn) {
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     btn.classList.add('active');
 }
+
+// Auto-switch to ledger tab if requested
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('tab') === 'ledger') {
+    const ledgerTab = document.querySelector('button[onclick*="tab-ledger"]');
+    if (ledgerTab) ledgerTab.click();
+}
+
 // Keyboard shortcuts
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') window.close();
