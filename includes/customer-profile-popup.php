@@ -29,7 +29,7 @@ function ensureTable($db, $table, $sql) {
 }
 
 // ============================================================
-// STEP 1: Ensure customers columns exist
+// STEP 1-9: Auto-create all missing tables and columns
 // ============================================================
 ensureColumn($db, 'customers', 'balance', "DECIMAL(15,2) DEFAULT 0 AFTER phone");
 ensureColumn($db, 'customers', 'address', "VARCHAR(500) NULL AFTER balance");
@@ -37,9 +37,6 @@ ensureColumn($db, 'customers', 'branch_id', "INT NULL AFTER address");
 ensureColumn($db, 'customers', 'email', "VARCHAR(200) NULL AFTER customer_name");
 ensureColumn($db, 'customers', 'tax_number', "VARCHAR(50) NULL AFTER email");
 
-// ============================================================
-// STEP 2: Ensure branches table exists (needed for FK)
-// ============================================================
 if (!tableExists($db, 'branches')) {
     ensureTable($db, 'branches', "
         CREATE TABLE IF NOT EXISTS branches (
@@ -54,9 +51,6 @@ if (!tableExists($db, 'branches')) {
     ");
 }
 
-// ============================================================
-// STEP 3: Ensure customer_payments table exists
-// ============================================================
 ensureTable($db, 'customer_payments', "
     CREATE TABLE IF NOT EXISTS customer_payments (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -72,9 +66,6 @@ ensureTable($db, 'customer_payments', "
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// ============================================================
-// STEP 4: Ensure sale_return_invoices table exists
-// ============================================================
 ensureTable($db, 'sale_return_invoices', "
     CREATE TABLE IF NOT EXISTS sale_return_invoices (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -95,9 +86,6 @@ ensureTable($db, 'sale_return_invoices', "
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// ============================================================
-// STEP 5: Ensure sale_return_items table exists
-// ============================================================
 ensureTable($db, 'sale_return_items', "
     CREATE TABLE IF NOT EXISTS sale_return_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -116,9 +104,6 @@ ensureTable($db, 'sale_return_items', "
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// ============================================================
-// STEP 6: Ensure customer_transactions table exists
-// ============================================================
 ensureTable($db, 'customer_transactions', "
     CREATE TABLE IF NOT EXISTS customer_transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -136,9 +121,6 @@ ensureTable($db, 'customer_transactions', "
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// ============================================================
-// STEP 7: Ensure inventory_movements table exists
-// ============================================================
 ensureTable($db, 'inventory_movements', "
     CREATE TABLE IF NOT EXISTS inventory_movements (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -157,18 +139,11 @@ ensureTable($db, 'inventory_movements', "
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// ============================================================
-// STEP 8: Ensure sale_invoices columns exist
-// ============================================================
 ensureColumn($db, 'sale_invoices', 'invoice_time', 'TIME NULL AFTER invoice_date');
 ensureColumn($db, 'sale_invoices', 'profit_amount', 'DECIMAL(15,2) DEFAULT 0 AFTER remaining_amount');
 ensureColumn($db, 'sale_invoices', 'cost_amount', 'DECIMAL(15,2) DEFAULT 0 AFTER profit_amount');
 ensureColumn($db, 'sale_invoices', 'extra_discount_pct', 'DECIMAL(5,2) DEFAULT 0 AFTER discount_val');
 ensureColumn($db, 'sale_invoices', 'extra_discount_val', 'DECIMAL(15,2) DEFAULT 0 AFTER extra_discount_pct');
-
-// ============================================================
-// STEP 9: Ensure sale_invoice_items columns exist
-// ============================================================
 ensureColumn($db, 'sale_invoice_items', 'batch_id', 'INT NULL AFTER batch_number');
 
 // ============================================================
@@ -200,6 +175,7 @@ try {
 // Ledger
 $from_date = $_GET['from_date'] ?? date('Y-m-d', strtotime('-3 months'));
 $to_date = $_GET['to_date'] ?? date('Y-m-d');
+$active_tab = $_GET['tab'] ?? 'profile'; // 'profile' or 'ledger'
 
 $transactions = [];
 $unions = [];
@@ -227,10 +203,15 @@ if (!empty($unions)) {
     } catch (PDOException $e) { $transactions = []; }
 }
 
-$runningBal = 0;
-foreach (array_reverse($transactions) as $t) {
-    $runningBal += floatval($t['debit']) - floatval($t['credit']);
+// Calculate running balance (forward)
+$runningBalForward = 0;
+foreach ($transactions as $t) {
+    $runningBalForward += floatval($t['debit']) - floatval($t['credit']);
 }
+
+// Totals
+$totalDebit = array_sum(array_map(fn($t)=>floatval($t['debit']??0), $transactions));
+$totalCredit = array_sum(array_map(fn($t)=>floatval($t['credit']??0), $transactions));
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -299,17 +280,17 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 
 <ul class="nav nav-tabs" id="profileTabs">
     <li class="nav-item">
-        <button class="nav-link active" onclick="showTab('tab-profile',this)"><i class="bi bi-person-vcard"></i> كارت العميل</button>
+        <button class="nav-link <?= $active_tab === 'profile' ? 'active' : '' ?>" onclick="showTab('tab-profile',this)"><i class="bi bi-person-vcard"></i> كارت العميل</button>
     </li>
     <li class="nav-item">
-        <button class="nav-link" onclick="showTab('tab-ledger',this)"><i class="bi bi-journal-text"></i> كشف حساب</button>
+        <button class="nav-link <?= $active_tab === 'ledger' ? 'active' : '' ?>" onclick="showTab('tab-ledger',this)"><i class="bi bi-journal-text"></i> كشف حساب</button>
     </li>
 </ul>
 
 <div class="tab-content">
 
 <!-- TAB 1: PROFILE -->
-<div id="tab-profile" class="tab-pane" style="display:block">
+<div id="tab-profile" class="tab-pane" style="display:<?= $active_tab === 'profile' ? 'block' : 'none' ?>">
     <div class="stats-row">
         <div class="stat-box count">
             <div class="num"><?= number_format(intval($stats['inv_count'] ?? 0)) ?></div>
@@ -368,15 +349,17 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 </div>
 
 <!-- TAB 2: LEDGER -->
-<div id="tab-ledger" class="tab-pane" style="display:none">
+<div id="tab-ledger" class="tab-pane" style="display:<?= $active_tab === 'ledger' ? 'block' : 'none' ?>">
     <form method="GET" class="filter-bar no-print">
         <input type="hidden" name="customer_id" value="<?= $customer_id ?>">
+        <!-- KEY FIX: tab=ledger persists when filtering -->
+        <input type="hidden" name="tab" value="ledger">
         <label style="font-size:13px;font-weight:600"><i class="bi bi-funnel"></i> فترة:</label>
         <input type="date" name="from_date" class="form-control" value="<?= $from_date ?>" style="width:140px">
         <span>إلى</span>
         <input type="date" name="to_date" class="form-control" value="<?= $to_date ?>" style="width:140px">
         <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> عرض</button>
-        <button type="button" class="btn btn-outline-secondary" onclick="location.href='?customer_id=<?= $customer_id ?>'"><i class="bi bi-arrow-counterclockwise"></i> إعادة</button>
+        <button type="button" class="btn btn-outline-secondary" onclick="location.href='?customer_id=<?= $customer_id ?>&amp;tab=ledger'"><i class="bi bi-arrow-counterclockwise"></i> إعادة</button>
         <div class="ms-auto" style="font-size:13px">
             <span class="badge bg-primary"><?= count($transactions) ?> حركة</span>
         </div>
@@ -402,9 +385,14 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                     <?php if (empty($transactions)): ?>
                     <tr><td colspan="9" class="no-data"><i class="bi bi-inbox" style="font-size:32px"></i><br>لا توجد حركات في الفترة المحددة</td></tr>
                     <?php else: 
-                        $runningBalForward = 0;
-                        foreach ($transactions as $i => $t):
-                            $runningBalForward += floatval($t['debit']) - floatval($t['credit']);
+                        $bal = 0;
+                        foreach (array_reverse($transactions) as $t) {
+                            $bal += floatval($t['debit']) - floatval($t['credit']);
+                        }
+                        // Show running balance forward (chronological)
+                        $fwd = 0;
+                        foreach (array_reverse($transactions) as $i => $t):
+                            $fwd += floatval($t['debit']) - floatval($t['credit']);
                             $tc = $t['type'] ?? 'invoice';
                             $typeClass = 'type-invoice';
                             $typeLabel = 'فاتورة';
@@ -419,13 +407,13 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
                             elseif ($st === 'open') { $statusClass = 'text-danger'; $statusLabel = 'مفتوح'; }
                     ?>
                     <tr>
-                        <td><?= $i + 1 ?></td>
+                        <td><?= count($transactions) - $i ?></td>
                         <td><?= htmlspecialchars($t['trans_date'] ?? '-') ?></td>
                         <td><span class="type-badge <?= $typeClass ?>"><?= $typeLabel ?></span></td>
                         <td><small class="font-monospace"><?= htmlspecialchars($t['ref_number'] ?? '-') ?></small></td>
                         <td class="amount text-danger"><?= floatval($t['debit'] ?? 0) > 0 ? number_format(floatval($t['debit']), 2) : '-' ?></td>
                         <td class="amount text-success"><?= floatval($t['credit'] ?? 0) > 0 ? number_format(floatval($t['credit']), 2) : '-' ?></td>
-                        <td class="amount fw-bold"><?= number_format($runningBalForward, 2) ?></td>
+                        <td class="amount fw-bold"><?= number_format($fwd, 2) ?></td>
                         <td class="<?= $statusClass ?>"><?= $statusLabel ?></td>
                         <td><small class="text-muted"><?= htmlspecialchars($t['notes'] ?? '') ?></small></td>
                     </tr>
@@ -436,9 +424,9 @@ body{background:#f0f2f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     </div>
     
     <div class="total-bar">
-        <div class="t-item">إجمالي مدين<strong style="color:var(--red)"><?= number_format(array_sum(array_map(fn($t)=>floatval($t['debit']??0),$transactions)), 2) ?></strong></div>
-        <div class="t-item">إجمالي دائن<strong style="color:var(--green)"><?= number_format(array_sum(array_map(fn($t)=>floatval($t['credit']??0),$transactions)), 2) ?></strong></div>
-        <div class="t-item">الرصيد النهائي<strong style="color:var(--primary)"><?= number_format($runningBalForward ?? 0, 2) ?></strong></div>
+        <div class="t-item">إجمالي مدين<strong style="color:var(--red)"><?= number_format($totalDebit, 2) ?></strong></div>
+        <div class="t-item">إجمالي دائن<strong style="color:var(--green)"><?= number_format($totalCredit, 2) ?></strong></div>
+        <div class="t-item">الرصيد النهائي<strong style="color:var(--primary)"><?= number_format($runningBalForward, 2) ?></strong></div>
     </div>
 </div>
 
@@ -450,12 +438,11 @@ function showTab(tabId, btn) {
     document.getElementById(tabId).style.display = 'block';
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     btn.classList.add('active');
-}
-
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('tab') === 'ledger') {
-    const ledgerTab = document.querySelector('button[onclick*="tab-ledger"]');
-    if (ledgerTab) ledgerTab.click();
+    // Update URL without reloading
+    const url = new URL(window.location);
+    if (tabId === 'tab-ledger') { url.searchParams.set('tab', 'ledger'); }
+    else { url.searchParams.delete('tab'); }
+    window.history.replaceState({}, '', url);
 }
 
 document.addEventListener('keydown', function(e) {
