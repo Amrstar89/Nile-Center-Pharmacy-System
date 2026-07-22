@@ -22,18 +22,9 @@ if ($search) { $where[] = '(si.invoice_number LIKE ? OR c.customer_name LIKE ?)'
 if ($customer_id_filter) { $where[] = 'si.customer_id = ?'; $params[] = $customer_id_filter; }
 $whereSql = implode(' AND ', $where);
 
-// Use prepare/execute for parameterized queries (PHP 8 compatibility)
-$totalInv = $db->prepare("SELECT COUNT(*) FROM sale_invoices si WHERE $whereSql");
-$totalInv->execute($params);
-$totalInv = $totalInv->fetchColumn();
-
-$totalAmount = $db->prepare("SELECT COALESCE(SUM(grand_total),0) FROM sale_invoices si WHERE $whereSql");
-$totalAmount->execute($params);
-$totalAmount = $totalAmount->fetchColumn();
-
-$totalPaid = $db->prepare("SELECT COALESCE(SUM(paid_amount),0) FROM sale_invoices si WHERE $whereSql");
-$totalPaid->execute($params);
-$totalPaid = $totalPaid->fetchColumn();
+$totalInv = $db->query("SELECT COUNT(*) FROM sale_invoices WHERE $whereSql", $params)->fetchColumn();
+$totalAmount = $db->query("SELECT COALESCE(SUM(grand_total),0) FROM sale_invoices WHERE $whereSql", $params)->fetchColumn();
+$totalPaid = $db->query("SELECT COALESCE(SUM(paid_amount),0) FROM sale_invoices WHERE $whereSql", $params)->fetchColumn();
 
 $invoices = $db->prepare("
     SELECT si.*, c.customer_name, c.customer_code, s.store_name, u.full_name as user_name

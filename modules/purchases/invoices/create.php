@@ -18,6 +18,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $decoded = json_decode($_POST['items_data'], true);
             if (is_array($decoded)) $items = $decoded;
         }
+        if (empty($items)) {
+            $items = $_POST['items'] ?? [];
+        }
         if (empty($items)) { throw new Exception('يجب إضافة صنف واحد على الأقل'); }
         $db->beginTransaction();
         $supplier_id = intval($_POST['supplier_id']);
@@ -77,6 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $existing->execute([$store_id, $pid]); $existingData = $existing->fetch();
                 if ($existingData) { $db->prepare("UPDATE inventory_items SET quantity = quantity + ?, unit_cost = ?, updated_at = NOW() WHERE id = ?")->execute([$qty + $bonus, $cost, $existingData['id']]); }
                 else { $db->prepare("INSERT INTO inventory_items (store_id, product_id, quantity, unit_cost, is_active, created_at) VALUES (?, ?, ?, ?, 1, NOW())")->execute([$store_id, $pid, $qty + $bonus, $cost]); }
+                // Record inventory movement for purchase
                 $movementQty = $qty + $bonus;
                 $db->prepare("INSERT INTO inventory_movements (store_id, product_id, movement_type, reference_type, reference_id, reference_number, quantity, unit_cost, total_cost, notes, created_by) VALUES (?, ?, 'purchase', 'purchase_invoice', ?, ?, ?, ?, ?, ?, ?)")
                    ->execute([$store_id, $pid, $inv_id, $inv_number, $movementQty, $cost, $movementQty * $cost, 'فاتورة شراء ' . $inv_number, $_SESSION['user_id']]);
@@ -131,6 +135,8 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .toolbar-right .tool-btn:hover .tooltip{opacity:1}
 .items-section{overflow-x:auto;padding:10px;background:#fff;margin:0 55px 0 0;position:relative}
 .items-section::-webkit-scrollbar{height:10px}
+.items-section::-webkit-scrollbar-track{background:#f0f0f0}
+.items-section::-webkit-scrollbar-thumb{background:#ccc;border-radius:5px}
 .items-table{width:100%;border-collapse:collapse;font-size:12px;min-width:2400px}
 .items-table th{background:var(--green);color:#fff;padding:6px 4px;text-align:center;font-weight:600;font-size:11px;white-space:nowrap;position:sticky;top:0;z-index:10}
 .items-table th:first-child{width:30px}
@@ -173,13 +179,14 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
     <a href="../invoices/" class="menu-item"><i class="bi bi-receipt"></i> فواتير الشراء</a>
     <a href="../orders/" class="menu-item"><i class="bi bi-file-earmark-text"></i> أوامر الشراء</a>
     <a href="../../dashboard/" class="menu-item"><i class="bi bi-speedometer2"></i> الرئيسية</a>
-    <div class="ms-auto" style="font-size:12px;opacity:.7"><?= $_SESSION['user_name'] ?? '' ?> | <?= date('Y-m-d') ?></div>
+    <div class="ms-auto" style="font-size:12px;opacity:.7"><?= $_SESSION['user_name'] ?? '' ?> | <?= arabicDate(date('Y-m-d')) ?></div>
 </div>
 <div class="sub-menu-bar">
     <div class="btn-icon" onclick="addRow()" title="إضافة صنف (F3)"><i class="bi bi-plus-lg"></i></div>
     <div class="btn-icon" onclick="openF2Search()" title="بحث F2"><i class="bi bi-search"></i></div>
     <div class="btn-icon" onclick="clearAll()" title="مسح الكل"><i class="bi bi-trash"></i></div>
     <div class="divider"></div>
+    <div class="btn-icon" onclick="ColOrder.openModal()" title="تخصيص الأعمدة"><i class="bi bi-layout-three-columns"></i></div>
     <div class="btn-icon" onclick="window.print()" title="طباعة"><i class="bi bi-printer"></i></div>
     <div class="btn-icon" onclick="saveInv()" title="حفظ Ctrl+S"><i class="bi bi-save"></i></div>
     <div class="divider"></div>
@@ -253,6 +260,7 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 <div class="toolbar-right">
     <button type="button" class="tool-btn" onclick="addRow()"><i class="bi bi-plus-lg"></i><span class="tooltip">إضافة صنف</span></button>
     <button type="button" class="tool-btn" onclick="openF2Search()"><i class="bi bi-search"></i><span class="tooltip">بحث F2</span></button>
+    <button type="button" class="tool-btn" onclick="ColOrder.openModal()"><i class="bi bi-layout-three-columns"></i><span class="tooltip">الأعمدة</span></button>
     <button type="button" class="tool-btn" onclick="window.print()"><i class="bi bi-printer"></i><span class="tooltip">طباعة</span></button>
     <div style="height:1px;background:rgba(255,255,255,0.3);margin:4px 0"></div>
     <button type="button" class="tool-btn" onclick="clearAll()" style="color:var(--red)"><i class="bi bi-trash"></i><span class="tooltip">مسح</span></button>
@@ -285,63 +293,12 @@ body{background:#e8eaf0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 </div>
 </div>
 </form>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../../../js/product-search.js"></script>
+<script src="../../../js/col-order.js"></script>
 <script>
-// ==================== INLINE ColOrder (no external file needed) ====================
-var ColOrder = (function(){
-    var defs=[], order=[], storageKey='', headerId='';
-    function init(d, sk, hid){
-        defs=d; storageKey=sk; headerId=hid;
-        var saved=localStorage.getItem(storageKey);
-        if(saved){ try{ order=JSON.parse(saved); }catch(e){ order=defs.map(function(c){return {key:c.key}}); } }
-        else{ order=defs.map(function(c){return {key:c.key}}); }
-        renderHeader();
-    }
-    function renderHeader(){
-        var hr=document.getElementById(headerId); if(!hr) return;
-        hr.innerHTML=order.map(function(c){
-            var d=defs.find(function(x){return x.key===c.key})||{label:'',width:''};
-            var style=d.width?' style="min-width:'+d.width+'"':'';
-            return '<th'+style+'>'+(d.label||'')+'</th>';
-        }).join('');
-    }
-    function isVisible(key){ return true; }
-    return { init:init, isVisible:isVisible, renderHeader:renderHeader };
-})();
-
-// ==================== INLINE ProductSearch (no external file needed) ====================
-var ProductSearch = (function(){
-    var popupWin=null, onSelectCb=null;
-    window.onProductSelected = function(product){
-        if(onSelectCb) onSelectCb(product);
-        if(popupWin && !popupWin.closed) popupWin.close();
-        popupWin=null;
-    };
-    function getBaseUrl(){
-        var path=window.location.pathname;
-        var idx=path.indexOf('/modules/');
-        return idx>0 ? path.substring(0,idx) : '';
-    }
-    return {
-        open: function(options){
-            if(!options.storeId){ alert('معرف المخزن مطلوب'); return; }
-            if(!options.onSelect){ alert('callback مطلوب'); return; }
-            onSelectCb=options.onSelect;
-            var base=getBaseUrl();
-            var mode=options.mode||'purchase';
-            if(popupWin && !popupWin.closed) popupWin.close();
-            var w=950, h=750, left=(screen.width-w)/2, top=(screen.height-h)/2;
-            var url=base+'/includes/product-search-popup-new.php?store_id='+options.storeId+'&mode='+mode+'&callback=onProductSelected';
-            popupWin=window.open(url,'productSearchPopup','width='+w+',height='+h+',top='+top+',left='+left+',resizable=yes,scrollbars=yes');
-            if(popupWin) popupWin.focus();
-        }
-    };
-})();
-
-// ==================== COLUMN DEFS ====================
-var colDefs=[
-    {key:'rownum',label:'#',width:'30px'},{key:'print',label:'ط',width:'24px'},
+const colDefs=[
+    {key:'rownum',label:'#',width:'30px',fixed:true},{key:'print',label:'ط',width:'24px'},
     {key:'barcode',label:'الباركود',width:'100px'},{key:'code',label:'كود الصنف',width:'80px'},
     {key:'name',label:'اسم الصنف',width:'170px'},{key:'unit',label:'الوحدة',width:'60px'},
     {key:'qty',label:'الكمية',width:'60px'},{key:'sell',label:'سعر البيع',width:'60px'},
@@ -351,75 +308,78 @@ var colDefs=[
     {key:'vat_val',label:'ق الضريبة',width:'60px'},{key:'total',label:'إجمالي تكلفة',width:'75px'},
     {key:'profit_v',label:'ربح ص',width:'55px'},{key:'profit_p',label:'ربح %',width:'55px'},
     {key:'company',label:'الشركة',width:'90px'},{key:'location',label:'الموقع',width:'70px'},
-    {key:'batch',label:'الباتش',width:'55px'},{key:'delete',label:'',width:'24px'}
+    {key:'batch',label:'الباتش',width:'55px'},{key:'delete',label:'',width:'24px',fixed:true}
 ];
-
-// ==================== DATA ====================
-var allUnits=<?= json_encode($units) ?>;
-var suppliers=<?= json_encode($suppliers) ?>;
-
-// ==================== FUNCTIONS ====================
 function onPayMethodChange(){
-    var m=document.getElementById('payMethod').value;
-    var dueWrap=document.getElementById('dueDateWrap');
-    var paidWrap=document.getElementById('paidFromWrap');
-    var defWrap=document.getElementById('deferredWrap');
-    if(m==='cash'||m==='bank_transfer'||m==='wallet_transfer'){dueWrap.classList.add('d-none');paidWrap.classList.add('d-none');defWrap.classList.remove('d-none');}
-    else if(m==='credit'||m==='under_collection'){dueWrap.classList.remove('d-none');paidWrap.classList.remove('d-none');defWrap.classList.add('d-none');}
+    const m=document.getElementById('payMethod').value;
+    const dueWrap=document.getElementById('dueDateWrap');
+    const paidWrap=document.getElementById('paidFromWrap');
+    const defWrap=document.getElementById('deferredWrap');
+    if(m==='cash'||m==='bank_transfer'||m==='wallet_transfer'){
+        dueWrap.classList.add('d-none');paidWrap.classList.add('d-none');defWrap.classList.remove('d-none');
+    } else if(m==='credit'||m==='under_collection'){
+        dueWrap.classList.remove('d-none');paidWrap.classList.remove('d-none');defWrap.classList.add('d-none');
+    }
     recalc();
 }
-var R=0;
+let R=0;const allUnits=<?= json_encode($units) ?>;const suppliers=<?= json_encode($suppliers) ?>;
 function getUnitOptions(selUnitId){
-    var h='<option value="">--</option>';
-    allUnits.forEach(function(u){h+='<option value="'+u.id+'"'+(u.id==selUnitId?' selected':'')+'>'+u.unit_name_ar+'</option>';});
+    let h='<option value="">--</option>';
+    allUnits.forEach(u=>{h+='<option value="'+u.id+'"'+(u.id==selUnitId?' selected':'')+'>'+u.unit_name_ar+'</option>';});
     return h;
 }
-function visCell(k,html){return ColOrder.isVisible(k)?html:'';}
-
 function buildRowCells(id,d){
-    var h='';
-    h+=visCell('rownum','<td>'+id+'<input type="hidden" id="hip_'+id+'" value="'+(d.product_id||'')+'"></td>');
-    h+=visCell('print','<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="togglePrint('+id+')"></i></td>');
-    h+=visCell('barcode','<td><div class="barcode-w"><input type="text" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'" placeholder="باركود" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2ForRow('+id+')">F2</button></div></td>');
-    h+=visCell('code','<td><input type="text" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>');
-    h+=visCell('name','<td><input type="text" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>');
-    h+=visCell('unit','<td><select id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+getUnitOptions(d.unit_id)+'</select></td>');
-    h+=visCell('qty','<td><input type="number" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(d.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>');
-    h+=visCell('sell','<td><input type="number" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(d.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>');
-    h+=visCell('bonus','<td><input type="number" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>');
-    h+=visCell('expiry','<td><input type="month" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>');
-    h+=visCell('disc_pct','<td><input type="number" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>');
-    h+=visCell('disc_val','<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>');
-    h+=visCell('cost','<td><input type="number" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>');
-    h+=visCell('vat_pct','<td><input type="number" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>');
-    h+=visCell('vat_val','<td><input type="number" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>');
-    h+=visCell('total','<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>');
-    h+=visCell('profit_v','<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
-    h+=visCell('profit_p','<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
-    h+=visCell('company','<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(d.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
-    h+=visCell('location','<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(d.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
-    h+=visCell('batch','<td><input type="text" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>');
-    h+=visCell('delete','<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>');
+    const V=function(k){return ColOrder.isVisible(k);};
+    const vis=function(k,html){return V(k)?html:'';};
+    let h='';
+    h+=vis('rownum','<td>'+id+'<input type="hidden" name="items['+id+'][product_id]" id="hip_'+id+'" value="'+(d.product_id||'')+'"></td>');
+    h+=vis('print','<td><i class="bi bi-printer print-icon print-off" id="pr_'+id+'" onclick="togglePrint('+id+')"></i></td>');
+    h+=vis('barcode','<td><div class="barcode-w"><input type="text" id="bc_'+id+'" class="form-control form-control-sm" value="'+(d.barcode||'')+'" placeholder="باركود" onkeydown="handleEnter(event,'+id+',1)"><button type="button" class="btn-f2" onclick="f2row('+id+')">F2</button></div></td>');
+    h+=vis('code','<td><input type="text" id="co_'+id+'" class="form-control form-control-sm" value="'+(d.product_code||'')+'" onkeydown="handleEnter(event,'+id+',2)"></td>');
+    h+=vis('name','<td><input type="text" id="nm_'+id+'" class="form-control form-control-sm product-name" value="'+(d.product_name||'')+'" required onkeydown="handleEnter(event,'+id+',3)"></td>');
+    h+=vis('unit','<td><select id="un_'+id+'" class="form-select form-select-sm" onkeydown="handleEnter(event,'+id+',4)">'+getUnitOptions(d.unit_id)+'</select></td>');
+    h+=vis('qty','<td><input type="number" id="qt_'+id+'" class="form-control form-control-sm num" value="'+(d.quantity||'1')+'" step="0.001" min="0.001" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',5)"></td>');
+    h+=vis('sell','<td><input type="number" id="sp_'+id+'" class="form-control form-control-sm num" value="'+(d.sell_price||'')+'" step="0.01" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',6)"></td>');
+    h+=vis('bonus','<td><input type="number" id="bn_'+id+'" class="form-control form-control-sm num" value="0" step="0.001" min="0" oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',7)"></td>');
+    h+=vis('expiry','<td><input type="month" id="ex_'+id+'" class="form-control form-control-sm" style="font-size:11px" onkeydown="handleEnter(event,'+id+',8)"></td>');
+    h+=vis('disc_pct','<td><input type="number" id="dp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onDiscPct('+id+')" onkeydown="handleEnter(event,'+id+',9)"></td>');
+    h+=vis('disc_val','<td><input type="number" id="dv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" oninput="onDiscVal('+id+')" onkeydown="handleEnter(event,'+id+',10)"></td>');
+    h+=vis('cost','<td><input type="number" id="cs_'+id+'" class="form-control form-control-sm num" value="'+(d.unit_cost||'')+'" step="0.01" min="0" required oninput="calc('+id+')" onkeydown="handleEnter(event,'+id+',11)"></td>');
+    h+=vis('vat_pct','<td><input type="number" id="vp_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" min="0" oninput="onVatPct('+id+')" onkeydown="handleEnter(event,'+id+',12)"></td>');
+    h+=vis('vat_val','<td><input type="number" id="vv_'+id+'" class="form-control form-control-sm num" value="0" step="0.01" oninput="onVatVal('+id+')" onkeydown="handleEnter(event,'+id+',13)"></td>');
+    h+=vis('total','<td><input type="number" id="tl_'+id+'" class="form-control form-control-sm num row-total" value="0" step="0.01" readonly></td>');
+    h+=vis('profit_v','<td><input type="number" id="pv_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
+    h+=vis('profit_p','<td><input type="number" id="pp_'+id+'" class="form-control form-control-sm num row-calc" value="0" step="0.01" readonly></td>');
+    h+=vis('company','<td><input type="text" id="cy_'+id+'" class="form-control form-control-sm" value="'+(d.company_name||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
+    h+=vis('location','<td><input type="text" id="lc_'+id+'" class="form-control form-control-sm" value="'+(d.location||'')+'" readonly style="background:#e9ecef;font-size:11px"></td>');
+    h+=vis('batch','<td><input type="text" id="ba_'+id+'" class="form-control form-control-sm num" placeholder="باتش" onkeydown="handleEnter(event,'+id+',14)"></td>');
+    h+=vis('delete','<td><span class="btn-del" onclick="delRow('+id+')" tabindex="-1"><i class="bi bi-trash-fill"></i></span></td>');
     return h;
 }
 function addRow(data){
-    R++;var id=R;var d=data||{};
-    var cells=buildRowCells(id,d);
+    R++;const id=R;const d=data||{};
+    const cells=buildRowCells(id,d);
     document.getElementById('itemsBody').insertAdjacentHTML('beforeend','<tr id="r_'+id+'" data-rid="'+id+'">'+cells+'</tr>');
-    var bc=document.getElementById('bc_'+id);var nm=document.getElementById('nm_'+id);
-    if(bc)bc.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2ForRow(id);}});
-    if(nm)nm.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2ForRow(id);}});
+    const bc=document.getElementById('bc_'+id);const nm=document.getElementById('nm_'+id);
+    if(bc)bc.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2row(id);}});
+    if(nm)nm.addEventListener('keydown',function(e){if(e.key==='F2'){e.preventDefault();f2row(id);}});
     if(d)calc(id);recalc();
-    setTimeout(function(){var el=document.getElementById('bc_'+id);if(el)el.focus();},50);
+    setTimeout(()=>{const el=document.getElementById('bc_'+id);if(el)el.focus();},50);
     return id;
 }
 function beforeSubmit(){
-    var rows=[];
-    document.querySelectorAll('#itemsBody tr').forEach(function(tr){
-        var id=tr.dataset.rid;if(!id)return;
-        var getVal=function(fid){var el=document.getElementById(fid+'_'+id);return el?el.value:'';};
-        var getNum=function(fid){var el=document.getElementById(fid+'_'+id);return el?parseFloat(el.value)||0:0;};
-        var row={product_id:getVal('hip'),barcode:getVal('bc'),product_code:getVal('co'),product_name:getVal('nm'),unit_id:getVal('un'),unit_name:'',quantity:getNum('qt')||1,bonus:getNum('bn'),unit_cost:getNum('cs'),sell_price:getNum('sp'),discount_percent:getNum('dp'),vat_percent:getNum('vp'),vat_value:getNum('vv'),expiry_date:getVal('ex'),batch_number:getVal('ba')};
+    const rows=[];
+    document.querySelectorAll('#itemsBody tr').forEach(tr=>{
+        const id=tr.dataset.rid;if(!id)return;
+        const getVal=function(fid,def){const el=document.getElementById(fid+'_'+id);return el?el.value:(def||'');};
+        const getNum=function(fid){const el=document.getElementById(fid+'_'+id);return el?parseFloat(el.value)||0:0;};
+        const row={
+            product_id:document.getElementById('hip_'+id)?.value||'',
+            barcode:getVal('bc'),product_code:getVal('co'),product_name:getVal('nm'),
+            unit_id:getVal('un'),unit_name:'',quantity:getNum('qt')||1,bonus:getNum('bn'),
+            unit_cost:getNum('cs'),sell_price:getNum('sp'),discount_percent:getNum('dp'),
+            vat_percent:getNum('vp'),vat_value:getNum('vv'),expiry_date:getVal('ex'),batch_number:getVal('ba')
+        };
         if(row.product_name)rows.push(row);
     });
     if(rows.length===0){alert('يجب إضافة صنف واحد على الأقل');return false;}
@@ -427,78 +387,78 @@ function beforeSubmit(){
     return true;
 }
 function onDiscPct(id){
-    var dp=parseFloat(document.getElementById('dp_'+id).value)||0;
-    var cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-    var qt=parseFloat(document.getElementById('qt_'+id).value)||0;
-    var bn=parseFloat(document.getElementById('bn_'+id).value)||0;
-    var base=(qt+bn)*cs;
-    var dvEl=document.getElementById('dv_'+id);
+    const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
+    const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+    const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+    const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+    const base=(qt+bn)*cs;
+    const dvEl=document.getElementById('dv_'+id);
     if(dvEl)dvEl.value=(base*dp/100).toFixed(2);
     calc(id);
 }
 function onDiscVal(id){
-    var dv=parseFloat(document.getElementById('dv_'+id).value)||0;
-    var cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-    var qt=parseFloat(document.getElementById('qt_'+id).value)||0;
-    var bn=parseFloat(document.getElementById('bn_'+id).value)||0;
-    var base=(qt+bn)*cs;
+    const dv=parseFloat(document.getElementById('dv_'+id).value)||0;
+    const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+    const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+    const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+    const base=(qt+bn)*cs;
     document.getElementById('dp_'+id).value=base>0?((dv/base)*100).toFixed(2):0;
     calc(id);
 }
 function onVatPct(id){
-    var vp=parseFloat(document.getElementById('vp_'+id).value)||0;
-    var cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-    var qt=parseFloat(document.getElementById('qt_'+id).value)||0;
-    var bn=parseFloat(document.getElementById('bn_'+id).value)||0;
-    var dp=parseFloat(document.getElementById('dp_'+id).value)||0;
-    var base=(qt+bn)*cs;
-    var afterDisc=base*(1-dp/100);
+    const vp=parseFloat(document.getElementById('vp_'+id).value)||0;
+    const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+    const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+    const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+    const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
+    const base=(qt+bn)*cs;
+    const afterDisc=base*(1-dp/100);
     document.getElementById('vv_'+id).value=(afterDisc*vp/100).toFixed(2);
     calc(id);
 }
 function onVatVal(id){
-    var vv=parseFloat(document.getElementById('vv_'+id).value)||0;
-    var cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-    var qt=parseFloat(document.getElementById('qt_'+id).value)||0;
-    var bn=parseFloat(document.getElementById('bn_'+id).value)||0;
-    var dp=parseFloat(document.getElementById('dp_'+id).value)||0;
-    var base=(qt+bn)*cs;
-    var afterDisc=base*(1-dp/100);
+    const vv=parseFloat(document.getElementById('vv_'+id).value)||0;
+    const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+    const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+    const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+    const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
+    const base=(qt+bn)*cs;
+    const afterDisc=base*(1-dp/100);
     document.getElementById('vp_'+id).value=afterDisc>0?((vv/afterDisc)*100).toFixed(2):0;
     calc(id);
 }
 function calc(id){
-    var qt=parseFloat(document.getElementById('qt_'+id).value)||0;
-    var bn=parseFloat(document.getElementById('bn_'+id).value)||0;
-    var cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-    var sp=parseFloat(document.getElementById('sp_'+id).value)||0;
-    var dp=parseFloat(document.getElementById('dp_'+id).value)||0;
-    var vv=parseFloat(document.getElementById('vv_'+id).value)||0;
-    var tq=qt+bn;var base=tq*cs;var disc=base*(dp/100);var afterDisc=base-disc;
-    var totalCost=afterDisc+vv;
-    var profitVal=(sp-cs)*qt;var profitPct=cs>0?(((sp-cs)/cs)*100):0;
+    const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+    const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+    const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+    const sp=parseFloat(document.getElementById('sp_'+id)?.value)||0;
+    const dp=parseFloat(document.getElementById('dp_'+id).value)||0;
+    const vv=parseFloat(document.getElementById('vv_'+id).value)||0;
+    const tq=qt+bn;const base=tq*cs;const disc=base*(dp/100);const afterDisc=base-disc;
+    const totalCost=afterDisc+vv;
+    const profitVal=(sp-cs)*qt;const profitPct=cs>0?(((sp-cs)/cs)*100):0;
     document.getElementById('tl_'+id).value=totalCost.toFixed(2);
-    var pvEl=document.getElementById('pv_'+id);var ppEl=document.getElementById('pp_'+id);
+    const pvEl=document.getElementById('pv_'+id);const ppEl=document.getElementById('pp_'+id);
     if(pvEl)pvEl.value=profitVal.toFixed(2);
     if(ppEl)ppEl.value=profitPct.toFixed(1);
     recalc();
 }
 function recalc(){
-    var n=0,bc=0,tc=0,tv=0,ts=0,tp=0;
-    document.querySelectorAll('#itemsBody tr').forEach(function(tr){
-        var id=tr.dataset.rid;
-        var qt=parseFloat(document.getElementById('qt_'+id).value)||0;
-        var bn=parseFloat(document.getElementById('bn_'+id).value)||0;
-        var cs=parseFloat(document.getElementById('cs_'+id).value)||0;
-        var sp=parseFloat(document.getElementById('sp_'+id).value)||0;
+    let n=0,bc=0,tc=0,tv=0,ts=0,tp=0;
+    document.querySelectorAll('#itemsBody tr').forEach(tr=>{
+        const id=tr.dataset.rid;
+        const qt=parseFloat(document.getElementById('qt_'+id).value)||0;
+        const bn=parseFloat(document.getElementById('bn_'+id).value)||0;
+        const cs=parseFloat(document.getElementById('cs_'+id).value)||0;
+        const sp=parseFloat(document.getElementById('sp_'+id)?.value)||0;
         n++;if(document.getElementById('bc_'+id).value)bc++;
         tc+=cs*(qt+bn);tv+=(parseFloat(document.getElementById('vv_'+id).value)||0);
-        ts+=sp*qt;tp+=(parseFloat(document.getElementById('pv_'+id).value)||0);
+        ts+=sp*qt;tp+=(parseFloat(document.getElementById('pv_'+id)?.value)||0);
     });
-    var xdp=parseFloat(document.getElementById('xdisc_pct').value)||0;
-    var xdv=parseFloat(document.getElementById('xdisc_val').value)||0;
-    var grand=tc+tv;
-    if(xdp>0)grand-=grand*(xdp/100);
+    const xdp=parseFloat(document.getElementById('xdisc_pct').value)||0;
+    const xdv=parseFloat(document.getElementById('xdisc_val').value)||0;
+    let grand=tc+tv;
+    if(xdp>0) grand-=grand*(xdp/100);
     grand-=xdv;if(grand<0)grand=0;
     document.getElementById('t_items').textContent=n;
     document.getElementById('t_barcodes').textContent=bc;
@@ -509,56 +469,55 @@ function recalc(){
     document.getElementById('t_profit_pct').textContent=tc>0?((tp/tc)*100).toFixed(1)+'%':'0%';
     document.getElementById('t_grand').textContent=grand.toFixed(2);
 }
-var fieldMap=['bc','co','nm','un','qt','sp','bn','ex','dp','dv','cs','vp','vv','ba'];
+const fieldMap=['bc','co','nm','un','qt','sp','bn','ex','dp','dv','cs','vp','vv','ba'];
 function handleEnter(e,id,fieldIdx){
     if(e.key==='Enter'){
         e.preventDefault();
         if(fieldIdx===fieldMap.length-1){addRow();}
-        else{var el=document.getElementById(fieldMap[fieldIdx+1]+'_'+id);if(el)el.focus();}
+        else{const el=document.getElementById(fieldMap[fieldIdx+1]+'_'+id);if(el)el.focus();}
     }
 }
 function togglePrint(id){
-    var ico=document.getElementById('pr_'+id);
-    if(ico.classList.contains('print-off')){ico.classList.remove('print-off');ico.classList.add('print-on');}
-    else{ico.classList.remove('print-on');ico.classList.add('print-off');}
+    const ico=document.getElementById('pr_'+id);const inp=document.getElementById('prv_'+id);
+    if(inp&&inp.value==='1'){inp.value='0';ico.classList.remove('print-on');ico.classList.add('print-off');}
+    else if(inp){inp.value='1';ico.classList.remove('print-off');ico.classList.add('print-on');}
 }
-function delRow(id){var r=document.getElementById('r_'+id);if(r)r.remove();recalc();}
+function delRow(id){const r=document.getElementById('r_'+id);if(r)r.remove();recalc();}
 function clearAll(){if(!confirm('مسح كل الأصناف؟'))return;document.getElementById('itemsBody').innerHTML='';R=0;recalc();}
 function onSupplierChange(){
-    var sel=document.getElementById('supplier_id');
-    var opt=sel.options[sel.selectedIndex];
+    const sel=document.getElementById('supplier_id');
+    const opt=sel.options[sel.selectedIndex];
     document.getElementById('supplier_code_display').value=opt.dataset.code||'';
     autoGenInvNo();
 }
 function onSupCodeInput(){
-    var code=document.getElementById('supplier_code_display').value.trim();
-    var sel=document.getElementById('supplier_id');
-    for(var i=0;i<sel.options.length;i++){if(sel.options[i].dataset.code===code){sel.selectedIndex=i;onSupplierChange();return;}}
+    const code=document.getElementById('supplier_code_display').value.trim();
+    const sel=document.getElementById('supplier_id');
+    for(let i=0;i<sel.options.length;i++){if(sel.options[i].dataset.code===code){sel.selectedIndex=i;onSupplierChange();return;}}
 }
 function autoGenInvNo(){
-    var sid=document.getElementById('supplier_id').value;
+    const sid=document.getElementById('supplier_id').value;
     if(!sid)return;
-    var s=suppliers.find(function(x){return x.id==sid;});
+    const s=suppliers.find(x=>x.id==sid);
     if(s)document.getElementById('supInvNo').value=s.supplier_code+'-'+Date.now().toString().slice(-4);
 }
 function filterStores(){
-    var bid=document.getElementById('branchSelect').value;
-    var sel=document.getElementById('store_id');
-    for(var i=0;i<sel.options.length;i++){var o=sel.options[i];if(!o.value)continue;o.style.display=!bid||o.dataset.branch===bid?'':'none';}
+    const bid=document.getElementById('branchSelect').value;
+    const sel=document.getElementById('store_id');
+    for(let i=0;i<sel.options.length;i++){const o=sel.options[i];if(!o.value)continue;o.style.display=!bid||o.dataset.branch===bid?'':'none';}
 }
-
-function openF2Search(){
-    var sid=document.getElementById('store_id').value;
-    if(!sid){alert('اختر المخزن أولاً');document.getElementById('store_id').focus();return;}
-    ProductSearch.open({storeId:parseInt(sid),mode:'purchase',onSelect:function(p){addRow(p);}});
-}
-function f2ForRow(id){
-    var sid=document.getElementById('store_id').value;
+function f2row(id){
+    const sid=document.getElementById('store_id').value;
     if(!sid){alert('اختر المخزن أولاً');return;}
-    ProductSearch.open({storeId:parseInt(sid),mode:'purchase',onSelect:function(p){fillRow(id,p);}});
+    ProductSearch.open({storeId:parseInt(sid),onSelect:function(p){fill(id,p);}});
 }
-function fillRow(id,p){
-    var hip=document.getElementById('hip_'+id);
+function openF2Search(){
+    const sid=document.getElementById('store_id').value;
+    if(!sid){alert('اختر المخزن أولاً');document.getElementById('store_id').focus();return;}
+    ProductSearch.open({storeId:parseInt(sid),onSelect:function(p){addRow(p);}});
+}
+function fill(id,p){
+    const hip=document.getElementById('hip_'+id);
     if(hip)hip.value=p.product_id||p.id||'';
     document.getElementById('nm_'+id).value=p.product_name||'';
     document.getElementById('co_'+id).value=p.product_code||'';
@@ -569,8 +528,8 @@ function fillRow(id,p){
     document.getElementById('lc_'+id).value=p.location||'';
     if(p.unit_id){document.getElementById('un_'+id).value=p.unit_id;}
     if(p.units&&p.units.length>0){
-        var sel=document.getElementById('un_'+id);sel.innerHTML='';
-        p.units.forEach(function(u){var opt=document.createElement('option');opt.value=u.id;opt.textContent=u.name;if(u.is_default)opt.selected=true;sel.appendChild(opt);});
+        const sel=document.getElementById('un_'+id);sel.innerHTML='';
+        p.units.forEach(u=>{const opt=document.createElement('option');opt.value=u.id;opt.textContent=u.name;if(u.is_default)opt.selected=true;sel.appendChild(opt);});
     }
     calc(id);
 }
@@ -579,11 +538,8 @@ document.addEventListener('keydown',function(e){
     if(e.ctrlKey&&e.key==='s'){e.preventDefault();saveInv();}
     if(e.key==='F3'){e.preventDefault();addRow();}
 });
-
-// ==================== INIT ====================
 ColOrder.init(colDefs,'purchase_invoice_cols','headerRow');
-onPayMethodChange();
-addRow();
+onPayMethodChange();addRow();
 <?php if(isset($error)): ?>alert('خطأ: <?= addslashes($error) ?>');<?php endif; ?>
 </script>
 </body>

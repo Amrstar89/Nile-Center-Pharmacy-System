@@ -21,7 +21,7 @@ try {
 }
 
 $store_id = intval($_GET['store_id'] ?? 0);
-$mode = $_GET['mode'] ?? 'sales';
+$mode = $_GET['mode'] ?? 'sales'; // 'sales' or 'purchase'
 $is_sales_mode = ($mode === 'sales');
 $callback = htmlspecialchars($_GET['callback'] ?? 'onProductSelected');
 
@@ -34,10 +34,11 @@ $store_name = $store->fetch()['store_name'] ?? 'المخزن';
 $categories = $db->query("SELECT id, category_name_ar as category_name FROM product_categories WHERE is_active = 1 ORDER BY category_name_ar")->fetchAll();
 $companies = $db->query("SELECT id, company_name_ar as company_name FROM product_companies WHERE is_active = 1 ORDER BY company_name_ar LIMIT 100")->fetchAll();
 
+// API Base URL - detect from current URL
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$script_dir = dirname($_SERVER['SCRIPT_NAME']);
-$base_url = $protocol . '://' . $host . $script_dir;
+$script_dir = dirname($_SERVER['SCRIPT_NAME']); // /nile-center-system/includes
+$base_url = $protocol . '://' . $host . $script_dir; // http://host/nile-center-system/includes
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -129,6 +130,7 @@ $base_url = $protocol . '://' . $host . $script_dir;
             <div class="col-md-2"><input type="number" id="priceTo" class="form-control form-control-sm" placeholder="سعر إلى" onchange="doSearch()"></div>
             <div class="col-md-2">
                 <?php if (!$is_sales_mode): ?>
+                <!-- Purchase mode: show toggle for zero-stock items -->
                 <div class="form-check form-switch mt-1">
                     <input class="form-check-input" type="checkbox" id="showNoStock" onchange="doSearch()">
                     <label class="form-check-label" for="showNoStock" style="font-size: 12px;">بدون رصيد</label>
@@ -138,6 +140,7 @@ $base_url = $protocol . '://' . $host . $script_dir;
         </div>
     </div>
     
+    <!-- Error Detail Panel -->
     <div class="error-detail" id="errorDetail"></div>
     
     <div class="px-4">
@@ -171,6 +174,7 @@ $base_url = $protocol . '://' . $host . $script_dir;
             <div class="col"><div class="bg-light rounded p-2 text-center"><small class="text-muted d-block">الرصيد</small><strong id="detailStock" class="text-success">-</strong></div></div>
         </div>
         
+        <!-- Stock per batch summary -->
         <div class="stock-summary" id="stockSummary" style="display:none;">
             <span class="stock-total">الرصيد الكلي: <span id="stockTotal">0</span></span>
             <span class="text-muted" style="margin-right:15px; font-size: 11px;">تاريخ الصلاحية يُختار تلقائياً حسب أقرب تاريخ</span>
@@ -285,6 +289,7 @@ $base_url = $protocol . '://' . $host . $script_dir;
             
             const isZeroStock = (selectedProduct.stock_qty || 0) <= 0;
             
+            // Show detail panel
             document.getElementById('detailPanel').classList.add('show');
             document.getElementById('detailName').textContent = selectedProduct.product_name;
             document.getElementById('detailCode').textContent = selectedProduct.manual_code || selectedProduct.product_code || '-';
@@ -294,6 +299,7 @@ $base_url = $protocol . '://' . $host . $script_dir;
             document.getElementById('detailCost').value = parseFloat(selectedProduct.unit_cost || selectedProduct.cost_price).toFixed(2);
             document.getElementById('detailSell').value = parseFloat(selectedProduct.sell_price).toFixed(2);
             
+            // Build expiry date dropdown with stock per date
             const expSel = document.getElementById('detailExpDate');
             expSel.innerHTML = '';
             
@@ -312,6 +318,7 @@ $base_url = $protocol . '://' . $host . $script_dir;
                     o.dataset.qty = qty;
                     expSel.appendChild(o);
                     
+                    // Track nearest (earliest) date for auto-selection
                     const batchDate = new Date(b.exp_date);
                     if (!nearestDate || batchDate < nearestDate) {
                         nearestDate = batchDate;
@@ -319,16 +326,19 @@ $base_url = $protocol . '://' . $host . $script_dir;
                     }
                 });
             } else {
+                // No batches - add a default option
                 const o = document.createElement('option');
                 o.value = '';
                 o.textContent = 'لا يوجد تاريخ صلاحية';
                 expSel.appendChild(o);
             }
             
+            // Pre-select nearest expiry date
             if (nearestBatchId) {
                 expSel.value = nearestBatchId;
             }
             
+            // Show stock summary
             const stockSummary = document.getElementById('stockSummary');
             const stockTotal = document.getElementById('stockTotal');
             if (selectedProduct.has_expire && selectedProduct.batches && selectedProduct.batches.length) {
@@ -338,6 +348,7 @@ $base_url = $protocol . '://' . $host . $script_dir;
                 stockSummary.style.display = 'none';
             }
             
+            // Handle sales mode zero-stock restriction
             const btnConfirm = document.getElementById('btnConfirm');
             const zeroStockWarning = document.getElementById('zeroStockWarning');
             
@@ -365,6 +376,7 @@ $base_url = $protocol . '://' . $host . $script_dir;
         function confirmSelect() {
             if (!selectedProduct) return;
             
+            // In sales mode, block zero-stock items
             if (IS_SALES && (selectedProduct.stock_qty || 0) <= 0) {
                 alert('لا يمكن إضافة صنف بدون رصيد في فاتورة البيع');
                 return;
@@ -388,6 +400,7 @@ $base_url = $protocol . '://' . $host . $script_dir;
                 current_stock: selectedProduct.stock_qty
             };
             
+            // Try callback first, then postMessage fallback
             if (window.opener && window.opener.onProductSelected) {
                 window.opener.onProductSelected(result);
                 window.close();
